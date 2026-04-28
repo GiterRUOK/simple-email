@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@simple-mail/core": ["../../packages/core/src/index.ts"],
+      "@simple-mail/core/style.css": ["../../packages/core/src/editor/styles.css"],
+      "@simple-mail/blocks": ["../../packages/blocks/src/index.ts"]
+    },
+    "types": ["node"]
+  },
+  "include": ["src", "vite.config.ts", "../../packages/core/src/shims.d.ts"]
+}

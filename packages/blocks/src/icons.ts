@@ -1,0 +1,11 @@
+/** 24x24 viewBox 的内置组件图标。集中放，避免散落到各 block 文件。 */
+export const icons = {
+  text: `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M5 6h14M5 10h14M5 14h10M5 18h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>`,
+  image: `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><path d="M4 18l5-5 4 4 3-3 4 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  button: `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="8" rx="4" fill="currentColor" opacity="0.75"/></svg>`,
+  divider: `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  spacer: `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M5 8h14M5 16h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 9v6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M9 12l3-3 3 3M9 12l3 3 3-3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>`,
+  logo: `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M5 18V6l7 6 7-6v12" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>`,
+  social: `<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/><circle cx="18" cy="12" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`,
+  footer: `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5 18h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+};

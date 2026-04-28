@@ -1,0 +1,35 @@
+{
+  "name": "@simple-mail/core",
+  "version": "0.0.1",
+  "description": "邮件可视化编辑器核心引擎（框架无关）",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@codemirror/lang-html": "^6.4.9",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.2",
+    "codemirror": "^6.0.1",
+    "mjml-browser": "^4.15.3",
+    "sortablejs": "^1.15.6"
+  },
+  "devDependencies": {
+    "@types/sortablejs": "^1.15.8",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
