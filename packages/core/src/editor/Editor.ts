@@ -10,7 +10,9 @@ import type {
 } from '../types';
 import { clear, h } from '../utils/dom';
 import { Canvas } from './Canvas';
+import { ExportModal } from './ExportModal';
 import { LeftPanel } from './LeftPanel';
+import { PreviewModal } from './PreviewModal';
 import { RichTextToolbar } from './RichTextToolbar';
 import { RightPanel } from './RightPanel';
 import { SourceView } from './SourceView';
@@ -140,6 +142,7 @@ export class MailEditor {
       onUndo: () => this.store.undo(),
       onRedo: () => this.store.redo(),
       onInsertVariable: (anchor) => this._showVariablePopover(anchor),
+      onPreview: () => this._showPreview(),
       onExport: () => this._showExport(),
     });
 
@@ -172,6 +175,8 @@ export class MailEditor {
     } else {
       this.body.style.gridTemplateColumns = '1fr';
       this.body.append(this.sourceView.el);
+      // 见 SourceView.refreshDoc：设计态源码面板未挂载时不更新，否则会一直显示构造函数时的旧快照
+      queueMicrotask(() => this.sourceView.refreshDoc());
     }
   }
 
@@ -320,14 +325,23 @@ export class MailEditor {
   }
 
   private _showExport() {
-    const result = this.export({ withSampleVariables: true });
-    const blob = new Blob([result.html], { type: 'text/html;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `email-${Date.now()}.html`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    // 切回设计模式时如果还在内联编辑，先把内容提交进 store
+    this.canvas.commitInlineEdit();
+    const modal = new ExportModal({
+      store: this.store,
+      registry: this.registry,
+      withSampleVariables: true,
+    });
+    modal.open(this.root);
+  }
+
+  private _showPreview() {
+    this.canvas.commitInlineEdit();
+    const modal = new PreviewModal({
+      store: this.store,
+      registry: this.registry,
+    });
+    modal.open(this.root);
   }
 }
 
@@ -346,11 +360,11 @@ function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
     styles: {
       backgroundColor: '#f4f4f6',
       contentBackgroundColor: '#ffffff',
-      fontFamily: '"Helvetica Neue", Arial, sans-serif',
-      fontSize: '14px',
-      color: '#1f2328',
-      linkColor: '#4f46e5',
-      lineHeight: '1.6',
+      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
+      fontSize: '16px',
+      color: '#433f3f',
+      linkColor: '#ff5a00',
+      lineHeight: '1.5',
       ...(partial?.styles ?? {}),
     },
     sections: partial?.sections ?? [],

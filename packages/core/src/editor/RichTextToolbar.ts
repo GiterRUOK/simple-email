@@ -4,10 +4,16 @@ import { h } from '../utils/dom';
 /**
  * 富文本浮动工具条。
  *
- * 关键点：
- *  - 工具条挂在 editor root 上，跨 block 实例复用；切换编辑对象时重新 attach 一个 InlineEditor。
- *  - 点击按钮时不能让被编辑元素失焦——所有 button 都 `mousedown` 拦截，避免触发 InlineEditor.commit。
- *  - 选区变化由 InlineEditor 推过来，包括 rect（用于浮动定位）与 formats（用于按钮高亮）。
+ * 关键设计：
+ *  - 工具条挂在 editor root 上，跨 block 实例复用；切换编辑对象时调用 attach()。
+ *  - **mousedown 在工具条任意位置时（capture 阶段）先调用 editor.saveSelection()**：
+ *    在浏览器把焦点切到 select/input 之前抢先把选区存到 InlineEditor，
+ *    后续 exec 时会自动 focus 回 contenteditable + 恢复选区——这是
+ *    "切字体/字号/颜色失灵"问题的根本修复。
+ *  - 按钮全部 mousedown.preventDefault：不抢焦点；select/color/url 这些
+ *    必须 takeFocus 的控件不能 preventDefault，但因为 mousedown 已经存档了选区，
+ *    onChange/onClick 时调 exec 即可。
+ *  - 链接：链形按钮始终可点开输入框；在已有 <a> 内会预填 href 可改；断链按钮仅在有链接时显示。
  */
 export interface RichTextToolbarOptions {
   /** 工具条的定位上下文：rect 是相对该容器计算的 */
@@ -16,7 +22,8 @@ export interface RichTextToolbarOptions {
 
 const FONT_FAMILIES = [
   { label: '默认', value: '' },
-  { label: '苹方/PingFang SC', value: '"PingFang SC", "Helvetica Neue", Arial, sans-serif' },
+  { label: 'Inter', value: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
+  { label: '苹方/PingFang', value: '"PingFang SC", "Helvetica Neue", Arial, sans-serif' },
   { label: '微软雅黑', value: '"Microsoft YaHei", "Segoe UI", sans-serif' },
   { label: '宋体', value: 'SimSun, "Songti SC", serif' },
   { label: 'Helvetica', value: '"Helvetica Neue", Arial, sans-serif' },
@@ -25,7 +32,14 @@ const FONT_FAMILIES = [
   { label: 'Courier', value: '"Courier New", monospace' },
 ];
 
-const FONT_SIZES = ['12px', '13px', '14px', '16px', '18px', '20px', '24px', '28px', '32px'];
+const FONT_SIZES = ['12px', '13px', '14px', '15px', '16px', '18px', '20px', '24px', '28px', '32px'];
+
+const FONT_WEIGHTS = [
+  { label: '常规', value: '400' },
+  { label: '中等', value: '500' },
+  { label: '半粗', value: '600' },
+  { label: '加粗', value: '700' },
+];
 
 export class RichTextToolbar {
   el: HTMLElement;
@@ -34,9 +48,13 @@ export class RichTextToolbar {
   private btns: Record<string, HTMLButtonElement> = {};
   private selectFontFamily!: HTMLSelectElement;
   private selectFontSize!: HTMLSelectElement;
+  private selectFontWeight!: HTMLSelectElement;
   private inputColor!: HTMLInputElement;
+  private inputBgColor!: HTMLInputElement;
   private inputLink!: HTMLInputElement;
   private linkPanel!: HTMLElement;
+  /** 最近一次选区推断出的链接，供打开面板时预填 */
+  private lastLinkHref: string | null = null;
 
   constructor(opts: RichTextToolbarOptions) {
     this.opts = opts;
@@ -44,6 +62,15 @@ export class RichTextToolbar {
     this._build();
     this.hide();
     opts.positionRoot.append(this.el);
+
+    // 关键：用 capture 阶段在所有控件之前抢先 save selection
+    this.el.addEventListener(
+      'mousedown',
+      () => {
+        this.editor?.saveSelection();
+      },
+      true,
+    );
   }
 
   attach(editor: InlineEditor) {
@@ -64,7 +91,7 @@ export class RichTextToolbar {
     this.linkPanel.classList.remove('is-visible');
   }
 
-  /** 由 Canvas / InlineEditor 推选区状态进来 */
+  /** 由 InlineEditor 推选区状态进来 */
   update(state: SelectionState | null) {
     if (!state || !this.editor) {
       this.hide();
@@ -82,13 +109,20 @@ export class RichTextToolbar {
     this._setActive('alignLeft', f.align === 'left');
     this._setActive('alignCenter', f.align === 'center');
     this._setActive('alignRight', f.align === 'right');
-    this._setActive('link', !!f.link);
+
+    const hasLink = !!f.link;
+    this.lastLinkHref = f.link;
+    this.btns.unlink.style.display = hasLink ? '' : 'none';
+
     if (f.foreColor) {
       const hex = rgbToHex(f.foreColor);
       if (hex) this.inputColor.value = hex;
     }
     if (f.fontName) this.selectFontFamily.value = matchFamily(f.fontName);
-    if (f.fontSize) this.selectFontSize.value = f.fontSize.match(/\d+px/)?.[0] ?? this.selectFontSize.value;
+    if (f.fontSize) {
+      const px = f.fontSize.match(/\d+px/)?.[0];
+      if (px && FONT_SIZES.includes(px)) this.selectFontSize.value = px;
+    }
   }
 
   destroy() {
@@ -100,6 +134,7 @@ export class RichTextToolbar {
   private _build() {
     const sep = () => h('div', { class: 'sm-floating-toolbar__sep' });
 
+    // 这些按钮 mousedown.preventDefault 阻止抢焦点；点击时直接 exec
     const exec = (cmd: string, val?: string) => () => this.editor?.exec(cmd, val);
 
     this.btns.bold = this._btn('B', '加粗 ⌘B', exec('bold'), { fontWeight: '700' });
@@ -148,14 +183,14 @@ export class RichTextToolbar {
       exec('insertOrderedList'),
     );
 
-    // 字体
+    // 字体：select 不能 preventDefault（否则下拉打不开）；mousedown(capture) 已存档选区
     this.selectFontFamily = h('select', {
       class: 'sm-floating-toolbar__select',
       title: '字体',
-      onmousedown: (e: Event) => e.preventDefault(), // 不抢焦点
       onchange: (e: Event) => {
         const v = (e.target as HTMLSelectElement).value;
         if (v) this.editor?.exec('fontName', v);
+        else this.editor?.exec('removeFormat');
       },
     });
     for (const f of FONT_FAMILIES) {
@@ -169,17 +204,17 @@ export class RichTextToolbar {
     this.selectFontSize = h('select', {
       class: 'sm-floating-toolbar__select',
       title: '字号',
-      onmousedown: (e: Event) => e.preventDefault(),
       onchange: (e: Event) => {
         const v = (e.target as HTMLSelectElement).value;
-        // execCommand 'fontSize' 只接受 1..7。改用包 span 设置 inline style
         if (v) this._wrapStyle('font-size', v);
       },
     });
-    const px0 = document.createElement('option');
-    px0.value = '';
-    px0.textContent = '字号';
-    this.selectFontSize.append(px0);
+    {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '字号';
+      this.selectFontSize.append(placeholder);
+    }
     for (const px of FONT_SIZES) {
       const opt = document.createElement('option');
       opt.value = px;
@@ -187,25 +222,57 @@ export class RichTextToolbar {
       this.selectFontSize.append(opt);
     }
 
-    // 颜色
+    // 字重
+    this.selectFontWeight = h('select', {
+      class: 'sm-floating-toolbar__select',
+      title: '字重',
+      onchange: (e: Event) => {
+        const v = (e.target as HTMLSelectElement).value;
+        if (v) this._wrapStyle('font-weight', v);
+      },
+    });
+    {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '字重';
+      this.selectFontWeight.append(placeholder);
+    }
+    for (const w of FONT_WEIGHTS) {
+      const opt = document.createElement('option');
+      opt.value = w.value;
+      opt.textContent = w.label;
+      this.selectFontWeight.append(opt);
+    }
+
+    // 文字颜色
     this.inputColor = h('input', {
       class: 'sm-floating-toolbar__color',
       type: 'color',
       title: '文字颜色',
-      value: '#1f2328',
-      onmousedown: (e: Event) => e.stopPropagation(),
+      value: '#433f3f',
       oninput: (e: Event) => this.editor?.exec('foreColor', (e.target as HTMLInputElement).value),
     }) as HTMLInputElement;
 
-    // 链接
+    // 文字背景色
+    this.inputBgColor = h('input', {
+      class: 'sm-floating-toolbar__color',
+      type: 'color',
+      title: '文字背景色',
+      value: '#fff7e6',
+      oninput: (e: Event) =>
+        this.editor?.exec('hiliteColor', (e.target as HTMLInputElement).value),
+    }) as HTMLInputElement;
+
+    // 链接：插入链接（无链接时显示）
     this.btns.link = this._iconBtn(
       svgIcon(
         '<path d="M9 11.5l1.5 1.5a3.5 3.5 0 005-5l-2-2a3.5 3.5 0 00-5 0M11 8.5L9.5 7a3.5 3.5 0 00-5 5l2 2a3.5 3.5 0 005 0" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
       ),
-      '插入/编辑链接',
+      '插入或编辑链接',
       () => this._toggleLinkPanel(),
     );
 
+    // 取消链接（有链接时显示）
     this.btns.unlink = this._iconBtn(
       svgIcon(
         '<path d="M9 11.5l1.5 1.5a3.5 3.5 0 005-5l-2-2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M3 3l14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
@@ -214,9 +281,10 @@ export class RichTextToolbar {
       exec('unlink'),
     );
 
+    // 清除格式：图标改为 Tx，避免被误认为"关闭工具条"
     this.btns.clear = this._iconBtn(
       svgIcon(
-        '<path d="M5 5l10 10M5 15L15 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+        '<text x="2" y="14" font-size="11" font-weight="700" fill="currentColor">T</text><text x="11" y="9" font-size="7" font-weight="700" fill="currentColor">x</text><path d="M11 11l5 5M16 11l-5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
       ),
       '清除格式',
       exec('removeFormat'),
@@ -227,12 +295,15 @@ export class RichTextToolbar {
       class: 'sm-input',
       type: 'url',
       placeholder: 'https://...',
-      onmousedown: (e: Event) => e.stopPropagation(),
       onkeydown: ((e: Event) => {
         const ke = e as KeyboardEvent;
         if (ke.key === 'Enter') {
           ke.preventDefault();
           this._applyLink();
+        } else if (ke.key === 'Escape') {
+          ke.preventDefault();
+          this.linkPanel.classList.remove('is-visible');
+          this.editor?.refocus();
         }
       }) as EventListener,
     }) as HTMLInputElement;
@@ -251,7 +322,9 @@ export class RichTextToolbar {
     this.el.append(
       this._group([this.btns.bold, this.btns.italic, this.btns.underline, this.btns.strikethrough]),
       sep(),
-      this._group([this.selectFontFamily, this.selectFontSize, this.inputColor]),
+      this._group([this.selectFontFamily, this.selectFontSize, this.selectFontWeight]),
+      sep(),
+      this._group([this.inputColor, this.inputBgColor]),
       sep(),
       this._group([this.btns.alignLeft, this.btns.alignCenter, this.btns.alignRight]),
       sep(),
@@ -263,40 +336,48 @@ export class RichTextToolbar {
   }
 
   private _toggleLinkPanel() {
+    const opening = !this.linkPanel.classList.contains('is-visible');
     this.linkPanel.classList.toggle('is-visible');
     if (this.linkPanel.classList.contains('is-visible')) {
+      if (opening) {
+        this.inputLink.value = this.lastLinkHref ?? '';
+      }
       requestAnimationFrame(() => this.inputLink.focus());
+    } else {
+      this.editor?.refocus();
     }
   }
 
   private _applyLink() {
     if (!this.editor) return;
     const url = this.inputLink.value.trim();
-    if (!url) {
-      this.editor.exec('unlink');
-    } else {
-      const safe = /^https?:|^mailto:|^tel:|^\{\{/i.test(url) ? url : `https://${url}`;
-      this.editor.exec('createLink', safe);
-    }
+    this.editor.setLink(url);
     this.linkPanel.classList.remove('is-visible');
     this.inputLink.value = '';
   }
 
   private _wrapStyle(prop: string, value: string) {
     if (!this.editor) return;
-    // 用 hiliteColor 这种方式不灵活，干脆插入一段带 style 的 span
+    // execCommand 没有"任意 inline style"命令；自己处理：把存档选区的内容包到一个 span。
+    this.editor.refocus(); // focus + restoreSelection
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
+    if (range.collapsed) return; // 没选中文字，无意义
     const span = document.createElement('span');
     span.setAttribute('style', `${prop}:${value};`);
-    span.appendChild(range.extractContents());
-    range.insertNode(span);
-    // 选中 span 内容方便连续操作
-    const newRange = document.createRange();
-    newRange.selectNodeContents(span);
-    sel.removeAllRanges();
-    sel.addRange(newRange);
+    try {
+      span.appendChild(range.extractContents());
+      range.insertNode(span);
+      // 选中 span 内容方便连续操作
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      this.editor.saveSelection();
+    } catch {
+      // 跨节点结构复杂时 extractContents 偶尔抛错，忽略并保持原样
+    }
   }
 
   private _position(rect: DOMRect | null) {
@@ -330,7 +411,7 @@ export class RichTextToolbar {
         class: 'sm-floating-toolbar__btn',
         type: 'button',
         title,
-        onmousedown: (e: Event) => e.preventDefault(), // 关键：阻止失焦
+        onmousedown: (e: Event) => e.preventDefault(),
         onclick: onClick,
       },
       [text],
@@ -368,7 +449,7 @@ function svgIcon(inner: string): SVGElement {
 }
 
 function matchFamily(name: string): string {
-  const lower = name.toLowerCase().replace(/['"]/g, '');
+  const lower = name.toLowerCase().replace(/['"]/g, '').split(',')[0].trim();
   for (const f of FONT_FAMILIES) {
     if (!f.value) continue;
     if (f.value.toLowerCase().includes(lower)) return f.value;

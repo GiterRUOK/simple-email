@@ -197,6 +197,18 @@ export class RightPanel {
               vals;
           }),
       ),
+      section.layout !== '1'
+        ? this._switchField(
+            '小屏仍并排显示多列（可能字很窄）',
+            !!a.preserveColumnsOnMobile,
+            (checked) =>
+              this.opts.store.update((d) => {
+                const s = findSection(d, section.id);
+                if (s) s.attrs.preserveColumnsOnMobile = checked || undefined;
+              }),
+            '开启后 MJML 会生成 mj-group，移动端预览/导出与默认「小屏堆叠列」行为不同。',
+          )
+        : null,
     ]);
   }
 
@@ -362,14 +374,27 @@ export class RightPanel {
       sel,
     ]);
   }
-  private _switchField(label: string, value: boolean, onChange: (v: boolean) => void) {
-    return h('label', { class: 'sm-field', style: 'flex-direction:row;align-items:center;gap:8px;' }, [
+  private _switchField(
+    label: string,
+    value: boolean,
+    onChange: (v: boolean) => void,
+    help?: string,
+  ): HTMLElement {
+    const row = h('label', {
+      class: 'sm-field',
+      style: 'flex-direction:row;align-items:center;gap:8px;',
+    }, [
       h('input', {
         type: 'checkbox',
         onchange: (e: Event) => onChange((e.target as HTMLInputElement).checked),
         ...(value ? { checked: true } : {}),
       } as any),
       h('span', { class: 'sm-field__label' }, [label]),
+    ]);
+    if (!help) return row;
+    return h('div', { class: 'sm-field', style: 'flex-direction:column;align-items:flex-start;gap:6px;' }, [
+      row,
+      h('div', { class: 'sm-field__help' }, [help]),
     ]);
   }
   private _spacingField(

@@ -36,6 +36,15 @@ export class SourceView {
     });
   }
 
+  /**
+   * 设计态运行时 SourceView 不在 DOM，`store.subscribe` 里的 `_renderEditor()` 全部被跳过，
+   * CodeMirror 里仍是构造函数那一刻的快照。**切到「源码」模式后必须手动调一次**，
+   * 否则会看到空文档 / 旧文档，但「导出」「预览」「MJML→HTML」却一直是当前 doc ——这正是用户报告的错位。
+   */
+  refreshDoc() {
+    this._renderEditor();
+  }
+
   private _isVisible(): boolean {
     return this.el.isConnected && (this.el.offsetParent !== null || this.el.getClientRects().length > 0);
   }

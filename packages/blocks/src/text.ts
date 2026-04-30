@@ -30,8 +30,8 @@ export const textBlock = defineBlock<TextProps>({
     content:
       '<p style="margin:0;">在此处输入文本。<strong>双击</strong>进入编辑模式，<em>选中文字</em>会出现工具条；支持变量 {{user.name}}</p>',
     align: 'left',
-    color: '#1f2328',
-    fontSize: '14px',
+    color: '#433f3f',
+    fontSize: '16px',
     fontFamily: '',
     fontWeight: 'normal',
     paddingTop: 8,

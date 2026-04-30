@@ -46,6 +46,14 @@ export class InlineEditor {
   private originalContent: string;
   /** 防止 selectionchange 在我们 destroy 之后还回调 */
   private alive = true;
+  /**
+   * 上一次"用户在编辑区内"时的有效选区。
+   * 当用户去工具条点 select / input 时焦点会离开 contenteditable，
+   * execCommand 在那种状态下会哑火——必须先 focus 回来，再恢复选区，再执行命令。
+   */
+  private savedRange: Range | null = null;
+  /** 富文本工具条控件会抢走焦点，此时 getSelection 已不在编辑区内；保留上一帧状态避免工具条整栏收起。 */
+  private lastSelectionState: SelectionState | null = null;
 
   constructor(opts: InlineEditorOptions) {
     this.opts = opts;
@@ -85,18 +93,79 @@ export class InlineEditor {
     if (restore && !this.committed) this.el.innerHTML = this.originalContent;
   }
 
+  /**
+   * 保存当前在编辑区内的选区。Toolbar 在 mousedown（capture）阶段调用：
+   * 在浏览器把焦点切到 select/input 之前抢先存档。
+   */
+  saveSelection() {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!this.el.contains(range.startContainer) || !this.el.contains(range.endContainer)) return;
+    this.savedRange = range.cloneRange();
+  }
+
   /** 直接对当前选区执行命令（供 Toolbar 调用）。 */
   exec(command: string, value?: string) {
     this._ensureFocus();
+    this._restoreSelection();
+    // styleWithCSS=true 让浏览器把 bold 之类输出成 <span style="font-weight:..."> 而不是 <b>，方便邮件 inline 化
     document.execCommand('styleWithCSS', false, 'true' as any);
     document.execCommand(command, false, value);
+    // 命令执行后选区可能已经变化（例如插入链接会扩展），刷新存档
+    this.saveSelection();
+    this._emitSelection();
+  }
+
+  /**
+   * 设置或移除超链接：已有 &lt;a&gt; 则改 href；否则 createLink。
+   * （仅用 createLink 在链接内需改 URL 时浏览器行为不一致。）
+   */
+  setLink(url: string) {
+    this._ensureFocus();
+    this._restoreSelection();
+    const trimmed = url.trim();
+    if (!trimmed) {
+      document.execCommand('unlink');
+      this.saveSelection();
+      this._emitSelection();
+      return;
+    }
+    const safe = /^https?:|^mailto:|^tel:|^\{\{/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const anchor = findAncestorAnchor(sel.anchorNode, this.el);
+    if (anchor) {
+      anchor.setAttribute('href', safe);
+      if (!anchor.getAttribute('rel')) anchor.setAttribute('rel', 'noopener');
+    } else {
+      document.execCommand('styleWithCSS', false, 'true' as any);
+      document.execCommand('createLink', false, safe);
+    }
+    this.saveSelection();
     this._emitSelection();
   }
 
   /** 在当前光标处插入纯文本（供"插入变量"使用）。 */
   insertText(text: string) {
     this._ensureFocus();
+    this._restoreSelection();
     document.execCommand('insertText', false, text);
+    this.saveSelection();
+  }
+
+  /** Toolbar 关闭某个面板/控件后调用，把选区还给编辑区，方便用户继续输入。 */
+  refocus() {
+    this._ensureFocus();
+    this._restoreSelection();
+  }
+
+  private _restoreSelection() {
+    if (!this.savedRange) return;
+    const sel = window.getSelection();
+    if (!sel) return;
+    sel.removeAllRanges();
+    sel.addRange(this.savedRange);
   }
 
   /* -------------------------------- 内部 ---------------------------------- */
@@ -153,7 +222,31 @@ export class InlineEditor {
     };
     const onSelChange = () => {
       if (!this.alive) return;
+      this.saveSelection();
       this._emitSelection();
+    };
+
+    const linkInsideEditing = (t: EventTarget | null): HTMLAnchorElement | null => {
+      if (!(t instanceof Element)) return null;
+      const a = t.closest('a');
+      if (!a || !el.contains(a)) return null;
+      const href = a.getAttribute('href');
+      if (href == null || href === '' || href === '#') return null;
+      return a;
+    };
+
+    /** Chrome：contenteditable 里的 <a href> 仍会在 mousedown/click 时导航；阻止后用手动 caret 对齐点击处 */
+    const onLinkMouseDown = (e: MouseEvent) => {
+      if (mode !== 'rich' || e.button !== 0) return;
+      if (!linkInsideEditing(e.target)) return;
+      e.preventDefault();
+      placeCaretAtClientPoint(el, e.clientX, e.clientY);
+    };
+
+    const stopLinkActivate = (e: MouseEvent) => {
+      if (mode !== 'rich') return;
+      if (!linkInsideEditing(e.target)) return;
+      e.preventDefault();
     };
 
     el.addEventListener('keydown', onKeyDown);
@@ -162,6 +255,11 @@ export class InlineEditor {
     document.addEventListener('selectionchange', onSelChange);
     el.addEventListener('input', onSelChange);
     el.addEventListener('mouseup', onSelChange);
+    if (mode === 'rich') {
+      el.addEventListener('mousedown', onLinkMouseDown, true);
+      el.addEventListener('click', stopLinkActivate, true);
+      el.addEventListener('auxclick', stopLinkActivate, true);
+    }
 
     this.listeners.push(
       () => el.removeEventListener('keydown', onKeyDown),
@@ -170,6 +268,13 @@ export class InlineEditor {
       () => document.removeEventListener('selectionchange', onSelChange),
       () => el.removeEventListener('input', onSelChange),
       () => el.removeEventListener('mouseup', onSelChange),
+      ...(mode === 'rich'
+        ? [
+            () => el.removeEventListener('mousedown', onLinkMouseDown, true),
+            () => el.removeEventListener('click', stopLinkActivate, true),
+            () => el.removeEventListener('auxclick', stopLinkActivate, true),
+          ]
+        : []),
     );
   }
 
@@ -187,11 +292,11 @@ export class InlineEditor {
     }
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) {
-      this.opts.onSelectionChange(null);
+      this._emitSelectionOrKeepToolbar(null);
       return;
     }
     if (!this.el.contains(sel.anchorNode)) {
-      this.opts.onSelectionChange(null);
+      this._emitSelectionOrKeepToolbar(null);
       return;
     }
     const range = sel.getRangeAt(0);
@@ -209,17 +314,11 @@ export class InlineEditor {
             : 'left';
 
     const link = (() => {
-      let node: Node | null = sel.anchorNode;
-      while (node && node !== this.el) {
-        if (node.nodeType === 1 && (node as HTMLElement).tagName === 'A') {
-          return (node as HTMLAnchorElement).getAttribute('href');
-        }
-        node = node.parentNode;
-      }
-      return null;
+      const a = findAncestorAnchor(sel.anchorNode, this.el);
+      return a?.getAttribute('href') ?? null;
     })();
 
-    this.opts.onSelectionChange({
+    const state: SelectionState = {
       hasSelection: true,
       rect,
       formats: {
@@ -235,7 +334,23 @@ export class InlineEditor {
         fontSize: safeQueryValue('fontSize'),
         fontName: safeQueryValue('fontName'),
       },
-    });
+    };
+    this.lastSelectionState = state;
+    this.opts.onSelectionChange(state);
+  }
+
+  /** 焦点在浮动工具条上时沿用上一帧选区，避免点开链接框 / 颜色等控件后工具条消失。 */
+  private _emitSelectionOrKeepToolbar(fallback: null) {
+    if (
+      fallback === null &&
+      this.lastSelectionState &&
+      document.activeElement?.closest?.('.sm-floating-toolbar')
+    ) {
+      this.opts.onSelectionChange?.(this.lastSelectionState);
+      return;
+    }
+    if (fallback === null) this.lastSelectionState = null;
+    this.opts.onSelectionChange?.(fallback);
   }
 
   private _caretRect(range: Range): DOMRect | null {
@@ -255,6 +370,16 @@ export class InlineEditor {
 
 /* ----------------------------- helpers ----------------------------- */
 
+function findAncestorAnchor(node: Node | null, root: HTMLElement): HTMLAnchorElement | null {
+  while (node && node !== root) {
+    if (node.nodeType === 1 && (node as HTMLElement).tagName === 'A') {
+      return node as HTMLAnchorElement;
+    }
+    node = node.parentNode;
+  }
+  return null;
+}
+
 function placeCaretAtEnd(el: HTMLElement) {
   const range = document.createRange();
   range.selectNodeContents(el);
@@ -263,6 +388,39 @@ function placeCaretAtEnd(el: HTMLElement) {
   if (!sel) return;
   sel.removeAllRanges();
   sel.addRange(range);
+}
+
+/** 在视口坐标处设置折叠选区（用于拦截 <a> 默认行为后补回放光标） */
+function placeCaretAtClientPoint(root: HTMLElement, clientX: number, clientY: number): boolean {
+  const doc = root.ownerDocument;
+  const d = doc as Document & {
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+    caretPositionFromPoint?: (
+      x: number,
+      y: number,
+    ) => { offsetNode: Node; offset: number } | null;
+  };
+  let range: Range | null = null;
+  if (d.caretRangeFromPoint) {
+    range = d.caretRangeFromPoint(clientX, clientY);
+  } else if (d.caretPositionFromPoint) {
+    const pos = d.caretPositionFromPoint(clientX, clientY);
+    if (pos?.offsetNode) {
+      range = doc.createRange();
+      try {
+        range.setStart(pos.offsetNode, pos.offset);
+        range.collapse(true);
+      } catch {
+        range = null;
+      }
+    }
+  }
+  if (!range || !root.contains(range.startContainer)) return false;
+  const sel = doc.getSelection();
+  if (!sel) return false;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return true;
 }
 
 function safeQueryValue(cmd: string): string | null {

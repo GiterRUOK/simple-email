@@ -31,6 +31,7 @@ export interface CanvasOptions {
  *     - 顶层（sections 组）：Section 列表纵向排序，并接收左栏布局拖入
  *     - 列内（blocks 组）：Block 列表纵向排序，并接收左栏内容/自定义拖入
  *  4. 双击 Block 进入"内联编辑"——文本类直接富文本编辑，按钮文字单行编辑
+ *  5. 设计画布内所有 <a href> 拦截默认行为，避免误跳转；真实跳转仅在「预览」iframe 中可用。
  *
  * 关键约束：所有数据变更走 store.update()，UI 通过 subscribe 全量重渲染。
  * 内联编辑是例外：编辑期间不再每次输入都 update，避免 contenteditable 因重渲染丢光标。
@@ -46,6 +47,8 @@ export class Canvas {
   private inlineEditor: InlineEditor | null = null;
   /** 当 store 在编辑期间触发了 change（外部调用之类），延迟到编辑结束再重渲染 */
   private pendingRender = false;
+  /** 设计模式下禁用画布内超链接导航（预览弹框 iframe 不在此 DOM 内，不受影响） */
+  private linkNavSuppression = new AbortController();
 
   constructor(opts: CanvasOptions) {
     this.opts = opts;
@@ -53,6 +56,8 @@ export class Canvas {
     this.inner = h('div', { class: 'sm-canvas' });
     this.addBar = this._renderAddBar();
     this.el.append(this.inner, this.addBar);
+
+    this._bindDesignModeLinkSuppression();
 
     this._render();
 
@@ -81,8 +86,24 @@ export class Canvas {
   }
 
   destroy() {
+    this.linkNavSuppression.abort();
     this._exitEditing(false);
     this._destroySortables();
+  }
+
+  /** 捕获阶段拦截 <a href>，防止 Chrome 等在画布预览 DOM 上触发跳转（含未进入内联编辑时点到按钮块链接） */
+  private _bindDesignModeLinkSuppression() {
+    const opts = { capture: true, signal: this.linkNavSuppression.signal } as const;
+    const stop = (e: MouseEvent) => {
+      if (!(e.target instanceof Element)) return;
+      const a = e.target.closest('a');
+      if (!a || !this.inner.contains(a)) return;
+      if (!a.hasAttribute('href')) return;
+      e.preventDefault();
+    };
+    this.inner.addEventListener('mousedown', stop, opts);
+    this.inner.addEventListener('click', stop, opts);
+    this.inner.addEventListener('auxclick', stop, opts);
   }
 
   /* -------------------------------- 渲染 ---------------------------------- */

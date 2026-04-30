@@ -51,8 +51,15 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
     .map((col, i) => columnToMjml(col, widths[i], registry, ctx))
     .join('\n');
 
+  /** 多列 + 显式开启时包 mj-group，阻止小屏列堆叠（MJML 官方语义） */
+  const multiCol = section.columns.length > 1;
+  const grouped =
+    multiCol && section.attrs.preserveColumnsOnMobile === true
+      ? `      <mj-group>\n${indent(columns, 2)}\n      </mj-group>`
+      : columns;
+
   return `    <mj-section padding="${padding}"${bg}>
-${columns}
+${grouped}
     </mj-section>`;
 }
 

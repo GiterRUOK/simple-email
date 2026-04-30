@@ -55,6 +55,11 @@ export interface SectionAttrs {
   paddingRight?: number;
   paddingBottom?: number;
   paddingLeft?: number;
+  /**
+   * 默认 false / 未设置：MJML 在小屏会堆叠为多行（符合常见邮件习惯）。
+   * 为 true 时在多列 Section 内包一层 `mj-group`，小屏仍并排，列宽按比例保留（字可能很窄）。
+   */
+  preserveColumnsOnMobile?: boolean;
 }
 
 export interface Column {

@@ -215,6 +215,7 @@ interface EmailDoc {
   sections: Section[];   // 顺序即视觉顺序
 }
 interface Section { id; type: 'section'; layout: '1'|'1-1'|'1-2'|'2-1'|'1-1-1'; attrs; columns: Column[] }
+// attrs.preserveColumnsOnMobile：多列时可设 true，MJML 包 mj-group，小屏仍为并排列；默认/未设则小屏堆叠列
 interface Column  { id; attrs; blocks: Block[] }
 interface Block   { id; type; props; lockedMjml? }
 ```

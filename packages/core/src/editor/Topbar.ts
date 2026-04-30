@@ -10,6 +10,7 @@ export interface TopbarOptions {
   onUndo: () => void;
   onRedo: () => void;
   onInsertVariable: (anchor: HTMLElement) => void;
+  onPreview: () => void;
   onExport: () => void;
 }
 
@@ -93,6 +94,12 @@ export class Topbar {
       ['{{ }} 插入变量'],
     );
 
+    const previewBtn = h(
+      'button',
+      { class: 'sm-btn', type: 'button', onclick: this.opts.onPreview },
+      [iconEye(), '预览'],
+    );
+
     const exportBtn = h(
       'button',
       { class: 'sm-btn sm-btn--primary', type: 'button', onclick: this.opts.onExport },
@@ -104,7 +111,7 @@ export class Topbar {
       h('div', { class: 'sm-topbar__group' }, [segmented]),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),
       h('div', { class: 'sm-topbar__spacer' }),
-      h('div', { class: 'sm-topbar__group' }, [insertVar, exportBtn]),
+      h('div', { class: 'sm-topbar__group' }, [insertVar, previewBtn, exportBtn]),
     );
 
     this.setMode(this.opts.mode);
@@ -124,6 +131,11 @@ function iconUndo(): SVGElement {
 function iconRedo(): SVGElement {
   return svg(
     '<path d="M11 14l4-4-4-4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 10H8a4 4 0 000 8h1" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>',
+  );
+}
+function iconEye(): SVGElement {
+  return svg(
+    '<path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="10" cy="10" r="2.4" stroke="currentColor" stroke-width="1.5" fill="none"/>',
   );
 }
 function svg(inner: string): SVGElement {
