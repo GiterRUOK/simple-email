@@ -35,6 +35,11 @@ export interface EditorOptions {
    * - false：严格，只允许拖到现有列内；落到顶层会被 SortableJS 显示为禁止
    */
   autoWrapSection?: boolean;
+  /**
+   * 为 true 时：点击中栏白底画布之外的灰色衬底会清空选中，右栏回到「邮件设置 / 全局样式」。
+   * 默认 false，避免误触。
+   */
+  clearSelectionOnCanvasMargin?: boolean;
   /** 文档变更回调（防抖发出） */
   onChange?: (doc: EmailDoc) => void;
 }
@@ -65,6 +70,41 @@ export class MailEditor {
   private body: HTMLElement;
   private changeTimer: number | null = null;
 
+  /** design 态 Esc：清空选中回到邮件设置（捕获阶段，便于焦点在 body 时也能响应） */
+  private _mailEscHandler = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    if (this.mode !== 'design') return;
+    if (!this.store.selection) return;
+    if (document.querySelector('.sm-modal__mask.is-open')) return;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('.sm-modal__mask')) return;
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    if (ae && ae !== document.body && !this.root.contains(ae)) return;
+    e.preventDefault();
+    this._focusMailSettings();
+  };
+
+  /**
+   * 文档级撤销/重做（捕获阶段）：焦点在右栏 input/CodeMirror 内时，冒泡到 root 的监听太晚，
+   * 浏览器会先处理控件内撤销；仅在 store 仍有历史时拦截并走全局 undo/redo。
+   */
+  private _mailUndoRedoHandler = (e: KeyboardEvent) => {
+    const meta = e.metaKey || e.ctrlKey;
+    if (!meta) return;
+    const k = e.key.toLowerCase();
+    if (k !== 'z') return;
+    const t = e.target as Node | null;
+    if (!t || !this.root.contains(t)) return;
+    const undo = !e.shiftKey;
+    const redo = e.shiftKey;
+    if (undo && !this.store.canUndo()) return;
+    if (redo && !this.store.canRedo()) return;
+    e.preventDefault();
+    if (undo) this.store.undo();
+    else this.store.redo();
+  };
+
   constructor(opts: EditorOptions) {
     this.opts = opts;
     this.registry = new Registry();
@@ -90,6 +130,7 @@ export class MailEditor {
   /* ------------------------------ Public API ------------------------------ */
 
   setValue(doc: EmailDoc) {
+    this._blurRightPanelIfFocused();
     this.store.replace(doc);
   }
 
@@ -126,6 +167,8 @@ export class MailEditor {
 
   destroy() {
     if (this.changeTimer) window.clearTimeout(this.changeTimer);
+    document.removeEventListener('keydown', this._mailEscHandler, true);
+    document.removeEventListener('keydown', this._mailUndoRedoHandler, true);
     this.canvas?.destroy?.();
     this.sourceView?.destroy?.();
     this.toolbar?.destroy?.();
@@ -139,8 +182,13 @@ export class MailEditor {
       store: this.store,
       mode: this.mode,
       onModeChange: (m) => this._setMode(m),
-      onUndo: () => this.store.undo(),
-      onRedo: () => this.store.redo(),
+      onUndo: () => {
+        this.store.undo();
+      },
+      onRedo: () => {
+        this.store.redo();
+      },
+      onMailSettings: () => this._focusMailSettings(),
       onInsertVariable: (anchor) => this._showVariablePopover(anchor),
       onPreview: () => this._showPreview(),
       onExport: () => this._showExport(),
@@ -155,12 +203,25 @@ export class MailEditor {
       registry: this.registry,
       toolbar: this.toolbar,
       autoWrapSection: autoWrap,
+      clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin === true,
     });
     this.rightPanel = new RightPanel({ store: this.store, registry: this.registry });
     this.sourceView = new SourceView({ store: this.store, registry: this.registry });
 
     this.body.append(this.leftPanel.el, this.canvas.el, this.rightPanel.el);
     this.root.append(this.topbar.el, this.body);
+  }
+
+  /** 撤销/替换文档前先失焦右栏，否则 RightPanel 会因「保留焦点」跳过重绘而仍显示旧值 */
+  private _blurRightPanelIfFocused() {
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && this.rightPanel.el.contains(ae)) ae.blur();
+  }
+
+  /** 提交内联编辑并清空选中，右栏回到邮件设置 / 全局样式 */
+  private _focusMailSettings() {
+    this.canvas.commitInlineEdit();
+    this.store.setSelection(null);
   }
 
   private _setMode(m: EditorMode) {
@@ -182,14 +243,7 @@ export class MailEditor {
 
   private _bindKeyboard() {
     this.root.addEventListener('keydown', (e) => {
-      const meta = e.metaKey || e.ctrlKey;
-      if (meta && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        this.store.undo();
-      } else if (meta && (e.key === 'Z' || (e.key === 'z' && e.shiftKey))) {
-        e.preventDefault();
-        this.store.redo();
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         const tag = (e.target as HTMLElement).tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement).isContentEditable) {
           return;
@@ -214,6 +268,8 @@ export class MailEditor {
         }
       }
     });
+    document.addEventListener('keydown', this._mailUndoRedoHandler, true);
+    document.addEventListener('keydown', this._mailEscHandler, true);
     this.root.tabIndex = 0;
   }
 

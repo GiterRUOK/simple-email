@@ -1,7 +1,11 @@
 import type { Block, Column, EmailDoc, Section, SectionLayout, Selection } from '../types';
 import { uid } from '../utils/id';
 
-type Listener = () => void;
+/** 文档变更通知来源（右栏等可按来源决定是否保留焦点） */
+export type DocChangedDetail = { source: 'mutate' | 'history' | 'replace' };
+
+type Listener = (detail?: DocChangedDetail) => void;
+type SelectionListener = () => void;
 
 /**
  * 极小的不可变 store + 发布订阅 + history。
@@ -13,7 +17,7 @@ export class Store {
   private _doc: EmailDoc;
   private _selection: Selection | null = null;
   private _listeners: Set<Listener> = new Set();
-  private _selectionListeners: Set<Listener> = new Set();
+  private _selectionListeners: Set<SelectionListener> = new Set();
   private _past: EmailDoc[] = [];
   private _future: EmailDoc[] = [];
   private _historyLimit = 100;
@@ -35,7 +39,7 @@ export class Store {
     return () => this._listeners.delete(fn);
   }
 
-  subscribeSelection(fn: Listener): () => void {
+  subscribeSelection(fn: SelectionListener): () => void {
     this._selectionListeners.add(fn);
     return () => this._selectionListeners.delete(fn);
   }
@@ -56,7 +60,7 @@ export class Store {
     if (this._past.length > this._historyLimit) this._past.shift();
     this._future = [];
     this._doc = draft;
-    if (!opts.silent) this._notify();
+    if (!opts.silent) this._notify('mutate');
   }
 
   /** 替换整个文档（如外部 setValue），会清空 history。 */
@@ -64,7 +68,7 @@ export class Store {
     this._past = [];
     this._future = [];
     this._doc = doc;
-    this._notify();
+    this._notify('replace');
   }
 
   undo(): boolean {
@@ -72,7 +76,7 @@ export class Store {
     if (!prev) return false;
     this._future.push(this._doc);
     this._doc = prev;
-    this._notify();
+    this._notify('history');
     return true;
   }
 
@@ -81,7 +85,7 @@ export class Store {
     if (!next) return false;
     this._past.push(this._doc);
     this._doc = next;
-    this._notify();
+    this._notify('history');
     return true;
   }
 
@@ -93,8 +97,9 @@ export class Store {
     return this._future.length > 0;
   }
 
-  private _notify() {
-    this._listeners.forEach((l) => l());
+  private _notify(source: DocChangedDetail['source']) {
+    const detail: DocChangedDetail = { source };
+    this._listeners.forEach((l) => l(detail));
   }
 }
 

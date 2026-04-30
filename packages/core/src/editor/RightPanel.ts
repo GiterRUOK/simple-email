@@ -3,7 +3,7 @@ import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
 import type { Registry } from '../registry/registry';
 import { findBlockLocation, findSection } from '../store/store';
-import type { Store } from '../store/store';
+import type { Store, DocChangedDetail } from '../store/store';
 import type {
   Block,
   BlockSchemaField,
@@ -33,11 +33,66 @@ export class RightPanel {
     this.opts = opts;
     this.el = h('aside', { class: 'sm-panel sm-panel--right' });
     this._render();
-    opts.store.subscribe(() => this._render());
+    opts.store.subscribe((detail?: DocChangedDetail) => {
+      if (detail?.source === 'history') {
+        this._renderPreservingFieldFocus();
+        return;
+      }
+      if (detail?.source === 'replace') {
+        this._render();
+        return;
+      }
+      // update() 每打一字符都会 notify；整栏 clear 会拆掉输入框导致失焦
+      if (this._shouldSkipRenderBecauseFocused()) return;
+      this._render();
+    });
     opts.store.subscribeSelection(() => {
       this.currentTab = 'props';
       this._render();
     });
+  }
+
+  /** 焦点在右栏可编辑控件上时不要整栏重渲染（避免输入/CodeMirror 失焦） */
+  private _shouldSkipRenderBecauseFocused(): boolean {
+    const ae = document.activeElement as HTMLElement | null;
+    if (!ae || !this.el.contains(ae)) return false;
+    if (ae.closest('.cm-editor')) return true;
+    const tag = ae.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    return false;
+  }
+
+  /** undo/redo 后整栏重绘，但尽量回到同一输入框与光标位置 */
+  private _renderPreservingFieldFocus() {
+    const ae = document.activeElement as HTMLElement | null;
+    let token: string | null = null;
+    let selStart = 0;
+    let selEnd = 0;
+    if (ae && this.el.contains(ae)) {
+      token = ae.getAttribute('data-sm-focus');
+      if (
+        token &&
+        (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement)
+      ) {
+        selStart = ae.selectionStart ?? 0;
+        selEnd = ae.selectionEnd ?? 0;
+      }
+    }
+    this._render();
+    if (!token) return;
+    const next = this._findFocusEl(token);
+    next?.focus();
+    if (next instanceof HTMLInputElement || next instanceof HTMLTextAreaElement) {
+      const len = next.value.length;
+      next.setSelectionRange(Math.min(selStart, len), Math.min(selEnd, len));
+    }
+  }
+
+  private _findFocusEl(token: string): HTMLElement | null {
+    for (const el of this.el.querySelectorAll('[data-sm-focus]')) {
+      if ((el as HTMLElement).getAttribute('data-sm-focus') === token) return el as HTMLElement;
+    }
+    return null;
   }
 
   private _render() {
@@ -129,47 +184,79 @@ export class RightPanel {
         this.opts.store.update((d) => {
           d.meta.subject = v;
         }),
+        '',
+        'doc:meta.subject',
       ),
       this._textField('Preheader', doc.meta.preheader ?? '', (v) =>
         this.opts.store.update((d) => {
           d.meta.preheader = v;
         }),
+        '',
+        'doc:meta.preheader',
       ),
       this._numberField('内容宽度 (px)', doc.meta.width, 320, 800, (v) =>
         this.opts.store.update((d) => {
           d.meta.width = v;
         }),
+        1,
+        'doc:meta.width',
       ),
       h('div', { class: 'sm-panel__title' }, ['全局样式']),
-      this._colorField('页面背景', doc.styles.backgroundColor, (v) =>
-        this.opts.store.update((d) => {
-          d.styles.backgroundColor = v;
-        }),
+      this._colorField(
+        '页面背景',
+        doc.styles.backgroundColor,
+        (v) =>
+          this.opts.store.update((d) => {
+            d.styles.backgroundColor = v;
+          }),
+        'doc:styles.backgroundColor',
       ),
-      this._colorField('内容背景', doc.styles.contentBackgroundColor, (v) =>
-        this.opts.store.update((d) => {
-          d.styles.contentBackgroundColor = v;
-        }),
+      this._colorField(
+        '内容背景',
+        doc.styles.contentBackgroundColor,
+        (v) =>
+          this.opts.store.update((d) => {
+            d.styles.contentBackgroundColor = v;
+          }),
+        'doc:styles.contentBackgroundColor',
       ),
-      this._textField('字体', doc.styles.fontFamily, (v) =>
-        this.opts.store.update((d) => {
-          d.styles.fontFamily = v;
-        }),
+      this._textField(
+        '字体',
+        doc.styles.fontFamily,
+        (v) =>
+          this.opts.store.update((d) => {
+            d.styles.fontFamily = v;
+          }),
+        '',
+        'doc:styles.fontFamily',
       ),
-      this._textField('字号', doc.styles.fontSize, (v) =>
-        this.opts.store.update((d) => {
-          d.styles.fontSize = v;
-        }),
+      this._textField(
+        '字号',
+        doc.styles.fontSize,
+        (v) =>
+          this.opts.store.update((d) => {
+            d.styles.fontSize = v;
+          }),
+        '',
+        'doc:styles.fontSize',
       ),
-      this._colorField('正文颜色', doc.styles.color, (v) =>
-        this.opts.store.update((d) => {
-          d.styles.color = v;
-        }),
+      this._colorField(
+        '正文颜色',
+        doc.styles.color,
+        (v) =>
+          this.opts.store.update((d) => {
+            d.styles.color = v;
+          }),
+        'doc:styles.color',
       ),
-      this._colorField('链接颜色', doc.styles.linkColor, (v) =>
-        this.opts.store.update((d) => {
-          d.styles.linkColor = v;
-        }),
+      this._colorField(
+        '链接颜色',
+        doc.styles.linkColor,
+        (v) =>
+          this.opts.store.update((d) => {
+            d.styles.linkColor = v;
+          }),
+        'doc:styles.linkColor',
       ),
     ]);
   }
@@ -180,11 +267,15 @@ export class RightPanel {
     const a = section.attrs;
     return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, [
       h('div', { class: 'sm-panel__title' }, ['Section 设置']),
-      this._colorField('背景色', a.backgroundColor ?? '', (v) =>
-        this.opts.store.update((d) => {
-          const s = findSection(d, section.id);
-          if (s) s.attrs.backgroundColor = v || undefined;
-        }),
+      this._colorField(
+        '背景色',
+        a.backgroundColor ?? '',
+        (v) =>
+          this.opts.store.update((d) => {
+            const s = findSection(d, section.id);
+            if (s) s.attrs.backgroundColor = v || undefined;
+          }),
+        `section:${section.id}:attrs.bg`,
       ),
       this._spacingField(
         '内边距',
@@ -196,6 +287,7 @@ export class RightPanel {
             [s.attrs.paddingTop, s.attrs.paddingRight, s.attrs.paddingBottom, s.attrs.paddingLeft] =
               vals;
           }),
+        `section:${section.id}:attrs.pad`,
       ),
       section.layout !== '1'
         ? this._switchField(
@@ -207,6 +299,7 @@ export class RightPanel {
                 if (s) s.attrs.preserveColumnsOnMobile = checked || undefined;
               }),
             '开启后 MJML 会生成 mj-group，移动端预览/导出与默认「小屏堆叠列」行为不同。',
+            `section:${section.id}:attrs.preserveMobile`,
           )
         : null,
     ]);
@@ -218,7 +311,7 @@ export class RightPanel {
     const form = h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() });
     for (const field of schema) {
       const v = (block.props as any)[field.key];
-      form.append(this._field(field, v, (nv) => this._updateBlock(block.id, field.key, nv)));
+      form.append(this._field(field, v, (nv) => this._updateBlock(block.id, field.key, nv), block.id));
     }
     return form;
   }
@@ -235,10 +328,12 @@ export class RightPanel {
     field: BlockSchemaField,
     value: any,
     onChange: (v: any) => void,
+    blockId: string,
   ): HTMLElement {
+    const fp = `block:${blockId}:${field.key}`;
     switch (field.type) {
       case 'textarea':
-        return this._textareaField(field.label, value ?? '', onChange, field.help);
+        return this._textareaField(field.label, value ?? '', onChange, field.help, fp);
       case 'number':
         return this._numberField(
           field.label,
@@ -247,22 +342,24 @@ export class RightPanel {
           field.max ?? 9999,
           onChange,
           field.step ?? 1,
+          fp,
         );
       case 'color':
-        return this._colorField(field.label, value ?? '', onChange);
+        return this._colorField(field.label, value ?? '', onChange, fp);
       case 'select':
-        return this._selectField(field.label, value ?? '', field.options ?? [], onChange);
+        return this._selectField(field.label, value ?? '', field.options ?? [], onChange, fp);
       case 'switch':
-        return this._switchField(field.label, !!value, onChange);
+        return this._switchField(field.label, !!value, onChange, field.help, fp);
       case 'image':
       case 'url':
       case 'text':
-        return this._textField(field.label, value ?? '', onChange, field.placeholder);
+        return this._textField(field.label, value ?? '', onChange, field.placeholder ?? '', fp);
       case 'spacing':
         return this._spacingField(
           field.label,
           (value ?? [0, 0, 0, 0]) as (number | undefined)[],
           (vals) => onChange(vals),
+          `${fp}:pad`,
         );
       default:
         return h('div');
@@ -276,6 +373,7 @@ export class RightPanel {
     value: string,
     onChange: (v: string) => void,
     placeholder = '',
+    focusToken?: string,
   ) {
     return h('div', { class: 'sm-field' }, [
       h('label', { class: 'sm-field__label' }, [label]),
@@ -284,6 +382,7 @@ export class RightPanel {
         type: 'text',
         value,
         placeholder,
+        ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
         oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
       }),
     ]);
@@ -293,9 +392,11 @@ export class RightPanel {
     value: string,
     onChange: (v: string) => void,
     help?: string,
+    focusToken?: string,
   ) {
     const ta = h('textarea', {
       class: 'sm-textarea',
+      ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
       oninput: (e: Event) => onChange((e.target as HTMLTextAreaElement).value),
     });
     ta.value = value;
@@ -316,6 +417,7 @@ export class RightPanel {
     max: number,
     onChange: (v: number) => void,
     step = 1,
+    focusToken?: string,
   ) {
     return h('div', { class: 'sm-field' }, [
       h('label', { class: 'sm-field__label' }, [label]),
@@ -326,6 +428,7 @@ export class RightPanel {
         min,
         max,
         step,
+        ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
         oninput: (e: Event) => {
           const v = Number((e.target as HTMLInputElement).value);
           if (!Number.isNaN(v)) onChange(v);
@@ -333,13 +436,21 @@ export class RightPanel {
       }),
     ]);
   }
-  private _colorField(label: string, value: string, onChange: (v: string) => void) {
+  private _colorField(
+    label: string,
+    value: string,
+    onChange: (v: string) => void,
+    focusPrefix?: string,
+  ) {
+    const pickToken = focusPrefix ? `${focusPrefix}:pick` : undefined;
+    const textToken = focusPrefix ? `${focusPrefix}:text` : undefined;
     return h('div', { class: 'sm-field' }, [
       h('label', { class: 'sm-field__label' }, [label]),
       h('div', { class: 'sm-color-row' }, [
         h('input', {
           type: 'color',
           value: value || '#ffffff',
+          ...(pickToken ? { 'data-sm-focus': pickToken } : {}),
           oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
         }),
         h('input', {
@@ -347,6 +458,7 @@ export class RightPanel {
           type: 'text',
           value,
           placeholder: '#ffffff',
+          ...(textToken ? { 'data-sm-focus': textToken } : {}),
           oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
         }),
       ]),
@@ -357,9 +469,11 @@ export class RightPanel {
     value: string,
     options: { label: string; value: string }[],
     onChange: (v: string) => void,
+    focusToken?: string,
   ) {
     const sel = h('select', {
       class: 'sm-select',
+      ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
       onchange: (e: Event) => onChange((e.target as HTMLSelectElement).value),
     });
     for (const o of options) {
@@ -379,6 +493,7 @@ export class RightPanel {
     value: boolean,
     onChange: (v: boolean) => void,
     help?: string,
+    focusToken?: string,
   ): HTMLElement {
     const row = h('label', {
       class: 'sm-field',
@@ -386,6 +501,7 @@ export class RightPanel {
     }, [
       h('input', {
         type: 'checkbox',
+        ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
         onchange: (e: Event) => onChange((e.target as HTMLInputElement).checked),
         ...(value ? { checked: true } : {}),
       } as any),
@@ -401,6 +517,7 @@ export class RightPanel {
     label: string,
     [t, r, b, l]: (number | undefined)[],
     onChange: (vals: number[]) => void,
+    focusPrefix?: string,
   ) {
     const make = (v: number | undefined, idx: number) =>
       h('input', {
@@ -410,6 +527,7 @@ export class RightPanel {
         max: 200,
         value: String(v ?? 0),
         title: ['上', '右', '下', '左'][idx],
+        ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:${idx}` } : {}),
         oninput: (e: Event) => {
           const next = [t ?? 0, r ?? 0, b ?? 0, l ?? 0];
           next[idx] = Number((e.target as HTMLInputElement).value) || 0;

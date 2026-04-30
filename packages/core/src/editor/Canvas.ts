@@ -22,6 +22,11 @@ export interface CanvasOptions {
   toolbar: RichTextToolbar;
   /** 是否允许 Block 落到 sections 之间空白处时自动裹一列 Section */
   autoWrapSection: boolean;
+  /**
+   * 为 true 时：点击画布包装层灰色区域（非 `.sm-canvas` 白底、非底部添加 Section 条）清空选中，
+   * 右栏回到文档级表单。
+   */
+  clearSelectionOnCanvasMargin?: boolean;
 }
 
 /**
@@ -64,6 +69,9 @@ export class Canvas {
     });
 
     this._bindDesignModeLinkSuppression();
+    if (opts.clearSelectionOnCanvasMargin) {
+      this._bindClearSelectionOnCanvasMargin();
+    }
 
     this._render();
 
@@ -96,6 +104,19 @@ export class Canvas {
     this._exitEditing(false);
     this._destroySortables();
     this.blockCodeModal.destroy();
+  }
+
+  /** 点击中栏灰色衬底（非白底画布、非底部添加 Section 条）时取消选中，回到文档级右栏 */
+  private _bindClearSelectionOnCanvasMargin() {
+    this.el.addEventListener('mousedown', (e: MouseEvent) => {
+      const t = e.target;
+      if (!(t instanceof Node)) return;
+      if (!this.el.contains(t)) return;
+      if (this.inner.contains(t)) return;
+      if (this.addBar.contains(t)) return;
+      this.commitInlineEdit();
+      this.opts.store.setSelection(null);
+    });
   }
 
   /** 捕获阶段拦截 <a href>，防止 Chrome 等在画布预览 DOM 上触发跳转（含未进入内联编辑时点到按钮块链接） */

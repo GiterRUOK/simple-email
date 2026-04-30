@@ -9,6 +9,8 @@ export interface TopbarOptions {
   onModeChange: (m: EditorMode) => void;
   onUndo: () => void;
   onRedo: () => void;
+  /** 清空画布选中并回到右栏「邮件设置 / 全局样式」 */
+  onMailSettings: () => void;
   onInsertVariable: (anchor: HTMLElement) => void;
   onPreview: () => void;
   onExport: () => void;
@@ -84,6 +86,17 @@ export class Topbar {
       [iconRedo(), '重做'],
     );
 
+    const mailSettingsBtn = h(
+      'button',
+      {
+        class: 'sm-btn sm-btn--ghost',
+        type: 'button',
+        title: '邮件主题、宽度与全局样式',
+        onclick: () => this.opts.onMailSettings(),
+      },
+      ['邮件设置'],
+    );
+
     const insertVar = h(
       'button',
       {
@@ -111,7 +124,7 @@ export class Topbar {
       h('div', { class: 'sm-topbar__group' }, [segmented]),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),
       h('div', { class: 'sm-topbar__spacer' }),
-      h('div', { class: 'sm-topbar__group' }, [insertVar, previewBtn, exportBtn]),
+      h('div', { class: 'sm-topbar__group' }, [mailSettingsBtn, insertVar, previewBtn, exportBtn]),
     );
 
     this.setMode(this.opts.mode);
