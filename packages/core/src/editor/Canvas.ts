@@ -11,6 +11,7 @@ import type {
   SectionLayout,
 } from '../types';
 import { clear, escapeHtml, h } from '../utils/dom';
+import { BlockCodeModal } from './BlockCodeModal';
 import { InlineEditor, type SelectionState } from './InlineEditor';
 import type { RichTextToolbar } from './RichTextToolbar';
 
@@ -49,6 +50,7 @@ export class Canvas {
   private pendingRender = false;
   /** 设计模式下禁用画布内超链接导航（预览弹框 iframe 不在此 DOM 内，不受影响） */
   private linkNavSuppression = new AbortController();
+  private blockCodeModal: BlockCodeModal;
 
   constructor(opts: CanvasOptions) {
     this.opts = opts;
@@ -56,6 +58,10 @@ export class Canvas {
     this.inner = h('div', { class: 'sm-canvas' });
     this.addBar = this._renderAddBar();
     this.el.append(this.inner, this.addBar);
+    this.blockCodeModal = new BlockCodeModal({
+      store: opts.store,
+      registry: opts.registry,
+    });
 
     this._bindDesignModeLinkSuppression();
 
@@ -89,6 +95,7 @@ export class Canvas {
     this.linkNavSuppression.abort();
     this._exitEditing(false);
     this._destroySortables();
+    this.blockCodeModal.destroy();
   }
 
   /** 捕获阶段拦截 <a href>，防止 Chrome 等在画布预览 DOM 上触发跳转（含未进入内联编辑时点到按钮块链接） */
@@ -298,6 +305,8 @@ export class Canvas {
       inner = `<div style="padding:8px;color:#dc2626;">未知组件: ${escapeHtml(block.type)}</div>`;
     }
 
+    const displayName = def?.name ?? block.type;
+
     const el = h('div', {
       class: `sm-block ${block.lockedMjml ? 'is-locked' : ''}`,
       'data-id': block.id,
@@ -308,8 +317,13 @@ export class Canvas {
     // 内容容器：renderPreview 输出放这里，便于精确定位 inlineEditable selector
     const content = h('div', { class: 'sm-block__content', html: inner });
 
-    // 块工具条：hover/selected 时显示，包含拖拽 handle / 复制 / 删除
+    // 块工具条：贴在组件顶边上方，含名称 / 代码编辑 / 拖拽 / 复制 / 删除
     const blockToolbar = h('div', { class: 'sm-block__toolbar' }, [
+      h(
+        'span',
+        { class: 'sm-block__toolbar-name', title: displayName },
+        [displayName],
+      ),
       h(
         'button',
         {
@@ -336,6 +350,19 @@ export class Canvas {
             [iconEdit()],
           )
         : null,
+      h(
+        'button',
+        {
+          class: 'sm-tool-btn',
+          type: 'button',
+          title: '编辑组件代码',
+          onclick: (e: Event) => {
+            e.stopPropagation();
+            this.blockCodeModal.open(block.id, displayName);
+          },
+        },
+        [iconCode()],
+      ),
       h(
         'button',
         {
@@ -746,5 +773,10 @@ function iconTrash() {
 function iconEdit() {
   return svg(
     '<path d="M4 14l8-8 2 2-8 8H4v-2z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/>',
+  );
+}
+function iconCode() {
+  return svg(
+    '<path d="M7 7l-3 3 3 3M13 7l3 3-3 3" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   );
 }

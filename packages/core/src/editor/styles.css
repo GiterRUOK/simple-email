@@ -280,11 +280,32 @@
 
 .sm-block__toolbar {
   position: absolute;
-  top: -12px;
-  right: 8px;
+  bottom: calc(100% + 4px);
+  top: auto;
+  left: auto;
+  right: 0;
   display: none;
-  gap: 4px;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: min(100%, 440px);
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(31, 35, 40, 0.92);
+  box-shadow: 0 4px 14px rgba(16, 24, 40, 0.14);
   z-index: 6;
+}
+.sm-block__toolbar-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.88);
+  margin-right: 2px;
+  max-width: 7em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
 }
 .sm-block:hover .sm-block__toolbar,
 .sm-block.is-selected .sm-block__toolbar,
@@ -755,7 +776,11 @@ html.sm-dragging-block .sm-root.sm-allow-auto-wrap .sm-canvas-wrap::before {
 }
 
 /* Export ------------------------------------------------------------------- */
-.sm-modal--export .sm-modal__body { padding: 0; background: #fafbfc; }
+.sm-modal--export .sm-modal__body,
+.sm-modal--block-code .sm-modal__body {
+  padding: 0;
+  background: #fafbfc;
+}
 .sm-export__editor {
   height: 100%;
   background: #fafbfc;
