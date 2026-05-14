@@ -5,13 +5,14 @@
  *  - 不直接同步到 store。编辑过程中只在本地累积，提交（blur / Esc / 单行 Enter）时一次性回调，
  *    避免每次按键都触发画布全量重渲染导致光标丢失。
  *  - mode=plain 时仅取 textContent，并在 paste/keydown 上拦截换行；
- *    mode=rich 时保留 inline HTML，但会在提交时做一次清理（白名单标签 + inline style）。
+ *    mode=rich 时保留 inline HTML，但会在提交时做一次清理（白名单标签 + inline style）；
+ *    mode=html 时提交原始 innerHTML（用于 mj-raw 等），不挂富文本浮动条。
  *  - 选区变化通过 `onSelectionChange` 实时回调，便于浮动工具条同步按钮状态/位置。
  */
 export interface InlineEditorOptions {
   el: HTMLElement;
   initialValue: string;
-  mode: 'rich' | 'plain';
+  mode: 'rich' | 'plain' | 'html';
   multiline: boolean;
   placeholder?: string;
   onCommit: (value: string) => void;
@@ -69,7 +70,9 @@ export class InlineEditor {
     const value =
       this.opts.mode === 'plain'
         ? (this.el.textContent ?? '').replace(/\s+\n/g, '\n').trim()
-        : sanitizeRichHtml(this.el.innerHTML);
+        : this.opts.mode === 'html'
+          ? this.el.innerHTML
+          : sanitizeRichHtml(this.el.innerHTML);
     this.opts.onCommit(value);
     this.destroy(false);
   }
@@ -182,7 +185,8 @@ export class InlineEditor {
     if (placeholder) el.setAttribute('data-placeholder', placeholder);
 
     if (this.opts.initialValue) {
-      el.innerHTML = mode === 'plain' ? escapeHtml(this.opts.initialValue) : this.opts.initialValue;
+      el.innerHTML =
+        mode === 'plain' ? escapeHtml(this.opts.initialValue) : this.opts.initialValue;
     }
 
     // 初始聚焦并把光标移到末尾，便于"双击 → 直接输入"
@@ -242,14 +246,14 @@ export class InlineEditor {
 
     /** Chrome：contenteditable 里的 <a href> 仍会在 mousedown/click 时导航；阻止后用手动 caret 对齐点击处 */
     const onLinkMouseDown = (e: MouseEvent) => {
-      if (mode !== 'rich' || e.button !== 0) return;
+      if ((mode !== 'rich' && mode !== 'html') || e.button !== 0) return;
       if (!linkInsideEditing(e.target)) return;
       e.preventDefault();
       placeCaretAtClientPoint(el, e.clientX, e.clientY);
     };
 
     const stopLinkActivate = (e: MouseEvent) => {
-      if (mode !== 'rich') return;
+      if (mode !== 'rich' && mode !== 'html') return;
       if (!linkInsideEditing(e.target)) return;
       e.preventDefault();
     };
@@ -260,7 +264,7 @@ export class InlineEditor {
     document.addEventListener('selectionchange', onSelChange);
     el.addEventListener('input', onSelChange);
     el.addEventListener('mouseup', onSelChange);
-    if (mode === 'rich') {
+    if (mode === 'rich' || mode === 'html') {
       el.addEventListener('mousedown', onLinkMouseDown, true);
       el.addEventListener('click', stopLinkActivate, true);
       el.addEventListener('auxclick', stopLinkActivate, true);
@@ -273,7 +277,7 @@ export class InlineEditor {
       () => document.removeEventListener('selectionchange', onSelChange),
       () => el.removeEventListener('input', onSelChange),
       () => el.removeEventListener('mouseup', onSelChange),
-      ...(mode === 'rich'
+      ...(mode === 'rich' || mode === 'html'
         ? [
             () => el.removeEventListener('mousedown', onLinkMouseDown, true),
             () => el.removeEventListener('click', stopLinkActivate, true),
@@ -291,8 +295,8 @@ export class InlineEditor {
 
   private _emitSelection() {
     if (!this.opts.onSelectionChange) return;
-    if (this.opts.mode === 'plain') {
-      this.opts.onSelectionChange(null); // 单行 plain 不需要工具条
+    if (this.opts.mode === 'plain' || this.opts.mode === 'html') {
+      this.opts.onSelectionChange(null); // plain / 原始 HTML 不挂富文本浮动条
       return;
     }
     const sel = window.getSelection();

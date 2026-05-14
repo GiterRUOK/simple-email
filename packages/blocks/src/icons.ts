@@ -1,5 +1,6 @@
 /** 24x24 viewBox 的内置组件图标。集中放，避免散落到各 block 文件。 */
 export const icons = {
+  html: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4" width="17" height="16" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 8.5l3 3.5-3 3.5M16 8.5l-3 3.5 3 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   text: `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M5 6h14M5 10h14M5 14h10M5 18h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>`,
   image: `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><path d="M4 18l5-5 4 4 3-3 4 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   hero: `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M6 14h5M6 17h8" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,

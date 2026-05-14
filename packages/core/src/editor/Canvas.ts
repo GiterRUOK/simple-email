@@ -2,15 +2,9 @@ import Sortable from 'sortablejs';
 import type { Registry } from '../registry/registry';
 import { createSection, findBlockLocation } from '../store/store';
 import type { Store } from '../store/store';
-import type {
-  Block,
-  Column,
-  EmailDoc,
-  RenderContext,
-  Section,
-  SectionLayout,
-} from '../types';
+import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
 import { clear, escapeHtml, h } from '../utils/dom';
+import { htmlFragmentForLockedHtmlBlockCanvas } from '../utils/lockedMjml';
 import { BlockCodeModal } from './BlockCodeModal';
 import { InlineEditor, type SelectionState } from './InlineEditor';
 import type { RichTextToolbar } from './RichTextToolbar';
@@ -151,11 +145,7 @@ export class Canvas {
     this.inner.style.setProperty('--sm-editor-link-color', doc.styles.linkColor);
 
     if (!doc.sections.length) {
-      this.inner.append(
-        h('div', { class: 'sm-empty-doc' }, [
-          '从左侧把"布局"拖到这里开始 ✦',
-        ]),
-      );
+      this.inner.append(h('div', { class: 'sm-empty-doc' }, ['从左侧把"布局"拖到这里开始 ✦']));
     } else {
       for (let si = 0; si < doc.sections.length; si++) {
         this.inner.append(this._renderSection(doc.sections[si], doc, si));
@@ -202,48 +192,44 @@ export class Canvas {
 
     const toolbar = h('div', { class: 'sm-section__toolbar' }, [
       h('span', { class: 'sm-section__toolbar-label', title: sectionChip }, [sectionChip]),
-      h(
-        'div',
-        { class: 'sm-section__toolbar-actions' },
-        [
-          h(
-            'button',
-            {
-              class: 'sm-tool-btn sm-section__handle',
-              type: 'button',
-              title: '拖拽排序',
-              onmousedown: (e: Event) => e.stopPropagation(),
+      h('div', { class: 'sm-section__toolbar-actions' }, [
+        h(
+          'button',
+          {
+            class: 'sm-tool-btn sm-section__handle',
+            type: 'button',
+            title: '拖拽排序',
+            onmousedown: (e: Event) => e.stopPropagation(),
+          },
+          [iconDrag()],
+        ),
+        h(
+          'button',
+          {
+            class: 'sm-tool-btn',
+            type: 'button',
+            title: '复制',
+            onclick: (e: Event) => {
+              e.stopPropagation();
+              this._duplicateSection(section.id);
             },
-            [iconDrag()],
-          ),
-          h(
-            'button',
-            {
-              class: 'sm-tool-btn',
-              type: 'button',
-              title: '复制',
-              onclick: (e: Event) => {
-                e.stopPropagation();
-                this._duplicateSection(section.id);
-              },
+          },
+          [iconCopy()],
+        ),
+        h(
+          'button',
+          {
+            class: 'sm-tool-btn sm-tool-btn--danger',
+            type: 'button',
+            title: '删除',
+            onclick: (e: Event) => {
+              e.stopPropagation();
+              this._removeSection(section.id);
             },
-            [iconCopy()],
-          ),
-          h(
-            'button',
-            {
-              class: 'sm-tool-btn sm-tool-btn--danger',
-              type: 'button',
-              title: '删除',
-              onclick: (e: Event) => {
-                e.stopPropagation();
-                this._removeSection(section.id);
-              },
-            },
-            [iconTrash()],
-          ),
-        ],
-      ),
+          },
+          [iconTrash()],
+        ),
+      ]),
     ]);
 
     const cols = h('div', {
@@ -279,11 +265,7 @@ export class Canvas {
       'data-column-index': String(columnIndex),
       style: `flex:${layoutFlexValue(section.layout, columnIndex)};${
         column.attrs.backgroundColor ? `background:${column.attrs.backgroundColor};` : ''
-      }${
-        column.attrs.verticalAlign
-          ? `align-self:${vaToFlex(column.attrs.verticalAlign)};`
-          : ''
-      }`,
+      }${column.attrs.verticalAlign ? `align-self:${vaToFlex(column.attrs.verticalAlign)};` : ''}`,
     });
 
     for (const block of column.blocks) {
@@ -326,9 +308,25 @@ export class Canvas {
     const def = this.opts.registry.get(block.type);
     let inner = '';
     if (block.lockedMjml) {
-      inner = `<div style="padding:8px;color:#92400e;background:#fffbeb;border:1px dashed #f59e0b;font-family:monospace;font-size:11px;white-space:pre-wrap;">${escapeHtml(
-        block.lockedMjml,
-      )}</div>`;
+      if (block.type === 'html') {
+        const p = block.props as {
+          paddingTop?: number;
+          paddingRight?: number;
+          paddingBottom?: number;
+          paddingLeft?: number;
+        };
+        const frag = htmlFragmentForLockedHtmlBlockCanvas(block.lockedMjml, {
+          top: Number(p.paddingTop ?? 8),
+          right: Number(p.paddingRight ?? 16),
+          bottom: Number(p.paddingBottom ?? 8),
+          left: Number(p.paddingLeft ?? 16),
+        });
+        inner = `<div class="sm-html-content">${frag}</div>`;
+      } else {
+        inner = `<div style="padding:8px;color:#92400e;background:#fffbeb;border:1px dashed #f59e0b;font-family:monospace;font-size:11px;white-space:pre-wrap;">${escapeHtml(
+          block.lockedMjml,
+        )}</div>`;
+      }
     } else if (def?.renderPreview) {
       inner = def.renderPreview(block.props as any, ctx);
     } else if (def) {
@@ -353,82 +351,74 @@ export class Canvas {
 
     // 块工具条：hover 仅名称；选中 / 编辑中显示全部按钮；贴在块顶边之上不压内容
     const blockToolbar = h('div', { class: 'sm-block__toolbar' }, [
-      h(
-        'span',
-        { class: 'sm-block__toolbar-name', title: displayName },
-        [displayName],
-      ),
-      h(
-        'div',
-        { class: 'sm-block__toolbar-actions' },
-        [
-          h(
-            'button',
-            {
-              class: 'sm-tool-btn sm-block__handle',
-              type: 'button',
-              title: '拖拽排序',
-              onmousedown: (e: Event) => e.stopPropagation(),
-              onclick: (e: Event) => e.stopPropagation(),
-            },
-            [iconDrag()],
-          ),
-          def?.inlineEditable && !block.lockedMjml
-            ? h(
-                'button',
-                {
-                  class: 'sm-tool-btn',
-                  type: 'button',
-                  title: '编辑文本',
-                  onclick: (e: Event) => {
-                    e.stopPropagation();
-                    this._enterEditing(block);
-                  },
+      h('span', { class: 'sm-block__toolbar-name', title: displayName }, [displayName]),
+      h('div', { class: 'sm-block__toolbar-actions' }, [
+        h(
+          'button',
+          {
+            class: 'sm-tool-btn sm-block__handle',
+            type: 'button',
+            title: '拖拽排序',
+            onmousedown: (e: Event) => e.stopPropagation(),
+            onclick: (e: Event) => e.stopPropagation(),
+          },
+          [iconDrag()],
+        ),
+        def?.inlineEditable && !block.lockedMjml
+          ? h(
+              'button',
+              {
+                class: 'sm-tool-btn',
+                type: 'button',
+                title: '编辑文本',
+                onclick: (e: Event) => {
+                  e.stopPropagation();
+                  this._enterEditing(block);
                 },
-                [iconEdit()],
-              )
-            : null,
-          h(
-            'button',
-            {
-              class: 'sm-tool-btn',
-              type: 'button',
-              title: '编辑组件代码',
-              onclick: (e: Event) => {
-                e.stopPropagation();
-                this.blockCodeModal.open(block.id, displayName);
               },
+              [iconEdit()],
+            )
+          : null,
+        h(
+          'button',
+          {
+            class: 'sm-tool-btn',
+            type: 'button',
+            title: '编辑组件代码',
+            onclick: (e: Event) => {
+              e.stopPropagation();
+              this.blockCodeModal.open(block.id, displayName);
             },
-            [iconCode()],
-          ),
-          h(
-            'button',
-            {
-              class: 'sm-tool-btn',
-              type: 'button',
-              title: '复制',
-              onclick: (e: Event) => {
-                e.stopPropagation();
-                this._duplicateBlock(block.id);
-              },
+          },
+          [iconCode()],
+        ),
+        h(
+          'button',
+          {
+            class: 'sm-tool-btn',
+            type: 'button',
+            title: '复制',
+            onclick: (e: Event) => {
+              e.stopPropagation();
+              this._duplicateBlock(block.id);
             },
-            [iconCopy()],
-          ),
-          h(
-            'button',
-            {
-              class: 'sm-tool-btn sm-tool-btn--danger',
-              type: 'button',
-              title: '删除',
-              onclick: (e: Event) => {
-                e.stopPropagation();
-                this._removeBlock(block.id);
-              },
+          },
+          [iconCopy()],
+        ),
+        h(
+          'button',
+          {
+            class: 'sm-tool-btn sm-tool-btn--danger',
+            type: 'button',
+            title: '删除',
+            onclick: (e: Event) => {
+              e.stopPropagation();
+              this._removeBlock(block.id);
             },
-            [iconTrash()],
-          ),
-        ],
-      ),
+          },
+          [iconTrash()],
+        ),
+      ]),
     ]);
 
     el.append(blockToolbar, content);
@@ -468,9 +458,7 @@ export class Canvas {
       { layout: '2-1', label: '2:1' },
       { layout: '1-1-1', label: '三列' },
     ];
-    const bar = h('div', { class: 'sm-add-section-bar' }, [
-      h('span', {}, ['+ 添加 Section：']),
-    ]);
+    const bar = h('div', { class: 'sm-add-section-bar' }, [h('span', {}, ['+ 添加 Section：'])]);
     for (const l of layouts) {
       bar.append(
         h(
@@ -505,9 +493,11 @@ export class Canvas {
     const contentRoot = blockEl?.querySelector('.sm-block__content') as HTMLElement | null;
     if (!contentRoot) return;
 
-    const target = (def.inlineEditable.selector
-      ? contentRoot.querySelector(def.inlineEditable.selector)
-      : contentRoot.firstElementChild) as HTMLElement | null;
+    const target = (
+      def.inlineEditable.selector
+        ? contentRoot.querySelector(def.inlineEditable.selector)
+        : contentRoot.firstElementChild
+    ) as HTMLElement | null;
     if (!target) return;
 
     this.editingBlockId = block.id;
@@ -539,7 +529,9 @@ export class Canvas {
       },
     });
 
-    this.opts.toolbar.attach(this.inlineEditor);
+    if (def.inlineEditable.mode === 'rich') {
+      this.opts.toolbar.attach(this.inlineEditor);
+    }
 
     // 选中该 block，便于属性面板同步
     this.opts.store.setSelection({
@@ -644,11 +636,7 @@ export class Canvas {
     });
   }
 
-  private _handleBlockAdd(
-    e: Sortable.SortableEvent,
-    sectionId: string,
-    columnIndex: number,
-  ) {
+  private _handleBlockAdd(e: Sortable.SortableEvent, sectionId: string, columnIndex: number) {
     const item = e.item;
     const newIndex = e.newIndex ?? 0;
     const sourceGroup = item.getAttribute('data-source-group');
@@ -686,11 +674,7 @@ export class Canvas {
     }
   }
 
-  private _handleBlockMove(
-    e: Sortable.SortableEvent,
-    sectionId: string,
-    columnIndex: number,
-  ) {
+  private _handleBlockMove(e: Sortable.SortableEvent, sectionId: string, columnIndex: number) {
     const oldIndex = e.oldIndex ?? 0;
     const newIndex = e.newIndex ?? 0;
     if (oldIndex === newIndex) return;

@@ -3,6 +3,7 @@ import { buttonBlock } from './button';
 import { dividerBlock } from './divider';
 import { footerBlock } from './footer';
 import { heroBlock } from './hero';
+import { htmlBlock } from './html';
 import { imageBlock } from './image';
 import { logoBlock } from './logo';
 import { socialBlock } from './social';
@@ -14,6 +15,7 @@ export {
   dividerBlock,
   footerBlock,
   heroBlock,
+  htmlBlock,
   imageBlock,
   logoBlock,
   socialBlock,
@@ -24,6 +26,7 @@ export {
 /** 内置组件（content 类）。可直接传给 MailEditor.blocks。 */
 export const builtinBlocks: BlockDefinition<any>[] = [
   textBlock,
+  htmlBlock,
   imageBlock,
   heroBlock,
   buttonBlock,

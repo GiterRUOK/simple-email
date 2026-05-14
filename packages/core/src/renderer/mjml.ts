@@ -1,12 +1,11 @@
-import type {
-  Column,
-  EmailDoc,
-  RenderContext,
-  Section,
-  SectionLayout,
-} from '../types';
 import type { Registry } from '../registry/registry';
+import type { Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
 import { escapeAttr } from '../utils/dom';
+import {
+  mjRawCellTypographyFromStyles,
+  normalizeHtmlBlockLockedMjmlForCompile,
+  wrapLockedMjmlForMjColumn,
+} from '../utils/lockedMjml';
 
 /**
  * Schema → MJML 字符串。
@@ -73,9 +72,23 @@ function columnToMjml(
   const va = a.verticalAlign ? ` vertical-align="${a.verticalAlign}"` : '';
   const bg = a.backgroundColor ? ` background-color="${escapeAttr(a.backgroundColor)}"` : '';
 
+  const rawTypo = mjRawCellTypographyFromStyles(ctx.doc.styles);
   const blocks = column.blocks
     .map((b) => {
-      if (b.lockedMjml) return indent(b.lockedMjml, 8);
+      if (b.lockedMjml) {
+        let frag = wrapLockedMjmlForMjColumn(b.lockedMjml, rawTypo);
+        if (b.type === 'html') {
+          const p = b.props as {
+            paddingTop?: number;
+            paddingRight?: number;
+            paddingBottom?: number;
+            paddingLeft?: number;
+          };
+          const pad = `${Number(p.paddingTop ?? 8)}px ${Number(p.paddingRight ?? 16)}px ${Number(p.paddingBottom ?? 8)}px ${Number(p.paddingLeft ?? 16)}px`;
+          frag = normalizeHtmlBlockLockedMjmlForCompile(frag, pad, rawTypo);
+        }
+        return indent(frag, 8);
+      }
       const def = registry.require(b.type);
       return indent(def.toMjml(b.props, ctx), 8);
     })

@@ -29,7 +29,6 @@ export interface GlobalStyles {
   /** 全局字重，如 normal / 500 / bold */
   fontWeight: string;
   color: string;
-  /** 正文区域中超链接的默认显示颜色（文字色） */
   linkColor: string;
   /** 无单位倍数（如 1.5）或固定值（如 24px） */
   lineHeight: string;
@@ -146,7 +145,7 @@ export interface BlockDefinition<P extends object = Record<string, unknown>> {
   /**
    * 声明组件在画布内可以"双击编辑文本"。
    * 引擎会找到 `selector` 命中的元素，把它变成 contenteditable，
-   * 在用户提交时按 `mode` 写回 props（rich：innerHTML；plain：textContent）。
+   * 在用户提交时按 `mode` 写回 props（rich：清理后的 innerHTML；html：原始 innerHTML；plain：textContent）。
    */
   inlineEditable?: InlineEditableConfig<P>;
 }
@@ -154,8 +153,8 @@ export interface BlockDefinition<P extends object = Record<string, unknown>> {
 export interface InlineEditableConfig<P extends object = Record<string, unknown>> {
   /** 在 renderPreview 输出 DOM 中定位编辑区域；不填则取根元素 */
   selector?: string;
-  /** rich：富文本（HTML），plain：纯文本（textContent） */
-  mode: 'rich' | 'plain';
+  /** rich：富文本（HTML，提交时清理），plain：纯文本，html：原始 HTML（不清理，对应 mj-raw） */
+  mode: 'rich' | 'plain' | 'html';
   /** 单行 / 多行；单行时回车提交且禁止换行 */
   multiline?: boolean;
   /** 提交时把 html / text 写回 props 的某个 key */
