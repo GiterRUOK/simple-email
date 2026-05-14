@@ -2,6 +2,7 @@ import type { BlockDefinition } from '@simple-mail/core';
 import { buttonBlock } from './button';
 import { dividerBlock } from './divider';
 import { footerBlock } from './footer';
+import { heroBlock } from './hero';
 import { imageBlock } from './image';
 import { logoBlock } from './logo';
 import { socialBlock } from './social';
@@ -12,6 +13,7 @@ export {
   buttonBlock,
   dividerBlock,
   footerBlock,
+  heroBlock,
   imageBlock,
   logoBlock,
   socialBlock,
@@ -23,6 +25,7 @@ export {
 export const builtinBlocks: BlockDefinition<any>[] = [
   textBlock,
   imageBlock,
+  heroBlock,
   buttonBlock,
   dividerBlock,
   spacerBlock,
