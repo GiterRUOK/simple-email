@@ -116,7 +116,17 @@ export class RightPanel {
 
     // block
     const loc = findBlockLocation(doc, sel.blockId);
-    if (!loc) return;
+    if (!loc) {
+      const tabs = h('div', { class: 'sm-tabs' }, [
+        this._tabBtn('props', '属性'),
+        this._tabBtn('code', '代码'),
+      ]);
+      this.el.append(tabs);
+      this.el.append(
+        h('div', { class: 'sm-empty-form' }, ['该组件可能已被删除，请重新选中画布中的块。']),
+      );
+      return;
+    }
     const def = this.opts.registry.get(loc.block.type);
 
     const tabs = h('div', { class: 'sm-tabs' }, [
@@ -310,8 +320,7 @@ export class RightPanel {
   private _renderBlockForm(block: Block, schema: BlockSchemaField[]): HTMLElement {
     const form = h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() });
     for (const field of schema) {
-      const v = (block.props as any)[field.key];
-      form.append(this._field(field, v, (nv) => this._updateBlock(block.id, field.key, nv), block.id));
+      form.append(this._field(field, block));
     }
     return form;
   }
@@ -324,13 +333,12 @@ export class RightPanel {
     });
   }
 
-  private _field(
-    field: BlockSchemaField,
-    value: any,
-    onChange: (v: any) => void,
-    blockId: string,
-  ): HTMLElement {
+  private _field(field: BlockSchemaField, block: Block): HTMLElement {
+    const blockId = block.id;
     const fp = `block:${blockId}:${field.key}`;
+    const value = (block.props as any)[field.key];
+    const onChange = (v: any) => this._updateBlock(blockId, field.key, v);
+
     switch (field.type) {
       case 'textarea':
         return this._textareaField(field.label, value ?? '', onChange, field.help, fp);
@@ -354,13 +362,24 @@ export class RightPanel {
       case 'url':
       case 'text':
         return this._textField(field.label, value ?? '', onChange, field.placeholder ?? '', fp);
-      case 'spacing':
-        return this._spacingField(
-          field.label,
-          (value ?? [0, 0, 0, 0]) as (number | undefined)[],
-          (vals) => onChange(vals),
-          `${fp}:pad`,
-        );
+      case 'spacing': {
+        /** 与各 block 约定：四边分别存 paddingTop / paddingRight / paddingBottom / paddingLeft */
+        const p = block.props as Record<string, unknown>;
+        const quad = [
+          Number(p.paddingTop ?? 0),
+          Number(p.paddingRight ?? 0),
+          Number(p.paddingBottom ?? 0),
+          Number(p.paddingLeft ?? 0),
+        ];
+        return this._spacingField(field.label, quad, (vals) => {
+          this.opts.store.update((d) => {
+            const loc = findBlockLocation(d, blockId);
+            if (!loc) return;
+            const pr = loc.block.props as Record<string, number>;
+            [pr.paddingTop, pr.paddingRight, pr.paddingBottom, pr.paddingLeft] = vals;
+          });
+        }, `${fp}:pad`);
+      }
       default:
         return h('div');
     }
