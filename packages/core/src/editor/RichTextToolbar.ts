@@ -1,5 +1,5 @@
-import type { InlineEditor, SelectionState } from './InlineEditor';
 import { h } from '../utils/dom';
+import type { InlineEditor, SelectionState } from './InlineEditor';
 
 /**
  * 富文本浮动工具条。
@@ -13,7 +13,7 @@ import { h } from '../utils/dom';
  *  - 按钮全部 mousedown.preventDefault：不抢焦点；select/color/url 这些
  *    必须 takeFocus 的控件不能 preventDefault，但因为 mousedown 已经存档了选区，
  *    onChange/onClick 时调 exec 即可。
- *  - 链接：链形按钮始终可点开输入框；在已有 <a> 内会预填 href 可改；断链按钮仅在有链接时显示。
+ *  - 定位：贴在当前内联编辑根节点（正文容器）**上沿外**，不跟随选区以免压住文字；顶栏贴顶时落到下沿外。
  */
 export interface RichTextToolbarOptions {
   /** 工具条的定位上下文：rect 是相对该容器计算的 */
@@ -97,8 +97,8 @@ export class RichTextToolbar {
       this.hide();
       return;
     }
-    this._position(state.rect);
     this.show();
+
     const f = state.formats;
     this._setActive('bold', f.bold);
     this._setActive('italic', f.italic);
@@ -123,6 +123,12 @@ export class RichTextToolbar {
       const px = f.fontSize.match(/\d+px/)?.[0];
       if (px && FONT_SIZES.includes(px)) this.selectFontSize.value = px;
     }
+
+    const ed = this.editor;
+    requestAnimationFrame(() => {
+      if (!this.editor || ed !== this.editor || !this.el.classList.contains('is-visible')) return;
+      this._positionForAnchor(ed.getAnchorRect());
+    });
   }
 
   destroy() {
@@ -259,8 +265,7 @@ export class RichTextToolbar {
       type: 'color',
       title: '文字背景色',
       value: '#fff7e6',
-      oninput: (e: Event) =>
-        this.editor?.exec('hiliteColor', (e.target as HTMLInputElement).value),
+      oninput: (e: Event) => this.editor?.exec('hiliteColor', (e.target as HTMLInputElement).value),
     }) as HTMLInputElement;
 
     // 链接：插入链接（无链接时显示）
@@ -380,18 +385,31 @@ export class RichTextToolbar {
     }
   }
 
-  private _position(rect: DOMRect | null) {
-    if (!rect) return;
+  /**
+   * 相对 `positionRoot` 定位：默认贴在**正文容器**上沿上方，避免压在选区文字上；
+   * 若顶端空间不足则贴在容器下沿下方。
+   */
+  private _positionForAnchor(anchor: DOMRect) {
     const rootRect = this.opts.positionRoot.getBoundingClientRect();
-    const top = rect.top - rootRect.top - this.el.offsetHeight - 8;
+    const gap = 6;
+    const bar = this.el.getBoundingClientRect();
+    const tw = bar.width || this.el.offsetWidth;
+    const th = bar.height || this.el.offsetHeight || 40;
+
+    let top = anchor.top - rootRect.top - th - gap;
+    if (top < 8) {
+      top = anchor.bottom - rootRect.top + gap;
+    }
+
     const left = Math.max(
       8,
       Math.min(
-        rect.left - rootRect.left + rect.width / 2 - this.el.offsetWidth / 2,
-        rootRect.width - this.el.offsetWidth - 8,
+        anchor.left - rootRect.left + anchor.width / 2 - tw / 2,
+        rootRect.width - tw - 8,
       ),
     );
-    this.el.style.top = `${Math.max(8, top)}px`;
+
+    this.el.style.top = `${top}px`;
     this.el.style.left = `${left}px`;
   }
 

@@ -145,8 +145,10 @@ export class Canvas {
     this.inner.style.background = doc.styles.contentBackgroundColor;
     this.inner.style.fontFamily = doc.styles.fontFamily;
     this.inner.style.fontSize = doc.styles.fontSize;
+    this.inner.style.fontWeight = doc.styles.fontWeight || 'normal';
     this.inner.style.color = doc.styles.color;
-    this.inner.style.lineHeight = doc.styles.lineHeight;
+    this.inner.style.lineHeight = doc.styles.lineHeight ?? '1.5';
+    this.inner.style.setProperty('--sm-editor-link-color', doc.styles.linkColor);
 
     if (!doc.sections.length) {
       this.inner.append(
@@ -155,8 +157,8 @@ export class Canvas {
         ]),
       );
     } else {
-      for (const section of doc.sections) {
-        this.inner.append(this._renderSection(section, doc));
+      for (let si = 0; si < doc.sections.length; si++) {
+        this.inner.append(this._renderSection(doc.sections[si], doc, si));
       }
     }
 
@@ -182,54 +184,65 @@ export class Canvas {
     this._syncSelection();
   }
 
-  private _renderSection(section: Section, doc: EmailDoc): HTMLElement {
+  private _renderSection(section: Section, doc: EmailDoc, sectionIndex: number) {
     const a = section.attrs;
     const padding = `${a.paddingTop ?? 0}px ${a.paddingRight ?? 0}px ${
       a.paddingBottom ?? 0
     }px ${a.paddingLeft ?? 0}px`;
 
+    const layoutShort = layoutHumanLabel(section.layout);
+    const sectionChip = `区块 ${sectionIndex + 1} · ${layoutShort}`;
+
     const wrap = h('div', {
       class: 'sm-section',
       'data-id': section.id,
+      title: `${sectionChip}。子组件铺满列内时：按 Esc 或 Alt+点击块可选中本节。`,
       style: `padding:${padding};${a.backgroundColor ? `background:${a.backgroundColor};` : ''}`,
     });
 
     const toolbar = h('div', { class: 'sm-section__toolbar' }, [
+      h('span', { class: 'sm-section__toolbar-label', title: sectionChip }, [sectionChip]),
       h(
-        'button',
-        {
-          class: 'sm-tool-btn sm-section__handle',
-          type: 'button',
-          title: '拖拽排序',
-          onmousedown: (e: Event) => e.stopPropagation(),
-        },
-        [iconDrag()],
-      ),
-      h(
-        'button',
-        {
-          class: 'sm-tool-btn',
-          type: 'button',
-          title: '复制',
-          onclick: (e: Event) => {
-            e.stopPropagation();
-            this._duplicateSection(section.id);
-          },
-        },
-        [iconCopy()],
-      ),
-      h(
-        'button',
-        {
-          class: 'sm-tool-btn sm-tool-btn--danger',
-          type: 'button',
-          title: '删除',
-          onclick: (e: Event) => {
-            e.stopPropagation();
-            this._removeSection(section.id);
-          },
-        },
-        [iconTrash()],
+        'div',
+        { class: 'sm-section__toolbar-actions' },
+        [
+          h(
+            'button',
+            {
+              class: 'sm-tool-btn sm-section__handle',
+              type: 'button',
+              title: '拖拽排序',
+              onmousedown: (e: Event) => e.stopPropagation(),
+            },
+            [iconDrag()],
+          ),
+          h(
+            'button',
+            {
+              class: 'sm-tool-btn',
+              type: 'button',
+              title: '复制',
+              onclick: (e: Event) => {
+                e.stopPropagation();
+                this._duplicateSection(section.id);
+              },
+            },
+            [iconCopy()],
+          ),
+          h(
+            'button',
+            {
+              class: 'sm-tool-btn sm-tool-btn--danger',
+              type: 'button',
+              title: '删除',
+              onclick: (e: Event) => {
+                e.stopPropagation();
+                this._removeSection(section.id);
+              },
+            },
+            [iconTrash()],
+          ),
+        ],
       ),
     ]);
 
@@ -338,7 +351,7 @@ export class Canvas {
     // 内容容器：renderPreview 输出放这里，便于精确定位 inlineEditable selector
     const content = h('div', { class: 'sm-block__content', html: inner });
 
-    // 块工具条：贴在组件顶边上方，含名称 / 代码编辑 / 拖拽 / 复制 / 删除
+    // 块工具条：hover 仅名称；选中 / 编辑中显示全部按钮；贴在块顶边之上不压内容
     const blockToolbar = h('div', { class: 'sm-block__toolbar' }, [
       h(
         'span',
@@ -346,69 +359,75 @@ export class Canvas {
         [displayName],
       ),
       h(
-        'button',
-        {
-          class: 'sm-tool-btn sm-block__handle',
-          type: 'button',
-          title: '拖拽排序',
-          onmousedown: (e: Event) => e.stopPropagation(),
-          onclick: (e: Event) => e.stopPropagation(),
-        },
-        [iconDrag()],
-      ),
-      def?.inlineEditable && !block.lockedMjml
-        ? h(
+        'div',
+        { class: 'sm-block__toolbar-actions' },
+        [
+          h(
+            'button',
+            {
+              class: 'sm-tool-btn sm-block__handle',
+              type: 'button',
+              title: '拖拽排序',
+              onmousedown: (e: Event) => e.stopPropagation(),
+              onclick: (e: Event) => e.stopPropagation(),
+            },
+            [iconDrag()],
+          ),
+          def?.inlineEditable && !block.lockedMjml
+            ? h(
+                'button',
+                {
+                  class: 'sm-tool-btn',
+                  type: 'button',
+                  title: '编辑文本',
+                  onclick: (e: Event) => {
+                    e.stopPropagation();
+                    this._enterEditing(block);
+                  },
+                },
+                [iconEdit()],
+              )
+            : null,
+          h(
             'button',
             {
               class: 'sm-tool-btn',
               type: 'button',
-              title: '编辑文本',
+              title: '编辑组件代码',
               onclick: (e: Event) => {
                 e.stopPropagation();
-                this._enterEditing(block);
+                this.blockCodeModal.open(block.id, displayName);
               },
             },
-            [iconEdit()],
-          )
-        : null,
-      h(
-        'button',
-        {
-          class: 'sm-tool-btn',
-          type: 'button',
-          title: '编辑组件代码',
-          onclick: (e: Event) => {
-            e.stopPropagation();
-            this.blockCodeModal.open(block.id, displayName);
-          },
-        },
-        [iconCode()],
-      ),
-      h(
-        'button',
-        {
-          class: 'sm-tool-btn',
-          type: 'button',
-          title: '复制',
-          onclick: (e: Event) => {
-            e.stopPropagation();
-            this._duplicateBlock(block.id);
-          },
-        },
-        [iconCopy()],
-      ),
-      h(
-        'button',
-        {
-          class: 'sm-tool-btn sm-tool-btn--danger',
-          type: 'button',
-          title: '删除',
-          onclick: (e: Event) => {
-            e.stopPropagation();
-            this._removeBlock(block.id);
-          },
-        },
-        [iconTrash()],
+            [iconCode()],
+          ),
+          h(
+            'button',
+            {
+              class: 'sm-tool-btn',
+              type: 'button',
+              title: '复制',
+              onclick: (e: Event) => {
+                e.stopPropagation();
+                this._duplicateBlock(block.id);
+              },
+            },
+            [iconCopy()],
+          ),
+          h(
+            'button',
+            {
+              class: 'sm-tool-btn sm-tool-btn--danger',
+              type: 'button',
+              title: '删除',
+              onclick: (e: Event) => {
+                e.stopPropagation();
+                this._removeBlock(block.id);
+              },
+            },
+            [iconTrash()],
+          ),
+        ],
       ),
     ]);
 
@@ -416,6 +435,12 @@ export class Canvas {
 
     el.addEventListener('click', (e) => {
       if (this.editingBlockId === block.id) return; // 编辑中不抢焦点
+      /** Alt（mac Option）：穿透选中父级 Section，解决单列内边距为 0 时块铺满无法点到 Section */
+      if (e.altKey) {
+        e.stopPropagation();
+        this.opts.store.setSelection({ kind: 'section', sectionId: section.id });
+        return;
+      }
       e.stopPropagation();
       this.opts.store.setSelection({
         kind: 'block',
@@ -747,6 +772,18 @@ export class Canvas {
 }
 
 /* ---------------------------------- utils --------------------------------- */
+
+const LAYOUT_LABELS: Record<SectionLayout, string> = {
+  '1': '一列',
+  '1-1': '两列',
+  '1-2': '1:2',
+  '2-1': '2:1',
+  '1-1-1': '三列',
+};
+
+function layoutHumanLabel(layout: SectionLayout): string {
+  return LAYOUT_LABELS[layout] ?? layout;
+}
 
 function layoutFlexStyle(_layout: SectionLayout): string {
   return 'display:flex;flex-wrap:nowrap;width:100%;';

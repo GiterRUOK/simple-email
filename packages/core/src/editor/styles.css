@@ -192,6 +192,16 @@
   border-radius: var(--sm-radius);
   box-shadow: var(--sm-shadow-md);
   min-height: 400px;
+  /* 由 Canvas 在运行时设为 doc.styles.linkColor；兜底与默认邮件 link 橙一致 */
+  --sm-editor-link-color: #ff5a00;
+}
+/* 用户代理对 <a> 的默认色会盖过继承的 color，需与预览/MJML 全局链接色对齐 */
+.sm-canvas a,
+.sm-canvas a:link,
+.sm-canvas a:visited,
+.sm-canvas a:hover,
+.sm-canvas a:active {
+  color: var(--sm-editor-link-color) !important;
 }
 
 /* Section 在画布中的呈现层（包了一层壳便于选中/排序） */
@@ -207,14 +217,47 @@
 }
 .sm-section__toolbar {
   position: absolute;
-  top: -12px;
+  top: 0;
   right: 8px;
-  display: none;
-  gap: 4px;
   z-index: 5;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  max-width: calc(100% - 16px);
+  /* 整体上移到 Section 顶边之外，不压入内边距区域 */
+  transform: translateY(calc(-100% - 8px));
+  transform-origin: top right;
 }
 .sm-section.is-selected .sm-section__toolbar,
 .sm-section:hover .sm-section__toolbar {
+  display: inline-flex;
+}
+.sm-section__toolbar-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sm-text-muted);
+  background: #fff;
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--sm-border);
+  box-shadow: var(--sm-shadow);
+  white-space: nowrap;
+  user-select: none;
+  flex-shrink: 0;
+}
+.sm-section.is-selected .sm-section__toolbar-label {
+  border-color: var(--sm-primary-soft);
+  color: var(--sm-primary);
+}
+.sm-section__toolbar-actions {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sm-section.is-selected .sm-section__toolbar-actions {
   display: inline-flex;
 }
 .sm-tool-btn {
@@ -280,36 +323,66 @@
 
 .sm-block__toolbar {
   position: absolute;
-  bottom: calc(100% + 4px);
-  top: auto;
-  left: auto;
+  top: 0;
   right: 0;
+  z-index: 6;
   display: none;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: flex-end;
   max-width: min(100%, 440px);
   padding: 4px 6px;
   border-radius: 6px;
-  background: rgba(31, 35, 40, 0.92);
   box-shadow: 0 4px 14px rgba(16, 24, 40, 0.14);
-  z-index: 6;
+  pointer-events: auto;
+  /* 整体上移到 Block 顶边之外 */
+  transform: translateY(calc(-100% - 8px));
+  transform-origin: top right;
+}
+.sm-block:hover .sm-block__toolbar,
+.sm-block.is-selected .sm-block__toolbar,
+.sm-block.is-editing .sm-block__toolbar {
+  display: inline-flex;
+}
+/* hover 仅标识：浅色条，只显示名称 */
+.sm-block:not(.is-selected):not(.is-editing):hover .sm-block__toolbar {
+  background: #fff;
+  border: 1px solid var(--sm-border);
+  box-shadow: var(--sm-shadow);
+  padding: 3px 8px;
+}
+.sm-block.is-selected .sm-block__toolbar,
+.sm-block.is-editing .sm-block__toolbar {
+  background: rgba(31, 35, 40, 0.92);
+  border: 0;
 }
 .sm-block__toolbar-name {
   font-size: 11px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.88);
   margin-right: 2px;
-  max-width: 7em;
+  max-width: 10em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   user-select: none;
 }
-.sm-block:hover .sm-block__toolbar,
-.sm-block.is-selected .sm-block__toolbar,
-.sm-block.is-editing .sm-block__toolbar {
+.sm-block:not(.is-selected):not(.is-editing) .sm-block__toolbar-name {
+  color: var(--sm-text-muted);
+}
+.sm-block.is-selected .sm-block__toolbar-name,
+.sm-block.is-editing .sm-block__toolbar-name {
+  color: rgba(255, 255, 255, 0.88);
+}
+.sm-block__toolbar-actions {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.sm-block.is-selected .sm-block__toolbar-actions,
+.sm-block.is-editing .sm-block__toolbar-actions {
   display: inline-flex;
 }
 .sm-block__handle { cursor: grab; }
@@ -347,11 +420,8 @@
 
 /* 拖动 Block 时的画布提示——只有在 sm-allow-auto-wrap 启用时才显示，
    告诉运营"释放在画布任意位置都行；会自动加一列"。
-   当 autoWrapSection=false 时，运营拖到 sections 间隙会被 SortableJS 显示为禁止图标，无提示 */
-html.sm-dragging-block .sm-root.sm-allow-auto-wrap .sm-canvas {
-  outline: 2px dashed var(--sm-primary);
-  outline-offset: 6px;
-}
+   当 autoWrapSection=false 时，运营拖到 sections 间隙会被 SortableJS 显示为禁止图标，无提示。
+   仅用顶栏文案提示即可；给整块画布加虚线框易与选中态混淆、且与文案重复。 */
 html.sm-dragging-block .sm-root.sm-allow-auto-wrap .sm-canvas-wrap::before {
   content: '🪄 释放在 Section 之间会自动加一列';
   position: sticky;

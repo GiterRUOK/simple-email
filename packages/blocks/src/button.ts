@@ -59,7 +59,7 @@ export const buttonBlock = defineBlock<ButtonProps>({
     },
     { key: 'innerPaddingV', label: '按钮内上下边距', type: 'number', min: 0, max: 40 },
     { key: 'innerPaddingH', label: '按钮内左右边距', type: 'number', min: 0, max: 60 },
-    { key: 'paddingTop', label: '外边距（上/右/下/左）', type: 'spacing' },
+    { key: 'paddingTop', label: '外边距', type: 'spacing' },
   ],
   inlineEditable: {
     selector: '.sm-button-text',

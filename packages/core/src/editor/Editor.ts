@@ -70,7 +70,7 @@ export class MailEditor {
   private body: HTMLElement;
   private changeTimer: number | null = null;
 
-  /** design 态 Esc：清空选中回到邮件设置（捕获阶段，便于焦点在 body 时也能响应） */
+  /** design 态 Esc：块 → 父级 Section → 邮件设置；选中 Section 时一次 Esc 即回邮件设置 */
   private _mailEscHandler = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.mode !== 'design') return;
@@ -82,6 +82,12 @@ export class MailEditor {
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
     if (ae && ae !== document.body && !this.root.contains(ae)) return;
     e.preventDefault();
+    const sel = this.store.selection;
+    if (sel.kind === 'block') {
+      this.canvas.commitInlineEdit();
+      this.store.setSelection({ kind: 'section', sectionId: sel.sectionId });
+      return;
+    }
     this._focusMailSettings();
   };
 
@@ -404,6 +410,17 @@ export class MailEditor {
 /* ----------------------------- 默认空文档 ------------------------------- */
 
 function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
+  const mergedStyles = {
+    backgroundColor: '#f4f4f6',
+    contentBackgroundColor: '#ffffff',
+    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
+    fontSize: '16px',
+    fontWeight: 'normal',
+    color: '#433f3f',
+    linkColor: '#ff5a00',
+    lineHeight: '1.5',
+    ...(partial?.styles ?? {}),
+  };
   return {
     version: '1',
     meta: {
@@ -414,14 +431,9 @@ function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
     },
     variables: partial?.variables ?? [],
     styles: {
-      backgroundColor: '#f4f4f6',
-      contentBackgroundColor: '#ffffff',
-      fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
-      fontSize: '16px',
-      color: '#433f3f',
-      linkColor: '#ff5a00',
-      lineHeight: '1.5',
-      ...(partial?.styles ?? {}),
+      ...mergedStyles,
+      fontWeight: mergedStyles.fontWeight ?? 'normal',
+      lineHeight: mergedStyles.lineHeight ?? '1.5',
     },
     sections: partial?.sections ?? [],
   };

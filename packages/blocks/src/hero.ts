@@ -63,7 +63,7 @@ export const heroBlock = defineBlock<HeroProps>({
       ],
     },
     { key: 'textColor', label: '文字颜色', type: 'color' },
-    { key: 'paddingTop', label: '内边距（上/右/下/左）', type: 'spacing' },
+    { key: 'paddingTop', label: '内边距', type: 'spacing' },
     {
       key: 'content',
       label: '正文（HTML）',

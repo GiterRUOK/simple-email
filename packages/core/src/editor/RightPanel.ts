@@ -250,6 +250,31 @@ export class RightPanel {
         '',
         'doc:styles.fontSize',
       ),
+      this._selectField(
+        '字重',
+        doc.styles.fontWeight ?? 'normal',
+        [
+          { label: '常规', value: 'normal' },
+          { label: '中等 500', value: '500' },
+          { label: '半粗 600', value: '600' },
+          { label: '加粗 700', value: 'bold' },
+        ],
+        (v) =>
+          this.opts.store.update((d) => {
+            d.styles.fontWeight = v;
+          }),
+        'doc:styles.fontWeight',
+      ),
+      this._textField(
+        '行高',
+        doc.styles.lineHeight ?? '1.5',
+        (v) =>
+          this.opts.store.update((d) => {
+            d.styles.lineHeight = v;
+          }),
+        '如 1.5 或 24px',
+        'doc:styles.lineHeight',
+      ),
       this._colorField(
         '正文颜色',
         doc.styles.color,
@@ -260,13 +285,14 @@ export class RightPanel {
         'doc:styles.color',
       ),
       this._colorField(
-        '链接颜色',
+        '链接文字色',
         doc.styles.linkColor,
         (v) =>
           this.opts.store.update((d) => {
             d.styles.linkColor = v;
           }),
         'doc:styles.linkColor',
+        '正文里超链接的显示颜色；导出时已对 :link/:visited/:hover/:active 使用同色（邮件客户端支持程度不一）。',
       ),
     ]);
   }
@@ -460,28 +486,34 @@ export class RightPanel {
     value: string,
     onChange: (v: string) => void,
     focusPrefix?: string,
+    help?: string,
   ) {
     const pickToken = focusPrefix ? `${focusPrefix}:pick` : undefined;
     const textToken = focusPrefix ? `${focusPrefix}:text` : undefined;
-    return h('div', { class: 'sm-field' }, [
-      h('label', { class: 'sm-field__label' }, [label]),
-      h('div', { class: 'sm-color-row' }, [
-        h('input', {
-          type: 'color',
-          value: value || '#ffffff',
-          ...(pickToken ? { 'data-sm-focus': pickToken } : {}),
-          oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
-        }),
-        h('input', {
-          class: 'sm-input',
-          type: 'text',
-          value,
-          placeholder: '#ffffff',
-          ...(textToken ? { 'data-sm-focus': textToken } : {}),
-          oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
-        }),
-      ]),
-    ]);
+    return h(
+      'div',
+      { class: 'sm-field' },
+      [
+        h('label', { class: 'sm-field__label' }, [label]),
+        h('div', { class: 'sm-color-row' }, [
+          h('input', {
+            type: 'color',
+            value: value || '#ffffff',
+            ...(pickToken ? { 'data-sm-focus': pickToken } : {}),
+            oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
+          }),
+          h('input', {
+            class: 'sm-input',
+            type: 'text',
+            value,
+            placeholder: '#ffffff',
+            ...(textToken ? { 'data-sm-focus': textToken } : {}),
+            oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
+          }),
+        ]),
+        help ? h('div', { class: 'sm-field__help' }, [help]) : null,
+      ],
+    );
   }
   private _selectField(
     label: string,

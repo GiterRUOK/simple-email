@@ -47,7 +47,7 @@ export const imageBlock = defineBlock<ImageProps>({
         { label: '右', value: 'right' },
       ],
     },
-    { key: 'paddingTop', label: '内边距（上/右/下/左）', type: 'spacing' },
+    { key: 'paddingTop', label: '内边距', type: 'spacing' },
   ],
   toMjml: (p) => {
     const padding = `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;

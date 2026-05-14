@@ -26,8 +26,12 @@ export interface GlobalStyles {
   contentBackgroundColor: string;
   fontFamily: string;
   fontSize: string;
+  /** 全局字重，如 normal / 500 / bold */
+  fontWeight: string;
   color: string;
+  /** 正文区域中超链接的默认显示颜色（文字色） */
   linkColor: string;
+  /** 无单位倍数（如 1.5）或固定值（如 24px） */
   lineHeight: string;
 }
 

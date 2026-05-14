@@ -160,6 +160,11 @@ export class InlineEditor {
     this._restoreSelection();
   }
 
+  /** 内联编辑根节点（如 `.sm-text-content`）的盒模型矩形，供富文本条贴在正文区域外沿定位 */
+  getAnchorRect(): DOMRect {
+    return this.el.getBoundingClientRect();
+  }
+
   private _restoreSelection() {
     if (!this.savedRange) return;
     const sel = window.getSelection();
@@ -300,18 +305,15 @@ export class InlineEditor {
       return;
     }
     const range = sel.getRangeAt(0);
-    const rect = sel.isCollapsed
-      ? this._caretRect(range)
-      : range.getBoundingClientRect();
+    const rect = sel.isCollapsed ? this._caretRect(range) : range.getBoundingClientRect();
 
-    const align: SelectionState['formats']['align'] =
-      document.queryCommandState('justifyCenter')
-        ? 'center'
-        : document.queryCommandState('justifyRight')
-          ? 'right'
-          : document.queryCommandState('justifyFull')
-            ? 'justify'
-            : 'left';
+    const align: SelectionState['formats']['align'] = document.queryCommandState('justifyCenter')
+      ? 'center'
+      : document.queryCommandState('justifyRight')
+        ? 'right'
+        : document.queryCommandState('justifyFull')
+          ? 'justify'
+          : 'left';
 
     const link = (() => {
       const a = findAncestorAnchor(sel.anchorNode, this.el);
@@ -395,10 +397,7 @@ function placeCaretAtClientPoint(root: HTMLElement, clientX: number, clientY: nu
   const doc = root.ownerDocument;
   const d = doc as Document & {
     caretRangeFromPoint?: (x: number, y: number) => Range | null;
-    caretPositionFromPoint?: (
-      x: number,
-      y: number,
-    ) => { offsetNode: Node; offset: number } | null;
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
   };
   let range: Range | null = null;
   if (d.caretRangeFromPoint) {
