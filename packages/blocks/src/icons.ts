@@ -10,4 +10,5 @@ export const icons = {
   logo: `<svg width="24" height="24" viewBox="0 0 24 24"><path d="M5 18V6l7 6 7-6v12" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>`,
   social: `<svg width="24" height="24" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/><circle cx="12" cy="12" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/><circle cx="18" cy="12" r="2.5" stroke="currentColor" stroke-width="1.4" fill="none"/></svg>`,
   footer: `<svg width="24" height="24" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="10" rx="1.5" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5 18h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`,
+  socialGroup: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="16" cy="12" r="2" stroke="currentColor" stroke-width="1.4"/></svg>`,
 };

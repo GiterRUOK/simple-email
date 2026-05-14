@@ -497,6 +497,44 @@ html.sm-dragging-block .sm-root.sm-allow-auto-wrap .sm-canvas-wrap::before {
   gap: 10px;
 }
 
+.sm-social-link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sm-social-link-list__row {
+  display: grid;
+  grid-template-columns: minmax(0, 100px) 1fr auto;
+  gap: 6px;
+  align-items: center;
+}
+.sm-social-link-list__network {
+  min-width: 0;
+}
+.sm-social-link-list__href {
+  min-width: 0;
+}
+.sm-social-link-list__remove {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-sm);
+  background: #fff;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--sm-text-muted);
+}
+.sm-social-link-list__remove:hover {
+  border-color: var(--sm-danger);
+  color: var(--sm-danger);
+}
+.sm-social-link-list__add {
+  margin-top: 4px;
+  align-self: flex-start;
+}
+
 .sm-field {
   display: flex;
   flex-direction: column;

@@ -7,6 +7,7 @@ import { htmlBlock } from './html';
 import { imageBlock } from './image';
 import { logoBlock } from './logo';
 import { socialBlock } from './social';
+import { socialGroupBlock } from './socialGroup';
 import { spacerBlock } from './spacer';
 import { textBlock } from './text';
 
@@ -19,6 +20,7 @@ export {
   imageBlock,
   logoBlock,
   socialBlock,
+  socialGroupBlock,
   spacerBlock,
   textBlock,
 };
@@ -28,6 +30,7 @@ export const builtinBlocks: BlockDefinition<any>[] = [
   textBlock,
   htmlBlock,
   imageBlock,
+  socialGroupBlock,
   heroBlock,
   buttonBlock,
   dividerBlock,

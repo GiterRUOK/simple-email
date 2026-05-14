@@ -285,14 +285,13 @@ export class RightPanel {
         'doc:styles.color',
       ),
       this._colorField(
-        '链接文字色',
+        '链接颜色',
         doc.styles.linkColor,
         (v) =>
           this.opts.store.update((d) => {
             d.styles.linkColor = v;
           }),
         'doc:styles.linkColor',
-        '正文里超链接的显示颜色；导出时已对 :link/:visited/:hover/:active 使用同色（邮件客户端支持程度不一）。',
       ),
     ]);
   }
@@ -406,9 +405,102 @@ export class RightPanel {
           });
         }, `${fp}:pad`);
       }
+      case 'socialLinkList':
+        return this._socialLinkListField(
+          field.label,
+          Array.isArray(value) ? (value as { network: string; href: string }[]) : [],
+          field.options ?? [],
+          onChange,
+          field.help,
+          fp,
+        );
       default:
         return h('div');
     }
+  }
+
+  /** 社交组等：{ network, href }[] 可视编辑，支持增删行 */
+  private _socialLinkListField(
+    label: string,
+    items: { network: string; href: string }[],
+    networkOptions: { label: string; value: string }[],
+    onChange: (v: { network: string; href: string }[]) => void,
+    help: string | undefined,
+    focusPrefix: string,
+  ): HTMLElement {
+    const firstVal = networkOptions[0]?.value ?? 'weibo';
+    const wrap = h('div', { class: 'sm-field' });
+    wrap.append(h('label', { class: 'sm-field__label' }, [label]));
+
+    const listEl = h('div', { class: 'sm-social-link-list' });
+
+    const syncItem = (index: number, patch: Partial<{ network: string; href: string }>) => {
+      const next = items.map((x, i) => (i === index ? { ...x, ...patch } : x));
+      onChange(next);
+    };
+
+    const removeAt = (index: number) => {
+      onChange(items.filter((_, i) => i !== index));
+    };
+
+    for (let i = 0; i < items.length; i++) {
+      const rowData = items[i];
+      const rowWrap = h('div', { class: 'sm-social-link-list__row' });
+      const sel = h('select', {
+        class: 'sm-select sm-social-link-list__network',
+        ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:net` } : {}),
+        onchange: (e: Event) =>
+          syncItem(i, { network: (e.target as HTMLSelectElement).value }),
+      });
+      for (const o of networkOptions) {
+        const opt = document.createElement('option');
+        opt.value = o.value;
+        opt.textContent = o.label;
+        if (o.value === rowData.network) opt.selected = true;
+        sel.append(opt);
+      }
+      if (!networkOptions.some((o) => o.value === rowData.network) && rowData.network) {
+        const opt = document.createElement('option');
+        opt.value = rowData.network;
+        opt.textContent = rowData.network;
+        opt.selected = true;
+        sel.insertBefore(opt, sel.firstChild);
+      }
+      const inp = h('input', {
+        class: 'sm-input sm-social-link-list__href',
+        type: 'url',
+        placeholder: 'https://',
+        value: rowData.href,
+        ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:href` } : {}),
+        oninput: (e: Event) => syncItem(i, { href: (e.target as HTMLInputElement).value }),
+      });
+      const rm = h(
+        'button',
+        {
+          class: 'sm-social-link-list__remove',
+          type: 'button',
+          title: '删除',
+          onclick: () => removeAt(i),
+        },
+        ['×'],
+      );
+      rowWrap.append(sel, inp, rm);
+      listEl.append(rowWrap);
+    }
+
+    const addBtn = h(
+      'button',
+      {
+        class: 'sm-btn sm-social-link-list__add',
+        type: 'button',
+        onclick: () => onChange([...items, { network: firstVal, href: 'https://' }]),
+      },
+      ['+ 添加社交链接'],
+    );
+
+    wrap.append(listEl, addBtn);
+    if (help) wrap.append(h('div', { class: 'sm-field__help' }, [help]));
+    return wrap;
   }
 
   /* --------------------------------- 控件 --------------------------------- */
@@ -486,34 +578,28 @@ export class RightPanel {
     value: string,
     onChange: (v: string) => void,
     focusPrefix?: string,
-    help?: string,
   ) {
     const pickToken = focusPrefix ? `${focusPrefix}:pick` : undefined;
     const textToken = focusPrefix ? `${focusPrefix}:text` : undefined;
-    return h(
-      'div',
-      { class: 'sm-field' },
-      [
-        h('label', { class: 'sm-field__label' }, [label]),
-        h('div', { class: 'sm-color-row' }, [
-          h('input', {
-            type: 'color',
-            value: value || '#ffffff',
-            ...(pickToken ? { 'data-sm-focus': pickToken } : {}),
-            oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
-          }),
-          h('input', {
-            class: 'sm-input',
-            type: 'text',
-            value,
-            placeholder: '#ffffff',
-            ...(textToken ? { 'data-sm-focus': textToken } : {}),
-            oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
-          }),
-        ]),
-        help ? h('div', { class: 'sm-field__help' }, [help]) : null,
-      ],
-    );
+    return h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, [label]),
+      h('div', { class: 'sm-color-row' }, [
+        h('input', {
+          type: 'color',
+          value: value || '#ffffff',
+          ...(pickToken ? { 'data-sm-focus': pickToken } : {}),
+          oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
+        }),
+        h('input', {
+          class: 'sm-input',
+          type: 'text',
+          value,
+          placeholder: '#ffffff',
+          ...(textToken ? { 'data-sm-focus': textToken } : {}),
+          oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
+        }),
+      ]),
+    ]);
   }
   private _selectField(
     label: string,

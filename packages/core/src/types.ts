@@ -110,8 +110,9 @@ export interface BlockSchemaField {
     | 'switch'
     | 'image'
     | 'url'
-    | 'spacing';
-  /** select 用 */
+    | 'spacing'
+    | 'socialLinkList';
+  /** select 用；socialLinkList 时每行的「平台」下拉候选 */
   options?: { label: string; value: string }[];
   /** number 用 */
   min?: number;
