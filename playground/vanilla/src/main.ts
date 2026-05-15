@@ -1,6 +1,76 @@
-import { MailEditor } from '@simple-mail/core';
+import {
+  MailEditor,
+  type GalleryItem,
+  type ImageGalleryAdapter,
+  type ImageGalleryListResult,
+} from '@simple-mail/core';
 import '@simple-mail/core/style.css';
 import { allBlocks } from '@simple-mail/blocks';
+
+const demoItems: GalleryItem[] = [
+  {
+    id: 'demo-1',
+    url: 'https://picsum.photos/seed/simplemail-a/640/320',
+    thumbnailUrl: 'https://picsum.photos/seed/simplemail-a/240/160',
+    title: '示例素材 A',
+  },
+  {
+    id: 'demo-2',
+    url: 'https://picsum.photos/seed/simplemail-b/640/320',
+    thumbnailUrl: 'https://picsum.photos/seed/simplemail-b/240/160',
+    title: '示例素材 B',
+  },
+];
+
+let demoNextId = 100;
+
+const demoGalleryAdapter: ImageGalleryAdapter = {
+  async listItems({
+    query,
+    page,
+  }: {
+    query: string;
+    page: number;
+  }): Promise<ImageGalleryListResult> {
+    const q = query.trim().toLowerCase();
+    const filtered = demoItems.filter(
+      (x) => !q || `${x.title ?? ''} ${x.url}`.toLowerCase().includes(q),
+    );
+    const pageSize = 6;
+    const start = page * pageSize;
+    const items = filtered.slice(start, start + pageSize);
+    const hasMore = start + pageSize < filtered.length;
+    await new Promise((r) => setTimeout(r, page === 0 ? 120 : 60));
+    return { items, hasMore };
+  },
+  async uploadFile(file: File): Promise<void> {
+    const seed =
+      encodeURIComponent(file.name.replace(/\W/g, '_').slice(0, 24) || 'up') +
+      '-' +
+      Date.now();
+    const url = `https://picsum.photos/seed/${seed}/640/280`;
+    demoItems.unshift({
+      id: `up-${demoNextId++}`,
+      url,
+      thumbnailUrl: url,
+      title: file.name,
+    });
+  },
+  async addByUrl(raw: string): Promise<void> {
+    const u = raw.trim();
+    if (!/^https?:\/\/.+/i.test(u)) throw new Error('请输入有效的 http(s) 链接');
+    demoItems.unshift({
+      id: `url-${demoNextId++}`,
+      url: u,
+      thumbnailUrl: u,
+      title: '外链图片',
+    });
+  },
+  async deleteItem(id: string): Promise<void> {
+    const i = demoItems.findIndex((x) => x.id === id);
+    if (i >= 0) demoItems.splice(i, 1);
+  },
+};
 
 const container = document.getElementById('app')!;
 
@@ -16,26 +86,18 @@ const editor = new MailEditor({
     ],
     sections: [],
   },
-  /** 演示用：上传 / 图床返回 picsum 占位图（真实项目请接入自家 OSS 与素材库） */
+  /** 演示：侧边栏上传 + 内置图库（列表 / 搜索一行工具栏 / 上传与添加 / 删除） */
   imageAssets: {
-    showGallery: true, // 图床入口默认关闭，演示里显式打开
+    showGallery: true,
     async uploadImage(file: File) {
       const seed = encodeURIComponent(file.name.replace(/\W/g, '_').slice(0, 40) || 'up');
       return `https://picsum.photos/seed/${seed}/600/240`;
     },
-    async pickImageFromGallery(ctx) {
-      const ok = window.confirm(
-        '演示：是否填入一张示例图 URL？\n真实接入时请在此打开自有图床弹框并 resolve 图片地址。',
-      );
-      if (!ok) return null;
-      return `https://picsum.photos/seed/pick-${ctx.propKey}-${Date.now()}/600/240`;
-    },
+    imageGallery: demoGalleryAdapter,
   },
   onChange: (doc) => {
-    // 示例：把当前 doc 写到 console，方便调试
     console.debug('[doc changed]', doc);
   },
 });
 
-// 暴露到 window 方便手动调试
-(window as any).editor = editor;
+(window as unknown as { editor: MailEditor }).editor = editor;

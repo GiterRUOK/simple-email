@@ -13,6 +13,7 @@ import type {
 import { defaultSocialIconBackground } from '../socialDefaults';
 import { clear, h } from '../utils/dom';
 import type { ImageAssetsHandlers, ImageFieldContext } from './imageAssets';
+import { openImageGalleryModal } from './ImageGalleryModal';
 
 /** 与社交组 block 中每行元素结构一致（core 不依赖 blocks） */
 type SocialLinkRow = {
@@ -625,8 +626,14 @@ export class RightPanel {
   ): HTMLElement {
     const assets = this.opts.imageAssets;
     const showUploadBtn = !!assets?.uploadImage && assets.showUpload !== false;
-    const showGalleryBtn = !!assets?.pickImageFromGallery && assets.showGallery === true;
-    const hasAssetCallbacks = !!(assets?.uploadImage || assets?.pickImageFromGallery);
+    const showGalleryBtn =
+      assets?.showGallery === true &&
+      (!!assets.imageGallery || !!assets.pickImageFromGallery);
+    const hasAssetCallbacks = !!(
+      assets?.uploadImage ||
+      assets?.pickImageFromGallery ||
+      assets?.imageGallery
+    );
     const hasAnyPickerBtn = showUploadBtn || showGalleryBtn;
 
     const row = h('div', { class: 'sm-image-field__row' });
@@ -696,14 +703,24 @@ export class RightPanel {
           {
             class: 'sm-btn sm-btn--secondary sm-image-field__btn',
             type: 'button',
-            title: '从图床或素材库选择',
-            onclick: () =>
-              runAsync(
-                assets.pickImageFromGallery!(getCtx()).then((url) => {
-                  if (url != null && String(url).trim()) applyUrl(String(url));
-                }),
-                'pickImageFromGallery',
-              ),
+            title: '从图库选择',
+            onclick: () => {
+              if (assets.imageGallery) {
+                openImageGalleryModal({
+                  adapter: assets.imageGallery,
+                  onPick: (url) => applyUrl(url),
+                });
+                return;
+              }
+              if (assets.pickImageFromGallery) {
+                runAsync(
+                  assets.pickImageFromGallery(getCtx()).then((url) => {
+                    if (url != null && String(url).trim()) applyUrl(String(url));
+                  }),
+                  'pickImageFromGallery',
+                );
+              }
+            },
           },
           ['图床'],
         ),
@@ -718,10 +735,10 @@ export class RightPanel {
       helpBody = `${bits.join('；')}。`;
     } else if (hasAssetCallbacks) {
       helpBody =
-        '已传入 imageAssets：上传入口在提供 uploadImage 时默认显示（可用 showUpload:false 关闭）；图床入口默认隐藏，需设置 showGallery:true。仍可手输 URL。';
+        '已传入 imageAssets：上传默认显示（提供 uploadImage 且未设 showUpload:false）；图库需 showGallery:true，可使用内置 imageGallery 或自管 pickImageFromGallery。仍可手输 URL。';
     } else {
       helpBody =
-        '在 new MailEditor({ …, imageAssets: { uploadImage, pickImageFromGallery, showUpload, showGallery } }) 中传入回调与入口开关；未配置时仅支持手输 URL。';
+        '在 MailEditor 的 imageAssets 中配置 uploadImage、内置 imageGallery 或 pickImageFromGallery 等；未配置时仅支持手输 URL。';
     }
 
     return h('div', { class: 'sm-field' }, [

@@ -22,4 +22,12 @@ export type {
   Selection,
   Variable,
 } from './types';
-export type { ImageAssetsHandlers, ImageFieldContext } from './editor/imageAssets';
+export type {
+  GalleryItem,
+  ImageAssetsHandlers,
+  ImageFieldContext,
+  ImageGalleryAdapter,
+  ImageGalleryListResult,
+} from './editor/imageAssets';
+export type { OpenImageGalleryModalOptions } from './editor/ImageGalleryModal';
+export { openImageGalleryModal } from './editor/ImageGalleryModal';

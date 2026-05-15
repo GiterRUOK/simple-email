@@ -18,7 +18,7 @@ Doc → Section → Column → Block       // 仅四层，不允许 Block 再含
 - 双模式：设计态 + 源码态（文档级只读 MJML/HTML，组件级可编辑 MJML 锁定）
 - 内置组件：文本、图片、按钮、分隔线、间距，以及 1/2/3 列布局
 - 自定义组件示例：公司 Logo、社交链接、页脚
-- **图片字段**：`type: 'image'` 支持手输 URL；`imageAssets.uploadImage` 默认显示「上传」；「图床」需 `pickImageFromGallery` 且 **`showGallery: true`**
+- **图片字段**：`type: 'image'` 支持手输 URL；可选 **右侧「上传」**（`uploadImage`）与 **内置图库弹层**（`imageGallery` + `showGallery: true`）；仍支持完全自管的 `pickImageFromGallery`
 - 撤销/重做、键盘删除、复制 Section/Block
 - 包体可控：核心 + MJML + CodeMirror + 富文本，gzip ≈ 586KB
 
@@ -64,34 +64,62 @@ const editor = new MailEditor({
   autoWrapSection: true,
   onChange: (doc) => console.log(doc),
   /**
-   * 可选：见下方「图片资源 imageAssets」。配置后，组件里 type: 'image' 的字段会出现「上传 / 图床」。
+   * 可选：见 README「图片资源 imageAssets」（uploadImage、内置 imageGallery、自管 pickImageFromGallery）。
    */
-  // imageAssets: { uploadImage, pickImageFromGallery, showGallery: true },
+  // imageAssets 见下方；演示见 playground（内置图库 + 侧栏上传）
+  // imageAssets: { uploadImage, imageGallery: adapter, showGallery: true },
 });
 
 const { mjml, html } = editor.export({ withSampleVariables: true });
 ```
 
-### 图片资源 `imageAssets`（上传 / 图床）
+### 图片资源 `imageAssets`
 
-编辑器**只把图片存成 props 里的 URL 字符串**（与 MJML `src` 一致），**不负责**对象存储、鉴权或图床列表。接入方通过 `MailEditor` 构造参数传入：
+编辑器**只把图片存成 props 里的 URL 字符串**（与 MJML `src` 一致），不负责对象存储落地。通过 `MailEditor` 的 **`imageAssets`** 合并配置。
 
-| 回调 | 说明 |
+#### 总览
+
+| 字段 | 作用 |
 |------|------|
-| `uploadImage?: (file, ctx) => Promise<string>` | 用户点击「上传」并选择本地文件后调用。宿主完成校验与上传后，返回邮件中可访问的 **HTTPS 绝对地址**。 |
-| `pickImageFromGallery?: (ctx) => Promise<string \| null>` | 用户点击「图床」后调用。宿主自行打开弹层/页面，展示素材库；用户选定后 `resolve(url)`，取消或关闭则 `resolve(null)`。 |
-| `showUpload?: boolean` | 是否显示「上传」按钮；**仅当配置了 `uploadImage` 时有效**。**默认 `true`**；设为 `false` 可关闭上传入口。 |
-| `showGallery?: boolean` | 是否显示「图床」按钮；**仅当配置了 `pickImageFromGallery` 时有效**。**默认 `false`**；需设为 `true` 才展示图床入口。 |
+| `uploadImage?: (file, ctx) => Promise<string>` | 属性面板「上传」→ 返回可插入邮件的 **HTTPS 绝对 URL**。 |
+| `imageGallery?: ImageGalleryAdapter` | **内置图库弹层**（搜索、分页、选图、可选「链接添加 / 弹层内上传」）。配合 `showGallery: true` 显示「图床」按钮。 |
+| `pickImageFromGallery?: (ctx) => Promise<string \| null>` | **完全自管**图床 UI；与 `imageGallery` 可并存，**同时存在时优先打开内置图库**。 |
+| `showUpload?` | 是否显示「上传」；仅当配置了 `uploadImage` 时有效，**默认 `true`**。 |
+| `showGallery?` | 是否显示「图床」；配置了 `imageGallery` **或** `pickImageFromGallery` 时有效，**默认 `false`**。 |
 
-上下文 `ctx`（类型 `ImageFieldContext`，可从 `@simple-mail/core` 导入）：
+`ImageFieldContext`（`blockId` / `propKey` / `currentUrl`）在 `uploadImage` 与 `pickImageFromGallery` 中传入，可从 `@simple-mail/core` 导入。
 
-- `blockId`：当前块 id  
-- `propKey`：对应 `block.props` 字段名（如 `src`、`backgroundUrl`）  
-- `currentUrl`：输入框当前值（未失焦前也会尽量与 DOM 同步），便于默认目录或搜索  
+#### 内置图库 `ImageGalleryAdapter`
 
-未配置 `imageAssets` 时，`type: 'image'` 仍为 URL 输入；配置后，**默认**在提供 `uploadImage` 时显示「上传」按钮，**默认不**显示「图床」按钮（即使已写 `pickImageFromGallery`），需将 `showGallery` 设为 `true` 才出现图床入口。
+宿主实现数据与业务，**不写弹框 DOM**。弹层样式根节点为 `.sm-gallery-modal`，可通过 **CSS 变量** 覆盖主题，例如：
 
-**注意：** 邮件客户端需要**公网可访问**的图片 URL；`data:` / CID 内联图属于另一条能力，需单独扩展 MJML。`playground/vanilla` 内用 picsum 演示占位 URL，**不能**当生产 CDN。
+```css
+.sm-gallery-modal {
+  --sm-gallery-cell-bg: #f0f4f8;
+  --sm-gallery-thumb-h: 96px;
+}
+```
+
+| 方法 | 必选 | 说明 |
+|------|:----:|------|
+| `listItems({ query, page })` | ✅ | `query` 为搜索框文本；`page` 从 **0** 起。返回 `{ items: GalleryItem[], hasMore }`。 |
+| `uploadFile?(file)` |  | 若提供，工具栏显示「**上传**」（与搜索、添加同一行）；完成后重新请求第 0 页。 |
+| `addByUrl?(url)` |  | 若提供，工具栏显示链接输入与「**添加**」；完成后重新请求第 0 页；校验/落库由宿主完成，失败请 `throw`。 |
+| `deleteItem?(id)` |  | 若提供，每张缩略图右上角可删除；成功后重新请求第 0 页；失败请 `throw`。 |
+
+搜索框、链接输入、「添加」「上传」在**同一行**展示（窄屏下自动换行）。
+
+`GalleryItem`：`id`、`url`（写入字段的最终地址）、可选 `thumbnailUrl`、`title`。
+
+进阶：若需在任意时机主动打开同一套 UI，可导入 **`openImageGalleryModal({ adapter, onPick, parent?, onClose? })`**（类型 `OpenImageGalleryModalOptions`）。
+
+#### 与自管图库的关系
+
+仅需要自有弹层时：只配 `pickImageFromGallery` + `showGallery: true`。  
+需要本库弹层时：配 `imageGallery` + `showGallery: true`。  
+若两者都配，点击「图床」**走 `imageGallery`**。
+
+**注意：** 邮件中图片需**公网可访问** URL；`data:` / CID 需另扩 MJML。`playground` 中 picsum 仅作演示。
 
 ### React 集成（最小封装示意）
 
@@ -189,7 +217,7 @@ export const couponBlock = defineBlock<{ title: string; code: string; expiresAt:
 new MailEditor({ container, blocks: [...allBlocks, couponBlock] });
 ```
 
-`schema` 字段类型支持：`text | textarea | number | color | select | switch | image | url | spacing | socialLinkList`。其中 **`image`** 在右侧渲染为「图片 URL +（可选）上传 / 图床」，依赖宿主传入 `MailEditor` 的 `imageAssets`，见上文「图片资源 imageAssets」。
+`schema` 字段类型支持：`text | textarea | number | color | select | switch | image | url | spacing | socialLinkList`。其中 **`image`** 渲染为「URL 输入 +（可选）上传 +（可选）图库」，由 `MailEditor` 的 **`imageAssets`** 控制，见上文「图片资源 imageAssets」。
 所有字段会在右栏自动渲染表单，change 事件回写 `block.props`。
 
 ### 内联编辑 inlineEditable
