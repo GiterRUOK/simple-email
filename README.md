@@ -276,13 +276,14 @@ new MailEditor({ container, blocks: [...allBlocks, couponBlock] });
 ```ts
 interface EmailDoc {
   version: '1';
-  meta: { subject: string; preheader?: string; width: number };
+  meta: { subject: string; preheader?: string; width: number | string };
   variables: { key: string; label: string; sample?: string }[];
   styles: { backgroundColor; contentBackgroundColor; fontFamily; fontSize; color; linkColor; lineHeight };
   sections: Section[];   // 顺序即视觉顺序
 }
 interface Section { id; type: 'section'; layout: '1'|'1-1'|'1-2'|'2-1'|'1-1-1'; attrs; columns: Column[] }
 // attrs.preserveColumnsOnMobile：多列时可设 true，MJML 包 mj-group，小屏仍为并排列；默认/未设则小屏堆叠列
+// attrs.width：本节最大宽度（px 或 %），窄于邮件宽度时居中；不设则同邮件 meta.width
 // attrs.columnGap：多列时列间距 (px)，MJML 通过列对称 padding 实现；单列无效
 interface Column  { id; attrs; blocks: Block[] }
 interface Block   { id; type; props; lockedMjml? }

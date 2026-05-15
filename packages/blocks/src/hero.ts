@@ -1,4 +1,4 @@
-import { defineBlock } from '@simple-mail/core';
+import { defineBlock, docContentWidthCss } from '@simple-mail/core';
 import { icons } from './icons';
 
 interface HeroProps {
@@ -79,13 +79,13 @@ export const heroBlock = defineBlock<HeroProps>({
     placeholder: '编写覆盖在图片上的文案…',
   },
   toMjml: (p, ctx) => {
-    const w = ctx.doc.meta.width;
+    const w = docContentWidthCss(ctx.doc.meta.width);
     const padding = `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;
     const h = `${p.height}px`;
     return `<mj-hero
       mode="fixed-height"
       height="${h}"
-      background-width="${w}px"
+      background-width="${w}"
       background-height="${h}"
       background-url="${escapeAttr(p.backgroundUrl)}"
       background-color="${escapeAttr(p.backgroundColor)}"
@@ -100,7 +100,7 @@ export const heroBlock = defineBlock<HeroProps>({
     </mj-hero>`;
   },
   renderPreview: (p, ctx) => {
-    const w = ctx.doc.meta.width;
+    const w = docContentWidthCss(ctx.doc.meta.width);
     const flexAlign =
       p.verticalAlign === 'top' ? 'flex-start' : p.verticalAlign === 'bottom' ? 'flex-end' : 'center';
     const padding = `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;
@@ -109,7 +109,7 @@ export const heroBlock = defineBlock<HeroProps>({
       style="
         box-sizing:border-box;
         width:100%;
-        max-width:${w}px;
+        max-width:${w};
         min-height:${p.height}px;
         margin:0 auto;
         background-image:linear-gradient(to bottom,rgba(0,0,0,0.25),rgba(0,0,0,0.35)),url(${url});

@@ -2,8 +2,7 @@ import { EditorView, basicSetup } from 'codemirror';
 import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
 import type { Registry } from '../registry/registry';
-import { findBlockLocation, findSection } from '../store/store';
-import type { Store, DocChangedDetail } from '../store/store';
+import { findBlockLocation, findSection, type Store, type DocChangedDetail } from '../store/store';
 import type {
   Block,
   BlockSchemaField,
@@ -12,6 +11,7 @@ import type {
 } from '../types';
 import { defaultSocialIconBackground } from '../socialDefaults';
 import { clear, h } from '../utils/dom';
+import { metaWidthInputString, parseMetaWidthFromUserInput, parseSectionWidthFromUserInput, sectionWidthInputString } from '../utils/contentWidth';
 import type { ImageAssetsHandlers, ImageFieldContext } from './imageAssets';
 import { openImageGalleryModal } from './ImageGalleryModal';
 
@@ -220,11 +220,14 @@ export class RightPanel {
         '',
         'doc:meta.preheader',
       ),
-      this._numberField('内容宽度 (px)', doc.meta.width, 320, 800, (v) =>
-        this.opts.store.update((d) => {
-          d.meta.width = v;
-        }),
-        1,
+      this._textField(
+        '内容宽度',
+        metaWidthInputString(doc.meta.width),
+        (v) =>
+          this.opts.store.update((d) => {
+            d.meta.width = parseMetaWidthFromUserInput(v);
+          }),
+        '如 600、600px、100%',
         'doc:meta.width',
       ),
       h('div', { class: 'sm-panel__title' }, ['全局样式']),
@@ -328,6 +331,17 @@ export class RightPanel {
           }),
         `section:${section.id}:attrs.bg`,
       ),
+      this._textField(
+        '区域宽度',
+        sectionWidthInputString(a.width),
+        (v) =>
+          this.opts.store.update((d) => {
+            const s = findSection(d, section.id);
+            if (s) s.attrs.width = parseSectionWidthFromUserInput(v);
+          }),
+        '留空=与邮件同宽；如 480px、90%',
+        `section:${section.id}:attrs.width`,
+      ),
       this._spacingField(
         '内边距',
         [a.paddingTop, a.paddingRight, a.paddingBottom, a.paddingLeft],
@@ -426,8 +440,11 @@ export class RightPanel {
           { blockId, propKey: field.key },
         );
       case 'url':
-      case 'text':
-        return this._textField(field.label, value ?? '', onChange, field.placeholder ?? '', fp);
+      case 'text': {
+        const row = this._textField(field.label, value ?? '', onChange, field.placeholder ?? '', fp);
+        if (field.help) row.append(h('div', { class: 'sm-field__help' }, [field.help]));
+        return row;
+      }
       case 'spacing': {
         /** 与各 block 约定：四边分别存 paddingTop / paddingRight / paddingBottom / paddingLeft */
         const p = block.props as Record<string, unknown>;

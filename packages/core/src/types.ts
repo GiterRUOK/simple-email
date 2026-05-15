@@ -17,8 +17,10 @@ export interface EmailDoc {
 export interface EmailMeta {
   subject: string;
   preheader?: string;
-  /** 邮件内容宽度，默认 600 */
-  width: number;
+  /**
+   * 邮件内容区宽度：正整数按 px 存库；也可用字符串显式写 `600px`、`100%` 等。
+   */
+  width: number | string;
 }
 
 export interface GlobalStyles {
@@ -68,6 +70,10 @@ export interface SectionAttrs {
    * MJML 通过相邻 `mj-column` 对称内边距实现；画布用 flex `gap` 对齐观感。
    */
   columnGap?: number;
+  /**
+   * 本节内容区最大宽度（窄于邮件 `meta.width` 时居中）。支持 `480`、`480px`、`90%`；留空则与邮件同宽。
+   */
+  width?: string | number;
 }
 
 export interface Column {

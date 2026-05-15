@@ -1,5 +1,6 @@
 import type { Registry } from '../registry/registry';
 import type { Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
+import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import { escapeAttr } from '../utils/dom';
 import {
   mjRawCellTypographyFromStyles,
@@ -30,12 +31,30 @@ export function docToMjml(doc: EmailDoc, registry: Registry): string {
     </mj-attributes>
     <mj-style>
       a { color: ${escapeAttr(attrs.linkColor)}; }
+${sectionWidthConstraintCss(doc)}
     </mj-style>
   </mj-head>
-  <mj-body background-color="${escapeAttr(attrs.backgroundColor)}" width="${doc.meta.width}px">
+  <mj-body background-color="${escapeAttr(attrs.backgroundColor)}" width="${escapeAttr(docContentWidthCss(doc.meta.width))}">
 ${sections}
   </mj-body>
 </mjml>`;
+}
+
+function sectionMjClassName(sectionId: string): string {
+  return `sm-sec-${sectionId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+}
+
+/** 为设置了宽度的 Section 生成 max-width 规则（css-class 挂在 mj-section 上） */
+function sectionWidthConstraintCss(doc: EmailDoc): string {
+  return doc.sections
+    .map((s) => {
+      const w = blockButtonWidthCss(s.attrs.width);
+      if (!w) return '';
+      const cls = sectionMjClassName(s.id);
+      return `      .${cls} { max-width: ${w} !important; width: 100% !important; margin-left: auto !important; margin-right: auto !important; }`;
+    })
+    .filter(Boolean)
+    .join('\n');
 }
 
 function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext): string {
@@ -44,6 +63,8 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
     .map((v) => `${v ?? 0}px`)
     .join(' ');
   const bg = a.backgroundColor ? ` background-color="${escapeAttr(a.backgroundColor)}"` : '';
+  const secW = blockButtonWidthCss(a.width);
+  const secCls = secW ? ` css-class="${escapeAttr(sectionMjClassName(section.id))}"` : '';
   const widths = layoutWidths(section.layout);
   const gapPx = Math.max(0, section.attrs.columnGap ?? 0);
 
@@ -60,7 +81,7 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
       ? `      <mj-group>\n${indent(columns, 2)}\n      </mj-group>`
       : columns;
 
-  return `    <mj-section padding="${padding}"${bg}>
+  return `    <mj-section padding="${padding}"${bg}${secCls}>
 ${grouped}
     </mj-section>`;
 }

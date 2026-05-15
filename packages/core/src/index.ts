@@ -32,3 +32,11 @@ export type {
 } from './editor/imageAssets';
 export type { OpenImageGalleryModalOptions } from './editor/ImageGalleryModal';
 export { openImageGalleryModal } from './editor/ImageGalleryModal';
+export {
+  blockButtonWidthCss,
+  docContentWidthCss,
+  metaWidthInputString,
+  parseMetaWidthFromUserInput,
+  parseSectionWidthFromUserInput,
+  sectionWidthInputString,
+} from './utils/contentWidth';

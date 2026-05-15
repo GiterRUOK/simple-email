@@ -1,6 +1,7 @@
 import Sortable from 'sortablejs';
 import type { Registry } from '../registry/registry';
 import { createSection, findBlockLocation, pruneEmptySections } from '../store/store';
+import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import type { Store } from '../store/store';
 import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
 import { clear, escapeHtml, h } from '../utils/dom';
@@ -153,7 +154,7 @@ export class Canvas {
     clear(this.inner);
 
     const { doc } = this.opts.store;
-    this.inner.style.maxWidth = `${doc.meta.width}px`;
+    this.inner.style.maxWidth = docContentWidthCss(doc.meta.width);
     this.inner.style.background = doc.styles.contentBackgroundColor;
     this.inner.style.fontFamily = doc.styles.fontFamily;
     this.inner.style.fontSize = doc.styles.fontSize;
@@ -201,11 +202,15 @@ export class Canvas {
     const layoutShort = layoutHumanLabel(section.layout);
     const sectionChip = `区块 ${sectionIndex + 1} · ${layoutShort}`;
 
+    const sw = blockButtonWidthCss(a.width);
+    const box =
+      sw != null ? `max-width:${sw};width:100%;margin-left:auto;margin-right:auto;box-sizing:border-box;` : '';
+
     const wrap = h('div', {
       class: 'sm-section',
       'data-id': section.id,
       title: `${sectionChip}。子组件铺满列内时：按 Esc 或 Alt+点击块可选中本节。`,
-      style: `padding:${padding};${a.backgroundColor ? `background:${a.backgroundColor};` : ''}`,
+      style: `padding:${padding};${a.backgroundColor ? `background:${a.backgroundColor};` : ''}${box}`,
     });
 
     const toolbar = h('div', { class: 'sm-section__toolbar' }, [
