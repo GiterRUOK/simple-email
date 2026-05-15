@@ -22,3 +22,4 @@ export type {
   Selection,
   Variable,
 } from './types';
+export type { ImageAssetsHandlers, ImageFieldContext } from './editor/imageAssets';

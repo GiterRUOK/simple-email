@@ -17,6 +17,7 @@ import { RichTextToolbar } from './RichTextToolbar';
 import { RightPanel } from './RightPanel';
 import { SourceView } from './SourceView';
 import { Topbar, type EditorMode } from './Topbar';
+import type { ImageAssetsHandlers } from './imageAssets';
 
 import './styles.css';
 
@@ -42,6 +43,10 @@ export interface EditorOptions {
   clearSelectionOnCanvasMargin?: boolean;
   /** 文档变更回调（防抖发出） */
   onChange?: (doc: EmailDoc) => void;
+  /**
+   * 可选。为 `type: 'image'` 提供上传 / 图床；`showUpload` 默认 true（有 uploadImage 时），`showGallery` 默认 false。
+   */
+  imageAssets?: ImageAssetsHandlers;
 }
 
 /**
@@ -51,6 +56,7 @@ export interface EditorOptions {
  *   const editor = new MailEditor({
  *     container: document.getElementById('app')!,
  *     blocks: [/* 自定义组件 *\/],
+ *     // imageAssets: { uploadImage, pickImageFromGallery, showGallery: true }  // 可选，见 README
  *   });
  *   editor.setVariables([{ key: 'user.name', label: '用户名', sample: '张三' }]);
  *   editor.export(); // -> { mjml, html }
@@ -211,7 +217,11 @@ export class MailEditor {
       autoWrapSection: autoWrap,
       clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin !== false,
     });
-    this.rightPanel = new RightPanel({ store: this.store, registry: this.registry });
+    this.rightPanel = new RightPanel({
+      store: this.store,
+      registry: this.registry,
+      imageAssets: this.opts.imageAssets,
+    });
     this.sourceView = new SourceView({ store: this.store, registry: this.registry });
 
     this.body.append(this.leftPanel.el, this.canvas.el, this.rightPanel.el);

@@ -89,6 +89,20 @@
 .sm-btn--primary:hover { filter: brightness(1.05); }
 .sm-btn--ghost { border-color: transparent; background: transparent; }
 .sm-btn--ghost:hover { background: #f0f1f4; }
+.sm-btn--secondary {
+  border: 1px solid var(--sm-border);
+  background: #fff;
+  color: var(--sm-text);
+  font-size: 12px;
+  padding: 0 10px;
+  height: 30px;
+  border-radius: var(--sm-radius-sm);
+  white-space: nowrap;
+}
+.sm-btn--secondary:hover {
+  background: #f5f6f8;
+  border-color: #c7cad1;
+}
 
 .sm-segmented {
   display: inline-flex;
@@ -579,6 +593,28 @@ html.sm-dragging-block .sm-root.sm-allow-auto-wrap .sm-canvas-wrap::before {
   font-size: 11px;
   color: var(--sm-text-muted);
 }
+
+.sm-image-field__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sm-image-field__url {
+  flex: 1 1 120px;
+  min-width: 0;
+}
+.sm-image-field__btn {
+  flex-shrink: 0;
+}
+.sm-image-field__file {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .sm-input,
 .sm-textarea,
 .sm-select {

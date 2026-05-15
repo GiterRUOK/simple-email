@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { defaultSocialIconBackground } from '../socialDefaults';
 import { clear, h } from '../utils/dom';
+import type { ImageAssetsHandlers, ImageFieldContext } from './imageAssets';
 
 /** 与社交组 block 中每行元素结构一致（core 不依赖 blocks） */
 type SocialLinkRow = {
@@ -25,6 +26,10 @@ type SocialLinkRow = {
 export interface RightPanelOptions {
   store: Store;
   registry: Registry;
+  /**
+   * 可选。配置后，schema 中 `type: 'image'` 的字段会显示「上传 / 图床」按钮并调用对应回调。
+   */
+  imageAssets?: ImageAssetsHandlers;
 }
 
 type RightTab = 'props' | 'code';
@@ -394,6 +399,14 @@ export class RightPanel {
       case 'switch':
         return this._switchField(field.label, !!value, onChange, field.help, fp);
       case 'image':
+        return this._imageField(
+          field.label,
+          value ?? '',
+          onChange,
+          field.placeholder ?? 'https://',
+          fp,
+          { blockId, propKey: field.key },
+        );
       case 'url':
       case 'text':
         return this._textField(field.label, value ?? '', onChange, field.placeholder ?? '', fp);
@@ -598,6 +611,123 @@ export class RightPanel {
         ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
         oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
       }),
+    ]);
+  }
+
+  /** `type: 'image'`：URL 输入 + 可选上传、图床（由 `imageAssets` 注入） */
+  private _imageField(
+    label: string,
+    value: string,
+    onChange: (v: string) => void,
+    placeholder: string,
+    focusToken: string | undefined,
+    ids: Pick<ImageFieldContext, 'blockId' | 'propKey'>,
+  ): HTMLElement {
+    const assets = this.opts.imageAssets;
+    const showUploadBtn = !!assets?.uploadImage && assets.showUpload !== false;
+    const showGalleryBtn = !!assets?.pickImageFromGallery && assets.showGallery === true;
+    const hasAssetCallbacks = !!(assets?.uploadImage || assets?.pickImageFromGallery);
+    const hasAnyPickerBtn = showUploadBtn || showGalleryBtn;
+
+    const row = h('div', { class: 'sm-image-field__row' });
+    const urlInp = h('input', {
+      class: 'sm-input sm-image-field__url',
+      type: 'url',
+      value,
+      placeholder,
+      ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
+      oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
+    });
+    const getCtx = (): ImageFieldContext => ({
+      blockId: ids.blockId,
+      propKey: ids.propKey,
+      currentUrl: urlInp.value,
+    });
+    row.append(urlInp);
+
+    const applyUrl = (url: string) => {
+      const t = url.trim();
+      if (!t) return;
+      onChange(t);
+      urlInp.value = t;
+    };
+
+    const runAsync = (p: Promise<string | null | void>, labelErr: string) => {
+      p.catch((e) => {
+        console.error(`[simple-mail] ${labelErr}`, e);
+      });
+    };
+
+    if (showUploadBtn) {
+      const fileInp = h('input', {
+        type: 'file',
+        accept: 'image/*',
+        class: 'sm-image-field__file',
+        onchange: (e: Event) => {
+          const el = e.target as HTMLInputElement;
+          const f = el.files?.[0];
+          el.value = '';
+          if (!f) return;
+          runAsync(
+            assets.uploadImage!(f, getCtx()).then((url) => applyUrl(String(url))),
+            'uploadImage',
+          );
+        },
+      });
+      row.append(
+        h(
+          'button',
+          {
+            class: 'sm-btn sm-btn--secondary sm-image-field__btn',
+            type: 'button',
+            title: '上传本地图片',
+            onclick: () => fileInp.click(),
+          },
+          ['上传'],
+        ),
+      );
+      row.append(fileInp);
+    }
+
+    if (showGalleryBtn) {
+      row.append(
+        h(
+          'button',
+          {
+            class: 'sm-btn sm-btn--secondary sm-image-field__btn',
+            type: 'button',
+            title: '从图床或素材库选择',
+            onclick: () =>
+              runAsync(
+                assets.pickImageFromGallery!(getCtx()).then((url) => {
+                  if (url != null && String(url).trim()) applyUrl(String(url));
+                }),
+                'pickImageFromGallery',
+              ),
+          },
+          ['图床'],
+        ),
+      );
+    }
+
+    let helpBody: string;
+    if (hasAnyPickerBtn) {
+      const bits: string[] = ['可手输 URL'];
+      if (showUploadBtn) bits.push('或使用「上传」');
+      if (showGalleryBtn) bits.push('或使用「图床」');
+      helpBody = `${bits.join('；')}。`;
+    } else if (hasAssetCallbacks) {
+      helpBody =
+        '已传入 imageAssets：上传入口在提供 uploadImage 时默认显示（可用 showUpload:false 关闭）；图床入口默认隐藏，需设置 showGallery:true。仍可手输 URL。';
+    } else {
+      helpBody =
+        '在 new MailEditor({ …, imageAssets: { uploadImage, pickImageFromGallery, showUpload, showGallery } }) 中传入回调与入口开关；未配置时仅支持手输 URL。';
+    }
+
+    return h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, [label]),
+      row,
+      h('div', { class: 'sm-field__help' }, [helpBody]),
     ]);
   }
   private _textareaField(

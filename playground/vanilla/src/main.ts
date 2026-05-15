@@ -16,6 +16,21 @@ const editor = new MailEditor({
     ],
     sections: [],
   },
+  /** 演示用：上传 / 图床返回 picsum 占位图（真实项目请接入自家 OSS 与素材库） */
+  imageAssets: {
+    showGallery: true, // 图床入口默认关闭，演示里显式打开
+    async uploadImage(file: File) {
+      const seed = encodeURIComponent(file.name.replace(/\W/g, '_').slice(0, 40) || 'up');
+      return `https://picsum.photos/seed/${seed}/600/240`;
+    },
+    async pickImageFromGallery(ctx) {
+      const ok = window.confirm(
+        '演示：是否填入一张示例图 URL？\n真实接入时请在此打开自有图床弹框并 resolve 图片地址。',
+      );
+      if (!ok) return null;
+      return `https://picsum.photos/seed/pick-${ctx.propKey}-${Date.now()}/600/240`;
+    },
+  },
   onChange: (doc) => {
     // 示例：把当前 doc 写到 console，方便调试
     console.debug('[doc changed]', doc);
