@@ -1,6 +1,6 @@
 import Sortable from 'sortablejs';
 import type { Registry } from '../registry/registry';
-import { createSection, findBlockLocation } from '../store/store';
+import { createSection, findBlockLocation, pruneEmptySections } from '../store/store';
 import type { Store } from '../store/store';
 import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
 import { clear, escapeHtml, h } from '../utils/dom';
@@ -634,6 +634,7 @@ export class Canvas {
         // 由于来源 column 内的 block 不属于 inner 的直接子节点，
         // newIndex 在 inner 的可视位置上是准确的。
         d.sections.splice(newIndex, 0, newSection);
+        pruneEmptySections(d);
       });
       this.opts.store.setSelection({
         kind: 'block',
@@ -688,6 +689,7 @@ export class Canvas {
         const [moved] = fromCol.blocks.splice(idx, 1);
         const targetSec = d.sections.find((s) => s.id === sectionId);
         targetSec?.columns[columnIndex]?.blocks.splice(newIndex, 0, moved);
+        pruneEmptySections(d);
       });
     }
   }
@@ -735,6 +737,7 @@ export class Canvas {
       if (!loc) return;
       const col = loc.section.columns[loc.columnIndex];
       col.blocks = col.blocks.filter((b) => b.id !== id);
+      pruneEmptySections(d);
     });
     this.opts.store.setSelection(null);
   }

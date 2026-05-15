@@ -125,6 +125,17 @@ export function findBlockLocation(
   return undefined;
 }
 
+/**
+ * 从文档中移除「每一列都没有任何 Block」的 Section。
+ * 在内容块被删除或拖走后调用，可与 `autoWrapSection` 搭配，避免唯一块离场后仍残留空壳；
+ * 不会在用户仅点击「添加 Section」时单独触发，因此未拖入内容的空布局仍会保留在画布上。
+ */
+export function pruneEmptySections(draft: EmailDoc) {
+  draft.sections = draft.sections.filter((sec) =>
+    sec.columns.some((col) => col.blocks.length > 0),
+  );
+}
+
 export function createSection(layout: SectionLayout): Section {
   const colCount = layout.split('-').length;
   const columns: Column[] = Array.from({ length: colCount }, () => ({

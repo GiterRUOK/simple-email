@@ -62,6 +62,7 @@ const editor = new MailEditor({
   },
   // autoWrapSection: true（默认）— 把 Block 拖到 Section 之间空白处时
   // 自动包一个一列 Section。设为 false 则强制只能拖入现有列内。
+  // 唯一块被删或拖走后，会去掉因此变空的 Section，无需再删一次壳子。
   autoWrapSection: true,
   onChange: (doc) => console.log(doc),
   /**

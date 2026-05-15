@@ -1,6 +1,6 @@
 import { Registry, defineBlock } from '../registry/registry';
 import { renderDoc } from '../renderer';
-import { Store } from '../store/store';
+import { Store, pruneEmptySections } from '../store/store';
 import type {
   BlockDefinition,
   EmailDoc,
@@ -307,6 +307,7 @@ export class MailEditor {
             const col = sec.columns[sel.columnIndex];
             if (!col) return;
             col.blocks = col.blocks.filter((b) => b.id !== sel.blockId);
+            pruneEmptySections(d);
           });
           this.store.setSelection(null);
         }
