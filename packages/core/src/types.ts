@@ -63,6 +63,11 @@ export interface SectionAttrs {
    * 为 true 时在多列 Section 内包一层 `mj-group`，小屏仍并排，列宽按比例保留（字可能很窄）。
    */
   preserveColumnsOnMobile?: boolean;
+  /**
+   * 多列时相邻列之间的水平间距（px）。单列 Section 忽略。
+   * MJML 通过相邻 `mj-column` 对称内边距实现；画布用 flex `gap` 对齐观感。
+   */
+  columnGap?: number;
 }
 
 export interface Column {

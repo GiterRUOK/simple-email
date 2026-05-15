@@ -41,7 +41,7 @@ export const heroBlock = defineBlock<HeroProps>({
   schema: [
     { key: 'backgroundUrl', label: '背景图', type: 'image' },
     { key: 'backgroundColor', label: '背景占位色', type: 'color', help: '图片加载失败时的底色' },
-    { key: 'height', label: '区域高度 (px)', type: 'number', min: 120, max: 640 },
+    { key: 'height', label: '区域高度 (px)', type: 'number', step: 1 },
     {
       key: 'verticalAlign',
       label: '文字垂直位置',

@@ -45,9 +45,12 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
     .join(' ');
   const bg = a.backgroundColor ? ` background-color="${escapeAttr(a.backgroundColor)}"` : '';
   const widths = layoutWidths(section.layout);
+  const gapPx = Math.max(0, section.attrs.columnGap ?? 0);
 
   const columns = section.columns
-    .map((col, i) => columnToMjml(col, widths[i], registry, ctx))
+    .map((col, i) =>
+      columnToMjml(col, widths[i], i, section.columns.length, gapPx, registry, ctx),
+    )
     .join('\n');
 
   /** 多列 + 显式开启时包 mj-group，阻止小屏列堆叠（MJML 官方语义） */
@@ -65,12 +68,23 @@ ${grouped}
 function columnToMjml(
   column: Column,
   width: string,
+  columnIndex: number,
+  columnCount: number,
+  columnGapPx: number,
   registry: Registry,
   ctx: RenderContext,
 ): string {
   const a = column.attrs;
   const va = a.verticalAlign ? ` vertical-align="${a.verticalAlign}"` : '';
   const bg = a.backgroundColor ? ` background-color="${escapeAttr(a.backgroundColor)}"` : '';
+
+  let gapPad = '';
+  if (columnCount > 1 && columnGapPx > 0) {
+    const half = columnGapPx / 2;
+    const pl = columnIndex > 0 ? `${half}px` : '0px';
+    const pr = columnIndex < columnCount - 1 ? `${half}px` : '0px';
+    gapPad = ` padding="0px ${pr} 0px ${pl}"`;
+  }
 
   const rawTypo = mjRawCellTypographyFromStyles(ctx.doc.styles);
   const blocks = column.blocks
@@ -94,7 +108,7 @@ function columnToMjml(
     })
     .join('\n');
 
-  return `      <mj-column width="${width}"${va}${bg}>
+  return `      <mj-column width="${width}"${va}${bg}${gapPad}>
 ${blocks || '        <!-- empty column -->'}
       </mj-column>`;
 }

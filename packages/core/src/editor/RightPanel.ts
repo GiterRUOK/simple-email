@@ -341,6 +341,23 @@ export class RightPanel {
         `section:${section.id}:attrs.pad`,
       ),
       section.layout !== '1'
+        ? this._numberField(
+            '列间距 (px)',
+            a.columnGap ?? 0,
+            0,
+            64,
+            (v) => {
+              const g = Math.max(0, Math.min(64, Math.round(v)));
+              this.opts.store.update((d) => {
+                const s = findSection(d, section.id);
+                if (s) s.attrs.columnGap = g > 0 ? g : undefined;
+              });
+            },
+            1,
+            `section:${section.id}:attrs.columnGap`,
+          )
+        : null,
+      section.layout !== '1'
         ? this._switchField(
             '小屏仍并排显示多列（可能字很窄）',
             !!a.preserveColumnsOnMobile,

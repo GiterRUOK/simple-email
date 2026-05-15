@@ -283,6 +283,7 @@ interface EmailDoc {
 }
 interface Section { id; type: 'section'; layout: '1'|'1-1'|'1-2'|'2-1'|'1-1-1'; attrs; columns: Column[] }
 // attrs.preserveColumnsOnMobile：多列时可设 true，MJML 包 mj-group，小屏仍为并排列；默认/未设则小屏堆叠列
+// attrs.columnGap：多列时列间距 (px)，MJML 通过列对称 padding 实现；单列无效
 interface Column  { id; attrs; blocks: Block[] }
 interface Block   { id; type; props; lockedMjml? }
 ```

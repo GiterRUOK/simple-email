@@ -252,7 +252,7 @@ export class Canvas {
 
     const cols = h('div', {
       class: 'sm-section__columns',
-      style: layoutFlexStyle(section.layout),
+      style: layoutFlexStyle(section.layout, section.attrs.columnGap),
     });
 
     section.columns.forEach((col, i) => {
@@ -790,8 +790,10 @@ function layoutHumanLabel(layout: SectionLayout): string {
   return LAYOUT_LABELS[layout] ?? layout;
 }
 
-function layoutFlexStyle(_layout: SectionLayout): string {
-  return 'display:flex;flex-wrap:nowrap;width:100%;';
+function layoutFlexStyle(_layout: SectionLayout, columnGap?: number): string {
+  const gap =
+    columnGap != null && columnGap > 0 ? `gap:${Math.min(columnGap, 200)}px;` : '';
+  return `display:flex;flex-wrap:nowrap;width:100%;${gap}`;
 }
 
 function layoutFlexValue(layout: SectionLayout, index: number): string {
