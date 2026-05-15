@@ -17,7 +17,7 @@ Doc → Section → Column → Block       // 仅四层，不允许 Block 再含
 - 兼容性输出：内部维护 JSON Schema，导出时编译为 MJML，再由 MJML 编译为 Outlook/Gmail 可用 HTML
 - 双模式：设计态 + 源码态（文档级只读 MJML/HTML，组件级可编辑 MJML 锁定）
 - 内置组件：文本、图片、按钮、分隔线、间距，以及 1/2/3 列布局
-- 自定义组件示例：公司 Logo、社交链接、页脚
+- 自定义组件示例：公司 Logo、业务社交链接（X / Rabbit / Facebook / TikTok / Instagram）、页脚
 - **图片字段**：`type: 'image'` 支持手输 URL；可选 **右侧「上传」**（`uploadImage`）与 **内置图库弹层**（`imageGallery` + `showGallery: true`）；仍支持完全自管的 `pickImageFromGallery`
 - 撤销/重做、键盘删除、复制 Section/Block
 - **界面主题**：顶栏 **太阳 / 月亮 / 显示器** 图标切换浅色、深色、跟随系统（`prefers-color-scheme`）；中间邮件画布仍为白纸以贴近成品

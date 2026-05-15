@@ -1,3 +1,20 @@
+/** 生成 mj-social-element 的 name 属性（与 MJML 内置图标对齐；未知平台退化为 web）。 */
+export function mjSocialElementName(network: string): string {
+  const n = network.trim();
+  if (n === 'ig') return 'instagram';
+  if (n === 'rabbit' || n === 'tiktok') return 'web';
+  return n;
+}
+
+/** 业务示例：固定海外/垂类五平台（与 custom:social 块配套）。 */
+export const BIZ_SOCIAL_NETWORK_OPTIONS: { label: string; value: string }[] = [
+  { label: 'X', value: 'x' },
+  { label: 'Rabbit', value: 'rabbit' },
+  { label: 'Facebook', value: 'facebook' },
+  { label: 'TikTok', value: 'tiktok' },
+  { label: 'Instagram', value: 'ig' },
+];
+
 /** 社交平台与 MJML mj-social-element 的 name 对齐（含常用内置名）。 */
 export const SOCIAL_NETWORK_OPTIONS: { label: string; value: string }[] = [
   { label: '微信', value: 'wechat' },
@@ -19,7 +36,10 @@ const NETWORK_META: Record<string, { color: string; preview: string }> = {
   github: { color: '#181717', preview: 'GH' },
   facebook: { color: '#1877F2', preview: 'f' },
   instagram: { color: '#E4405F', preview: '◎' },
+  ig: { color: '#E4405F', preview: '◎' },
   youtube: { color: '#FF0000', preview: '▶' },
+  tiktok: { color: '#000000', preview: '♪' },
+  rabbit: { color: '#FF2442', preview: 'R' },
   website: { color: '#6b7280', preview: '◇' },
   web: { color: '#6b7280', preview: '◇' },
 };
@@ -76,7 +96,7 @@ export function mjSocialElementsLines(
       const meta = socialMeta(l.network);
       const bgColor = l.backgroundColor?.trim() || meta.color;
       const attrs = [
-        `name="${escAttr(l.network)}"`,
+        `name="${escAttr(mjSocialElementName(l.network))}"`,
         `href="${escAttr(l.href)}"`,
         `background-color="${escAttr(bgColor)}"`,
         `color="${escAttr(textColor)}"`,

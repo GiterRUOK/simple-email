@@ -8,7 +8,10 @@ export function defaultSocialIconBackground(network: string): string {
     github: '#181717',
     facebook: '#1877F2',
     instagram: '#E4405F',
+    ig: '#E4405F',
     youtube: '#FF0000',
+    tiktok: '#000000',
+    rabbit: '#FF2442',
     website: '#6b7280',
     web: '#6b7280',
   };
