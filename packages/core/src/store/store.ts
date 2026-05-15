@@ -137,10 +137,11 @@ export function createSection(layout: SectionLayout): Section {
     type: 'section',
     layout,
     attrs: {
-      paddingTop: 16,
-      paddingRight: 16,
-      paddingBottom: 16,
-      paddingLeft: 16,
+      /** 默认 0：与内容块自带 padding 叠加易过宽；需要整节留白时在 Section 设置里调整 */
+      paddingTop: 0,
+      paddingRight: 0,
+      paddingBottom: 0,
+      paddingLeft: 0,
     },
     columns,
   };

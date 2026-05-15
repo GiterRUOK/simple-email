@@ -10,7 +10,17 @@ import type {
   EmailDoc,
   Section,
 } from '../types';
+import { defaultSocialIconBackground } from '../socialDefaults';
 import { clear, h } from '../utils/dom';
+
+/** 与社交组 block 中每行元素结构一致（core 不依赖 blocks） */
+type SocialLinkRow = {
+  network: string;
+  href: string;
+  label?: string;
+  iconSrc?: string;
+  backgroundColor?: string;
+};
 
 export interface RightPanelOptions {
   store: Store;
@@ -408,9 +418,10 @@ export class RightPanel {
       case 'socialLinkList':
         return this._socialLinkListField(
           field.label,
-          Array.isArray(value) ? (value as { network: string; href: string }[]) : [],
+          Array.isArray(value) ? (value as SocialLinkRow[]) : [],
           field.options ?? [],
-          onChange,
+          blockId,
+          field.key,
           field.help,
           fp,
         );
@@ -419,12 +430,17 @@ export class RightPanel {
     }
   }
 
-  /** 社交组等：{ network, href }[] 可视编辑，支持增删行 */
+  /**
+   * 社交组：每行含平台、链接、可选标签/图标 URL/图标背景色。
+   * 注意：右栏在输入框聚焦时会跳过整栏 _render()，故更新 elements 必须在 store.update 内
+   * 读取当前 props 再合并，禁止依赖闭包里的 items 快照（否则改一行会覆盖其它行已编辑未重绘的数据）。
+   */
   private _socialLinkListField(
     label: string,
-    items: { network: string; href: string }[],
+    items: SocialLinkRow[],
     networkOptions: { label: string; value: string }[],
-    onChange: (v: { network: string; href: string }[]) => void,
+    blockId: string,
+    elementsKey: string,
     help: string | undefined,
     focusPrefix: string,
   ): HTMLElement {
@@ -434,18 +450,33 @@ export class RightPanel {
 
     const listEl = h('div', { class: 'sm-social-link-list' });
 
-    const syncItem = (index: number, patch: Partial<{ network: string; href: string }>) => {
-      const next = items.map((x, i) => (i === index ? { ...x, ...patch } : x));
-      onChange(next);
+    const patchElements = (mutate: (rows: SocialLinkRow[]) => SocialLinkRow[]) => {
+      this.opts.store.update((d) => {
+        const loc = findBlockLocation(d, blockId);
+        if (!loc) return;
+        const props = loc.block.props as Record<string, unknown>;
+        const raw = props[elementsKey];
+        const cur: SocialLinkRow[] = Array.isArray(raw)
+          ? (raw as SocialLinkRow[]).map((x) => ({ ...x }))
+          : [];
+        props[elementsKey] = mutate(cur);
+      });
+    };
+
+    const syncItem = (index: number, patch: Partial<SocialLinkRow>) => {
+      patchElements((rows) =>
+        rows.map((x, i) => (i === index ? { ...x, ...patch } : x)),
+      );
     };
 
     const removeAt = (index: number) => {
-      onChange(items.filter((_, i) => i !== index));
+      patchElements((rows) => rows.filter((_, i) => i !== index));
     };
 
     for (let i = 0; i < items.length; i++) {
       const rowData = items[i];
       const rowWrap = h('div', { class: 'sm-social-link-list__row' });
+      const mainRow = h('div', { class: 'sm-social-link-list__row-main' });
       const sel = h('select', {
         class: 'sm-select sm-social-link-list__network',
         ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:net` } : {}),
@@ -484,7 +515,43 @@ export class RightPanel {
         },
         ['×'],
       );
-      rowWrap.append(sel, inp, rm);
+      mainRow.append(sel, inp, rm);
+      rowWrap.append(mainRow);
+
+      const extras = h('div', { class: 'sm-social-link-list__row-extras' });
+      const bgResolved = defaultSocialIconBackground(rowData.network);
+      const bgStored = rowData.backgroundColor?.trim();
+      const bgDisplay =
+        bgStored && bgStored.startsWith('#') ? bgStored : bgResolved;
+      extras.append(
+        h('input', {
+          class: 'sm-input sm-social-link-list__label',
+          type: 'text',
+          placeholder: '标签文字（可选）',
+          value: rowData.label ?? '',
+          ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:label` } : {}),
+          oninput: (e: Event) => syncItem(i, { label: (e.target as HTMLInputElement).value }),
+        }),
+        h('input', {
+          class: 'sm-input sm-social-link-list__iconsrc',
+          type: 'url',
+          placeholder: '图标 URL（可选）',
+          value: rowData.iconSrc ?? '',
+          ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:icon` } : {}),
+          oninput: (e: Event) => syncItem(i, { iconSrc: (e.target as HTMLInputElement).value }),
+        }),
+        h('input', {
+          class: 'sm-social-link-list__color sm-social-link-list__color--compact',
+          type: 'color',
+          title: '图标背景色',
+          value: bgDisplay.length >= 4 ? bgDisplay : bgResolved,
+          ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:bg` } : {}),
+          oninput: (e: Event) =>
+            syncItem(i, { backgroundColor: (e.target as HTMLInputElement).value }),
+        }),
+      );
+      rowWrap.append(extras);
+
       listEl.append(rowWrap);
     }
 
@@ -493,7 +560,16 @@ export class RightPanel {
       {
         class: 'sm-btn sm-social-link-list__add',
         type: 'button',
-        onclick: () => onChange([...items, { network: firstVal, href: 'https://' }]),
+        onclick: () =>
+          patchElements((rows) => [
+            ...rows,
+            {
+              network: firstVal,
+              href: 'https://',
+              label: '',
+              iconSrc: '',
+            },
+          ]),
       },
       ['+ 添加社交链接'],
     );

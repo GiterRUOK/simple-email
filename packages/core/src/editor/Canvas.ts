@@ -17,8 +17,8 @@ export interface CanvasOptions {
   /** 是否允许 Block 落到 sections 之间空白处时自动裹一列 Section */
   autoWrapSection: boolean;
   /**
-   * 为 true 时：点击画布包装层灰色区域（非 `.sm-canvas` 白底、非底部添加 Section 条）清空选中，
-   * 右栏回到文档级表单。
+   * 默认 true：点击 `.sm-canvas-wrap` 灰色衬底（白底画布、底部添加条以外）清空选中。
+   * 设为 false 可关闭（极少数嵌入场景需保留选中时）。
    */
   clearSelectionOnCanvasMargin?: boolean;
 }
@@ -63,7 +63,8 @@ export class Canvas {
     });
 
     this._bindDesignModeLinkSuppression();
-    if (opts.clearSelectionOnCanvasMargin) {
+    this._bindClearSelectionOnCanvasWhitespace();
+    if (opts.clearSelectionOnCanvasMargin !== false) {
       this._bindClearSelectionOnCanvasMargin();
     }
 
@@ -100,9 +101,26 @@ export class Canvas {
     this.blockCodeModal.destroy();
   }
 
-  /** 点击中栏灰色衬底（非白底画布、非底部添加 Section 条）时取消选中，回到文档级右栏 */
+  /**
+   * 点击画布白底上未落到 Section 内的区域（如 min-height 下方留白、空文档提示）时清空选中，
+   * Section/Block 上的点击会在冒泡到此前被 stopPropagation，不会误清。
+   */
+  private _bindClearSelectionOnCanvasWhitespace() {
+    this.inner.addEventListener('click', (e: MouseEvent) => {
+      const t = e.target;
+      if (!(t instanceof Node)) return;
+      const el = t instanceof Element ? t : t.parentElement;
+      if (!el) return;
+      if (el === this.inner || el.closest('.sm-empty-doc')) {
+        this.commitInlineEdit();
+        this.opts.store.setSelection(null);
+      }
+    });
+  }
+
+  /** 点击中栏灰色衬底（非白底画布、非底部添加 Section 条）时取消选中 */
   private _bindClearSelectionOnCanvasMargin() {
-    this.el.addEventListener('mousedown', (e: MouseEvent) => {
+    this.el.addEventListener('click', (e: MouseEvent) => {
       const t = e.target;
       if (!(t instanceof Node)) return;
       if (!this.el.contains(t)) return;

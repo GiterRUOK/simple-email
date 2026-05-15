@@ -36,8 +36,8 @@ export interface EditorOptions {
    */
   autoWrapSection?: boolean;
   /**
-   * 为 true 时：点击中栏白底画布之外的灰色衬底会清空选中，右栏回到「邮件设置 / 全局样式」。
-   * 默认 false，避免误触。
+   * 为 true（默认）时：点击中栏白底画布两侧的灰色衬底、下方留白等会清空选中，右栏回到「邮件设置 / 全局样式」。
+   * 设为 false 可关闭。
    */
   clearSelectionOnCanvasMargin?: boolean;
   /** 文档变更回调（防抖发出） */
@@ -209,7 +209,7 @@ export class MailEditor {
       registry: this.registry,
       toolbar: this.toolbar,
       autoWrapSection: autoWrap,
-      clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin === true,
+      clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin !== false,
     });
     this.rightPanel = new RightPanel({ store: this.store, registry: this.registry });
     this.sourceView = new SourceView({ store: this.store, registry: this.registry });
