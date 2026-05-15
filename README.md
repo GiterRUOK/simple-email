@@ -20,6 +20,7 @@ Doc → Section → Column → Block       // 仅四层，不允许 Block 再含
 - 自定义组件示例：公司 Logo、社交链接、页脚
 - **图片字段**：`type: 'image'` 支持手输 URL；可选 **右侧「上传」**（`uploadImage`）与 **内置图库弹层**（`imageGallery` + `showGallery: true`）；仍支持完全自管的 `pickImageFromGallery`
 - 撤销/重做、键盘删除、复制 Section/Block
+- **界面主题**：顶栏 **太阳 / 月亮 / 显示器** 图标切换浅色、深色、跟随系统（`prefers-color-scheme`）；中间邮件画布仍为白纸以贴近成品
 - 包体可控：核心 + MJML + CodeMirror + 富文本，gzip ≈ 586KB
 
 ## 仓库结构
@@ -72,6 +73,18 @@ const editor = new MailEditor({
 
 const { mjml, html } = editor.export({ withSampleVariables: true });
 ```
+
+### 界面主题
+
+构造参数 `theme?: 'light' | 'dark' | 'system'`（默认 `light`）。顶栏图标组与运行时 API 同步：
+
+```ts
+editor.setTheme('dark');
+editor.setTheme('system'); // 随系统明暗
+editor.getTheme();
+```
+
+根节点会设置 `data-sm-theme`，也可在宿主侧用 CSS 变量（`.sm-root` 上）覆盖配色。
 
 ### 图片资源 `imageAssets`
 

@@ -17,6 +17,7 @@ import { RichTextToolbar } from './RichTextToolbar';
 import { RightPanel } from './RightPanel';
 import { SourceView } from './SourceView';
 import { Topbar, type EditorMode } from './Topbar';
+import type { EditorTheme } from './theme';
 import type { ImageAssetsHandlers } from './imageAssets';
 
 import './styles.css';
@@ -44,6 +45,11 @@ export interface EditorOptions {
   /** 文档变更回调（防抖发出） */
   onChange?: (doc: EmailDoc) => void;
   /**
+   * 编辑器外框主题。`system` 随 `prefers-color-scheme`；邮件画布仍默认白纸以便预览成品。
+   * @default 'light'
+   */
+  theme?: EditorTheme;
+  /**
    * 可选。为 `type: 'image'` 提供上传 / 图床；`showUpload` 默认 true（有 uploadImage 时），`showGallery` 默认 false。
    */
   imageAssets?: ImageAssetsHandlers;
@@ -66,6 +72,7 @@ export class MailEditor {
   readonly registry: Registry;
   private opts: EditorOptions;
   private root: HTMLElement;
+  private theme: EditorTheme;
   private mode: EditorMode = 'design';
   private topbar!: Topbar;
   private leftPanel!: LeftPanel;
@@ -129,7 +136,9 @@ export class MailEditor {
     const initialDoc = createDefaultDoc(opts.initialDoc);
     this.store = new Store(initialDoc);
 
+    this.theme = opts.theme ?? 'light';
     this.root = h('div', { class: 'sm-root' });
+    this._applyThemeAttr();
     this.body = h('div', { class: 'sm-body' });
     opts.container.append(this.root);
 
@@ -158,6 +167,19 @@ export class MailEditor {
 
   getVariables(): Variable[] {
     return this.store.doc.variables;
+  }
+
+  /** 当前界面主题（`system` 不解析为 light/dark）。 */
+  getTheme(): EditorTheme {
+    return this.theme;
+  }
+
+  /** 切换界面主题；写入 `data-sm-theme`，顶栏选择器同步。 */
+  setTheme(t: EditorTheme) {
+    if (this.theme === t) return;
+    this.theme = t;
+    this._applyThemeAttr();
+    this.topbar?.syncTheme(t);
   }
 
   /** 导出 MJML 与编译后的 HTML。withSampleVariables=true 时把 {{var}} 替换为 sample 值用于预览。 */
@@ -189,10 +211,16 @@ export class MailEditor {
 
   /* -------------------------------- 私有 ---------------------------------- */
 
+  private _applyThemeAttr() {
+    this.root.setAttribute('data-sm-theme', this.theme);
+  }
+
   private _buildUI() {
     this.topbar = new Topbar({
       store: this.store,
       mode: this.mode,
+      theme: this.theme,
+      onThemeChange: (t) => this.setTheme(t),
       onModeChange: (m) => this._setMode(m),
       onUndo: () => {
         this.store.undo();

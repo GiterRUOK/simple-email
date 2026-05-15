@@ -22,6 +22,7 @@ export type {
   Selection,
   Variable,
 } from './types';
+export type { EditorTheme } from './editor/theme';
 export type {
   GalleryItem,
   ImageAssetsHandlers,

@@ -1,11 +1,14 @@
 import type { Store } from '../store/store';
 import { h, clear } from '../utils/dom';
+import type { EditorTheme } from './theme';
 
 export type EditorMode = 'design' | 'source';
 
 export interface TopbarOptions {
   store: Store;
   mode: EditorMode;
+  theme: EditorTheme;
+  onThemeChange: (t: EditorTheme) => void;
   onModeChange: (m: EditorMode) => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -21,6 +24,7 @@ export class Topbar {
   private opts: TopbarOptions;
   private undoBtn!: HTMLButtonElement;
   private redoBtn!: HTMLButtonElement;
+  private themeButtons!: Record<EditorTheme, HTMLButtonElement>;
   private modeButtons: Record<EditorMode, HTMLButtonElement> = {} as any;
 
   constructor(opts: TopbarOptions) {
@@ -35,6 +39,15 @@ export class Topbar {
     this.opts.mode = m;
     for (const k of ['design', 'source'] as EditorMode[]) {
       this.modeButtons[k].classList.toggle('sm-segmented__item--active', k === m);
+    }
+  }
+
+  syncTheme(t: EditorTheme) {
+    this.opts.theme = t;
+    for (const k of ['light', 'dark', 'system'] as const) {
+      const on = k === t;
+      this.themeButtons[k].classList.toggle('sm-segmented__item--active', on);
+      this.themeButtons[k].setAttribute('aria-pressed', on ? 'true' : 'false');
     }
   }
 
@@ -64,6 +77,30 @@ export class Topbar {
     );
     segmented.append(designBtn, sourceBtn);
     this.modeButtons = { design: designBtn, source: sourceBtn };
+
+    const themeSeg = h('div', {
+      class: 'sm-segmented sm-topbar__theme-seg',
+      role: 'group',
+      'aria-label': '界面主题',
+    });
+    const themeBtn = (theme: EditorTheme, title: string, icon: SVGElement) =>
+      h(
+        'button',
+        {
+          class: 'sm-segmented__item sm-topbar__theme-btn',
+          type: 'button',
+          title,
+          'aria-pressed': theme === this.opts.theme ? 'true' : 'false',
+          onclick: () => this.opts.onThemeChange(theme),
+        },
+        [icon],
+      ) as HTMLButtonElement;
+    this.themeButtons = {
+      light: themeBtn('light', '浅色', iconSun()),
+      dark: themeBtn('dark', '深色', iconMoon()),
+      system: themeBtn('system', '跟随系统', iconThemeAuto()),
+    };
+    themeSeg.append(this.themeButtons.light, this.themeButtons.dark, this.themeButtons.system);
 
     this.undoBtn = h(
       'button',
@@ -122,12 +159,14 @@ export class Topbar {
     this.el.append(
       title,
       h('div', { class: 'sm-topbar__group' }, [segmented]),
+      h('div', { class: 'sm-topbar__group' }, [themeSeg]),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),
       h('div', { class: 'sm-topbar__spacer' }),
       h('div', { class: 'sm-topbar__group' }, [mailSettingsBtn, insertVar, previewBtn, exportBtn]),
     );
 
     this.setMode(this.opts.mode);
+    this.syncTheme(this.opts.theme);
   }
 
   private _sync() {
@@ -151,11 +190,36 @@ function iconEye(): SVGElement {
     '<path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="10" cy="10" r="2.4" stroke="currentColor" stroke-width="1.5" fill="none"/>',
   );
 }
+function iconSun(): SVGElement {
+  return svgTheme(
+    '<circle cx="10" cy="10" r="3.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10 3.5V5M10 15v1.5M16.5 10H15M5 10H3.5M14.1 5.9 13 7M7 13 5.9 14.1M14.1 14.1 13 13M7 7 5.9 5.9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+  );
+}
+function iconMoon(): SVGElement {
+  return svgTheme(
+    '<path d="M8.5 4.2a5.8 5.8 0 100 11.3 4.8 4.8 0 01-1.3-11.3z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>',
+  );
+}
+/** 显示器：表示跟随系统外观 */
+function iconThemeAuto(): SVGElement {
+  return svgTheme(
+    '<path d="M5 5.5h10c.8 0 1.5.7 1.5 1.5v6c0 .8-.7 1.5-1.5 1.5H5c-.8 0-1.5-.7-1.5-1.5v-6c0-.8.7-1.5 1.5-1.5z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 16h4M10 14.2V16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>',
+  );
+}
 function svg(inner: string): SVGElement {
   const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   el.setAttribute('width', '14');
   el.setAttribute('height', '14');
   el.setAttribute('viewBox', '0 0 20 20');
+  el.innerHTML = inner;
+  return el;
+}
+function svgTheme(inner: string): SVGElement {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  el.setAttribute('width', '15');
+  el.setAttribute('height', '15');
+  el.setAttribute('viewBox', '0 0 20 20');
+  el.setAttribute('aria-hidden', 'true');
   el.innerHTML = inner;
   return el;
 }
