@@ -32,14 +32,14 @@ export const footerBlock = defineBlock<FooterProps>({
     { key: 'textColor', label: '文字颜色', type: 'color' },
   ],
   toMjml: (p) => {
-    return `<mj-text align="center" color="${esc(p.textColor)}" font-size="12px" line-height="1.6" padding="16px">
+    return `<mj-text align="center" color="${esc(p.textColor)}" font-size="12px" line-height="1.6" padding="8px 0px 8px 0px">
   ${esc(p.companyName)}<br />
   ${esc(p.address)}<br />
   <a href="${esc(p.unsubscribeHref)}" style="color:${esc(p.textColor)};">${esc(p.unsubscribeText)}</a>
 </mj-text>`;
   },
   renderPreview: (p) => {
-    return `<div style="padding:16px;text-align:center;font-size:12px;line-height:1.6;color:${p.textColor};">
+    return `<div style="padding:8px 0;text-align:center;font-size:12px;line-height:1.6;color:${p.textColor};">
       ${esc(p.companyName)}<br/>
       ${esc(p.address)}<br/>
       <a href="${esc(p.unsubscribeHref)}" style="color:${p.textColor};">${esc(p.unsubscribeText)}</a>

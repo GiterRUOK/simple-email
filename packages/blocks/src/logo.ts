@@ -39,11 +39,11 @@ export const logoBlock = defineBlock<LogoProps>({
     },
   ],
   toMjml: (p) =>
-    `<mj-image src="${esc(p.src)}" href="${esc(p.href)}" width="${p.width}px" align="${p.align}" alt="logo" padding="16px" />`,
+    `<mj-image src="${esc(p.src)}" href="${esc(p.href)}" width="${p.width}px" align="${p.align}" alt="logo" padding="8px 0px 8px 0px" />`,
   renderPreview: (p) => {
     const m =
       p.align === 'center' ? 'margin:0 auto;' : p.align === 'right' ? 'margin-left:auto;' : '';
-    return `<div style="padding:16px;text-align:${p.align};"><img src="${esc(
+    return `<div style="padding:8px 0;text-align:${p.align};"><img src="${esc(
       p.src,
     )}" alt="logo" style="display:block;${m}width:${p.width}px;max-width:100%;height:auto;" /></div>`;
   },

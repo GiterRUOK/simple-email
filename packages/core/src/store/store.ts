@@ -148,11 +148,11 @@ export function createSection(layout: SectionLayout): Section {
     type: 'section',
     layout,
     attrs: {
-      /** 默认 0：与内容块自带 padding 叠加易过宽；需要整节留白时在 Section 设置里调整 */
+      /** 默认左右 16：版心内边距由节承担；上下 0 由内容块堆叠节奏（常见 8）控制 */
       paddingTop: 0,
-      paddingRight: 0,
+      paddingRight: 16,
       paddingBottom: 0,
-      paddingLeft: 0,
+      paddingLeft: 16,
     },
     columns,
   };

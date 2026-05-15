@@ -31,9 +31,9 @@ export const imageBlock = defineBlock<ImageProps>({
     height: 0,
     align: 'center',
     paddingTop: 8,
-    paddingRight: 16,
+    paddingRight: 0,
     paddingBottom: 8,
-    paddingLeft: 16,
+    paddingLeft: 0,
   },
   schema: [
     { key: 'src', label: '图片地址', type: 'image' },

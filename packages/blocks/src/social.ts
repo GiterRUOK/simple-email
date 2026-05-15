@@ -57,9 +57,9 @@ export const socialBlock = defineBlock<SocialBizProps>({
     labelFontWeight: 'normal',
     labelColor: '#333333',
     paddingTop: 8,
-    paddingRight: 16,
+    paddingRight: 0,
     paddingBottom: 8,
-    paddingLeft: 16,
+    paddingLeft: 0,
   },
   schema: [
     {

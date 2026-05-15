@@ -98,7 +98,7 @@ function columnToMjml(
             paddingBottom?: number;
             paddingLeft?: number;
           };
-          const pad = `${Number(p.paddingTop ?? 8)}px ${Number(p.paddingRight ?? 16)}px ${Number(p.paddingBottom ?? 8)}px ${Number(p.paddingLeft ?? 16)}px`;
+          const pad = `${Number(p.paddingTop ?? 8)}px ${Number(p.paddingRight ?? 0)}px ${Number(p.paddingBottom ?? 8)}px ${Number(p.paddingLeft ?? 0)}px`;
           frag = normalizeHtmlBlockLockedMjmlForCompile(frag, pad, rawTypo);
         }
         return indent(frag, 8);

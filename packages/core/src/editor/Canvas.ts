@@ -335,9 +335,9 @@ export class Canvas {
         };
         const frag = htmlFragmentForLockedHtmlBlockCanvas(block.lockedMjml, {
           top: Number(p.paddingTop ?? 8),
-          right: Number(p.paddingRight ?? 16),
+          right: Number(p.paddingRight ?? 0),
           bottom: Number(p.paddingBottom ?? 8),
-          left: Number(p.paddingLeft ?? 16),
+          left: Number(p.paddingLeft ?? 0),
         });
         inner = `<div class="sm-html-content">${frag}</div>`;
       } else {

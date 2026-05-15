@@ -308,6 +308,7 @@ interface Block   { id; type; props; lockedMjml? }
 | 文档级源码可否回写 | ❌ 只读 | MJML/HTML → 反推 doc 风险大；如需直写源码请用组件级代码模式 |
 | 状态管理 | 自实现 immutable + history | 核心包零运行时依赖（除功能性依赖） |
 | 包体 | gzip ≈ 580KB | 主要来自 mjml-browser，后续 lazy-load 优化 |
+| 默认内边距 | Section 左右 16、上下 0；内容块上下 8、左右 0 | 横向版心由节统一；块只堆纵向节奏，避免左右重复缩进 |
 
 ## 许可证
 

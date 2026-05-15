@@ -34,7 +34,7 @@ export const dividerBlock = defineBlock<DividerProps>({
   toMjml: (p) =>
     `<mj-divider border-color="${esc(p.color)}" border-width="${p.thickness}px" width="${esc(
       p.width,
-    )}" padding="${p.paddingTop}px 16px ${p.paddingBottom}px 16px" />`,
+    )}" padding="${p.paddingTop}px 0px ${p.paddingBottom}px 0px" />`,
   renderPreview: (p) =>
-    `<div style="padding:${p.paddingTop}px 16px ${p.paddingBottom}px 16px;"><div style="border-top:${p.thickness}px solid ${p.color};width:${p.width};margin:0 auto;"></div></div>`,
+    `<div style="padding:${p.paddingTop}px 0 ${p.paddingBottom}px 0;"><div style="border-top:${p.thickness}px solid ${p.color};width:${p.width};margin:0 auto;"></div></div>`,
 });

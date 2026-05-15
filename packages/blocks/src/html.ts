@@ -17,9 +17,9 @@ export const htmlBlock = defineBlock<HtmlBlockProps>({
   defaultProps: {
     html: '<p style="margin:0;">在此写入任意 HTML，将经 <strong>mj-raw</strong> 原样输出到邮件。支持变量 {{user.name}}</p>',
     paddingTop: 8,
-    paddingRight: 16,
+    paddingRight: 0,
     paddingBottom: 8,
-    paddingLeft: 16,
+    paddingLeft: 0,
   },
   schema: [
     {
