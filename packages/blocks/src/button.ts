@@ -94,14 +94,15 @@ export const buttonBlock = defineBlock<ButtonProps>({
   renderPreview: (p) => {
     const bw = blockButtonWidthCss(p.width);
     const wst = bw ? `width:${bw};max-width:100%;box-sizing:border-box;` : '';
+    /* 画布对 .sm-canvas a 设置了带 !important 的链接色，文字颜色必须写在子节点上才能生效 */
     return `<div style="padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;text-align:${p.align};">
       <a href="${escapeAttr(p.href)}" style="display:inline-block;background:${
         p.backgroundColor
-      };color:${p.color};border-radius:${p.borderRadius}px;padding:${p.innerPaddingV}px ${
+      };border-radius:${p.borderRadius}px;padding:${p.innerPaddingV}px ${
         p.innerPaddingH
-      }px;text-decoration:none;font-size:${p.fontSize};line-height:1.2;${wst}"><span class="sm-button-text">${escapeAttr(
-        p.text,
-      )}</span></a>
+      }px;text-decoration:none;font-size:${p.fontSize};line-height:1.2;${wst}"><span class="sm-button-text" style="color:${
+        p.color
+      }">${escapeAttr(p.text)}</span></a>
     </div>`;
   },
 });

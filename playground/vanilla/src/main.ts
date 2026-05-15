@@ -98,6 +98,8 @@ const editor = new MailEditor({
   onChange: (doc) => {
     console.debug('[doc changed]', doc);
   },
+  /** 体验：右栏数字 / 内边距 / 字号滑块 + 字重分段 */
+  ui: { preferSliderControls: true },
 });
 
 (window as unknown as { editor: MailEditor }).editor = editor;

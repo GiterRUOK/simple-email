@@ -3,6 +3,7 @@ import { renderDoc } from '../renderer';
 import { Store, pruneEmptySections } from '../store/store';
 import type {
   BlockDefinition,
+  EditorUiOptions,
   EmailDoc,
   RenderEngine,
   Selection,
@@ -38,8 +39,8 @@ export interface EditorOptions {
    */
   autoWrapSection?: boolean;
   /**
-   * 为 true（默认）时：点击中栏白底画布两侧的灰色衬底、下方留白等会清空选中，右栏回到「邮件设置 / 全局样式」。
-   * 设为 false 可关闭。
+   * 为 true 时：点击中栏灰色衬底、画布内空白（未点到 Section/块）等会提交内联编辑并清空选中，右栏回到「邮件设置 / 全局样式」。
+   * 默认 false；需要「点空白取消选中」的宿主再设为 true。
    */
   clearSelectionOnCanvasMargin?: boolean;
   /** 文档变更回调（防抖发出） */
@@ -53,6 +54,8 @@ export interface EditorOptions {
    * 可选。为 `type: 'image'` 提供上传 / 图床；`showUpload` 默认 true（有 uploadImage 时），`showGallery` 默认 false。
    */
   imageAssets?: ImageAssetsHandlers;
+  /** 右栏控件形态等可选 UI 偏好。 */
+  ui?: EditorUiOptions;
 }
 
 /**
@@ -243,12 +246,14 @@ export class MailEditor {
       registry: this.registry,
       toolbar: this.toolbar,
       autoWrapSection: autoWrap,
-      clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin !== false,
+      clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin === true,
+      layerRoot: this.root,
     });
     this.rightPanel = new RightPanel({
       store: this.store,
       registry: this.registry,
       imageAssets: this.opts.imageAssets,
+      ui: this.opts.ui,
     });
     this.sourceView = new SourceView({ store: this.store, registry: this.registry });
 

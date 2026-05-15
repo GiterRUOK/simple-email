@@ -398,7 +398,7 @@
   min-height: 60px;
 }
 .sm-column.is-empty::after {
-  content: '拖入组件';
+  content: '拖入组件 · 双击插入文本';
   position: absolute;
   inset: 0;
   display: flex;
@@ -728,6 +728,97 @@ html.sm-dragging-block .sm-root.sm-allow-auto-wrap .sm-canvas-wrap::before {
   gap: 4px;
 }
 .sm-spacing-grid input { text-align: center; }
+
+.sm-spacing-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sm-spacing-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sm-spacing-row__axis {
+  flex: 0 0 18px;
+  font-size: 11px;
+  color: var(--sm-text-muted);
+  text-align: center;
+  line-height: 1.2;
+}
+.sm-spacing-row input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  accent-color: var(--sm-primary);
+}
+.sm-spacing-row .sm-input {
+  flex: 0 0 52px;
+  width: 52px;
+  text-align: center;
+}
+
+.sm-spacing-field__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.sm-spacing-field__reset {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.sm-field__slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sm-field__slider-row input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  accent-color: var(--sm-primary);
+}
+.sm-field__slider-row .sm-input {
+  width: 52px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.sm-segmented--wrap {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.sm-width-field__modes {
+  width: 100%;
+}
+.sm-width-field__slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.sm-width-field__slider-row input[type='range'] {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 28px;
+  accent-color: var(--sm-primary);
+}
+.sm-width-field__slider-row .sm-input {
+  flex: 0 0 60px;
+  width: 60px;
+  text-align: center;
+}
+.sm-width-field__slider-row.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
 
 .sm-color-row { display: flex; align-items: center; gap: 6px; }
 .sm-color-row input[type='color'] {

@@ -11,6 +11,7 @@ export type {
   BlockSchemaField,
   Column,
   EditorEvents,
+  EditorUiOptions,
   EmailDoc,
   EmailMeta,
   GlobalStyles,

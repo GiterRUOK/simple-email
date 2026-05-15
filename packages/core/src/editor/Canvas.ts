@@ -1,6 +1,6 @@
 import Sortable from 'sortablejs';
 import type { Registry } from '../registry/registry';
-import { createSection, findBlockLocation, pruneEmptySections } from '../store/store';
+import { createSection, findBlockLocation, findSection, pruneEmptySections } from '../store/store';
 import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import type { Store } from '../store/store';
 import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
@@ -18,10 +18,15 @@ export interface CanvasOptions {
   /** 是否允许 Block 落到 sections 之间空白处时自动裹一列 Section */
   autoWrapSection: boolean;
   /**
-   * 默认 true：点击 `.sm-canvas-wrap` 灰色衬底（白底画布、底部添加条以外）清空选中。
-   * 设为 false 可关闭（极少数嵌入场景需保留选中时）。
+   * 为 true 时：点击中栏灰色衬底、白底画布上未落到 Section/块的空白、空文档提示区等会提交内联编辑并清空选中。
+   * 默认不绑定（由 MailEditor 的 clearSelectionOnCanvasMargin 控制）。
    */
   clearSelectionOnCanvasMargin?: boolean;
+  /**
+   * 画布内弹层（如「编辑组件代码」）挂接到此节点，以继承 `.sm-root` 上的主题 CSS 变量。
+   * 应传入 MailEditor 根节点；若挂到 `document.body`，`var(--sm-code-bg)` 等会失效，弹框背景会变透明。
+   */
+  layerRoot: HTMLElement;
 }
 
 /**
@@ -61,13 +66,18 @@ export class Canvas {
     this.blockCodeModal = new BlockCodeModal({
       store: opts.store,
       registry: opts.registry,
+      mountParent: opts.layerRoot,
     });
 
     this._bindDesignModeLinkSuppression();
-    this._bindClearSelectionOnCanvasWhitespace();
-    if (opts.clearSelectionOnCanvasMargin !== false) {
+    if (opts.clearSelectionOnCanvasMargin) {
+      this._bindClearSelectionOnCanvasWhitespace();
       this._bindClearSelectionOnCanvasMargin();
     }
+
+    this.inner.addEventListener('dblclick', (e: MouseEvent) => {
+      this._onEmptyCanvasDblClick(e);
+    });
 
     this._render();
 
@@ -164,7 +174,11 @@ export class Canvas {
     this.inner.style.setProperty('--sm-editor-link-color', doc.styles.linkColor);
 
     if (!doc.sections.length) {
-      this.inner.append(h('div', { class: 'sm-empty-doc' }, ['从左侧把"布局"拖到这里开始 ✦']));
+      this.inner.append(
+        h('div', { class: 'sm-empty-doc' }, [
+          '从左侧拖入布局开始，或直接双击开始 ✦',
+        ]),
+      );
     } else {
       for (let si = 0; si < doc.sections.length; si++) {
         this.inner.append(this._renderSection(doc.sections[si], doc, si));
@@ -293,6 +307,15 @@ export class Canvas {
 
     for (const block of column.blocks) {
       colEl.append(this._renderBlock(section, columnIndex, block, doc));
+    }
+
+    if (isEmpty) {
+      colEl.addEventListener('dblclick', (e: MouseEvent) => {
+        if ((e.target as HTMLElement).closest('.sm-block')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this._insertEmptyTextAndEdit(section.id, columnIndex);
+      });
     }
 
     // 列内 Sortable：负责块排序，并且：
@@ -502,6 +525,60 @@ export class Canvas {
   }
 
   /* ----------------------------- 内联编辑 -------------------------------- */
+
+  /** 空文档时：在画布白底区域双击，插入一列 Section + 空文本并进入编辑 */
+  private _onEmptyCanvasDblClick(e: MouseEvent) {
+    if (this.opts.store.doc.sections.length > 0) return;
+    const t = e.target as HTMLElement | null;
+    if (!t || !this.inner.contains(t)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    this._bootstrapEmptyDocWithText();
+  }
+
+  /** 无任何 Section 时：创建单栏布局并放入空正文块，再进入内联编辑 */
+  private _bootstrapEmptyDocWithText() {
+    const reg = this.opts.registry;
+    if (!reg.get('text')?.inlineEditable) return;
+    this.opts.store.update((d) => {
+      if (d.sections.length > 0) return;
+      const newBlock = reg.createBlock('text');
+      (newBlock.props as { content: string }).content = '';
+      const section = createSection('1');
+      section.columns[0].blocks.push(newBlock);
+      d.sections.push(section);
+    });
+
+    const doc = this.opts.store.doc;
+    const firstBlock = doc.sections[0]?.columns[0]?.blocks[0];
+    if (!firstBlock) return;
+
+    requestAnimationFrame(() => {
+      const loc = findBlockLocation(this.opts.store.doc, firstBlock.id);
+      if (loc) this._enterEditing(loc.block);
+    });
+  }
+
+  /** 空列双击：插入正文组件（content 为空）并直接进入编辑 */
+  private _insertEmptyTextAndEdit(sectionId: string, columnIndex: number) {
+    const reg = this.opts.registry;
+    if (!reg.get('text')?.inlineEditable) return;
+    const newBlock = reg.createBlock('text');
+    (newBlock.props as { content: string }).content = '';
+
+    this.opts.store.update((d) => {
+      const sec = findSection(d, sectionId);
+      if (!sec) return;
+      const col = sec.columns[columnIndex];
+      if (!col || col.blocks.length > 0) return;
+      col.blocks.push(newBlock);
+    });
+
+    requestAnimationFrame(() => {
+      const loc = findBlockLocation(this.opts.store.doc, newBlock.id);
+      if (loc) this._enterEditing(loc.block);
+    });
+  }
 
   private _enterEditing(block: Block) {
     if (this.editingBlockId === block.id) return;

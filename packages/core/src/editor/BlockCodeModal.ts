@@ -11,6 +11,8 @@ import { Modal } from './Modal';
 export interface BlockCodeModalOptions {
   store: Store;
   registry: Registry;
+  /** 须落在 MailEditor `.sm-root` 子树内，才能继承 `--sm-code-bg` 等变量 */
+  mountParent: HTMLElement;
 }
 
 /**
@@ -73,7 +75,7 @@ export class BlockCodeModal {
         extensions: [basicSetup, cmHtml()],
       }),
     });
-    this.modal.open();
+    this.modal.open(this.opts.mountParent);
   }
 
   destroy() {

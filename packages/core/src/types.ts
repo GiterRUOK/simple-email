@@ -185,6 +185,16 @@ export interface RenderContext {
 /*                                  事件                                       */
 /* -------------------------------------------------------------------------- */
 
+/** MailEditor 可选 UI 行为（不改变文档模型） */
+export interface EditorUiOptions {
+  /**
+   * 为 true 时：右栏数值、内边距（四行滑块+输入）、全局/组件字号（px 滑块）、字重（分段）、
+   * Section/按钮/分隔线等「宽度」类文本字段（自适应 / px / % + 滑块）使用增强控件。
+   * 默认 false。
+   */
+  preferSliderControls?: boolean;
+}
+
 export interface EditorEvents {
   change: { doc: EmailDoc };
   selectionChange: { selection: Selection | null };

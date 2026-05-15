@@ -6,6 +6,7 @@ import { findBlockLocation, findSection, type Store, type DocChangedDetail } fro
 import type {
   Block,
   BlockSchemaField,
+  EditorUiOptions,
   EmailDoc,
   Section,
 } from '../types';
@@ -24,6 +25,25 @@ type SocialLinkRow = {
   backgroundColor?: string;
 };
 
+/** 宽度滑块：解析右栏当前字符串 */
+function classifyLayoutWidth(raw: string): 'auto' | 'px' | '%' | 'custom' {
+  const t = (raw ?? '').trim();
+  if (!t || t.toLowerCase() === 'auto') return 'auto';
+  if (/^\d+(\.\d+)?%$/.test(t)) return '%';
+  if (/^\d+(\.\d+)?px$/i.test(t)) return 'px';
+  if (/^\d+(\.\d+)?$/.test(t)) return 'px';
+  return 'custom';
+}
+
+function layoutWidthNumeric(raw: string, mode: 'px' | '%'): number {
+  const t = (raw ?? '').trim();
+  if (!t) return mode === '%' ? 100 : 280;
+  const m = t.match(/^(\d+(\.\d+)?)/);
+  const n = m ? parseFloat(m[1]) : mode === '%' ? 100 : 280;
+  if (mode === '%') return Math.min(100, Math.max(1, Math.round(n)));
+  return Math.min(1200, Math.max(1, Math.round(n)));
+}
+
 export interface RightPanelOptions {
   store: Store;
   registry: Registry;
@@ -31,6 +51,8 @@ export interface RightPanelOptions {
    * 可选。配置后，schema 中 `type: 'image'` 的字段会显示「上传 / 图床」按钮并调用对应回调。
    */
   imageAssets?: ImageAssetsHandlers;
+  /** 与 MailEditor.opts.ui 对齐 */
+  ui?: EditorUiOptions;
 }
 
 type RightTab = 'props' | 'code';
@@ -44,6 +66,10 @@ export class RightPanel {
   private opts: RightPanelOptions;
   private currentTab: RightTab = 'props';
   private codeView: EditorView | null = null;
+
+  private _preferSliderControls(): boolean {
+    return this.opts.ui?.preferSliderControls === true;
+  }
 
   constructor(opts: RightPanelOptions) {
     this.opts = opts;
@@ -259,25 +285,16 @@ export class RightPanel {
         '',
         'doc:styles.fontFamily',
       ),
-      this._textField(
-        '字号',
+      this._docFontSizeField(
         doc.styles.fontSize,
         (v) =>
           this.opts.store.update((d) => {
             d.styles.fontSize = v;
           }),
-        '',
         'doc:styles.fontSize',
       ),
-      this._selectField(
-        '字重',
+      this._docFontWeightField(
         doc.styles.fontWeight ?? 'normal',
-        [
-          { label: '常规', value: 'normal' },
-          { label: '中等 500', value: '500' },
-          { label: '半粗 600', value: '600' },
-          { label: '加粗 700', value: 'bold' },
-        ],
         (v) =>
           this.opts.store.update((d) => {
             d.styles.fontWeight = v;
@@ -331,7 +348,7 @@ export class RightPanel {
           }),
         `section:${section.id}:attrs.bg`,
       ),
-      this._textField(
+      this._layoutWidthField(
         '区域宽度',
         sectionWidthInputString(a.width),
         (v) =>
@@ -339,8 +356,8 @@ export class RightPanel {
             const s = findSection(d, section.id);
             if (s) s.attrs.width = parseSectionWidthFromUserInput(v);
           }),
-        '留空=与邮件同宽；如 480px、90%',
         `section:${section.id}:attrs.width`,
+        '留空=与邮件同宽；自适应等价于清空宽度',
       ),
       this._spacingField(
         '内边距',
@@ -353,6 +370,7 @@ export class RightPanel {
               vals;
           }),
         `section:${section.id}:attrs.pad`,
+        [0, 0, 0, 0],
       ),
       section.layout !== '1'
         ? this._numberField(
@@ -441,6 +459,32 @@ export class RightPanel {
         );
       case 'url':
       case 'text': {
+        if (field.key === 'width' && this._preferSliderControls()) {
+          const el = this._layoutWidthField(
+            field.label,
+            String(value ?? ''),
+            (v) => onChange(v),
+            fp,
+            field.help,
+          );
+          if (field.placeholder && !field.help) {
+            el.append(h('div', { class: 'sm-field__help' }, [field.placeholder]));
+          }
+          return el;
+        }
+        if (field.key === 'fontSize' && this._preferSliderControls()) {
+          const el = this._fontSizeSliderField(
+            field.label,
+            String(value ?? ''),
+            (v) => onChange(v),
+            fp,
+            field.help,
+          );
+          if (field.placeholder && !field.help) {
+            el.append(h('div', { class: 'sm-field__help' }, [field.placeholder]));
+          }
+          return el;
+        }
         const row = this._textField(field.label, value ?? '', onChange, field.placeholder ?? '', fp);
         if (field.help) row.append(h('div', { class: 'sm-field__help' }, [field.help]));
         return row;
@@ -454,6 +498,14 @@ export class RightPanel {
           Number(p.paddingBottom ?? 0),
           Number(p.paddingLeft ?? 0),
         ];
+        const def = this.opts.registry.get(block.type);
+        const dp = def?.defaultProps as Record<string, unknown> | undefined;
+        const resetQuad: [number, number, number, number] = [
+          Number(dp?.paddingTop ?? 0),
+          Number(dp?.paddingRight ?? 0),
+          Number(dp?.paddingBottom ?? 0),
+          Number(dp?.paddingLeft ?? 0),
+        ];
         return this._spacingField(field.label, quad, (vals) => {
           this.opts.store.update((d) => {
             const loc = findBlockLocation(d, blockId);
@@ -461,7 +513,7 @@ export class RightPanel {
             const pr = loc.block.props as Record<string, number>;
             [pr.paddingTop, pr.paddingRight, pr.paddingBottom, pr.paddingLeft] = vals;
           });
-        }, `${fp}:pad`);
+        }, `${fp}:pad`, resetQuad);
       }
       case 'socialLinkList':
         return this._socialLinkListField(
@@ -813,21 +865,66 @@ export class RightPanel {
     step = 1,
     focusToken?: string,
   ) {
+    const snap = (n: number) => {
+      const c = Math.min(max, Math.max(min, n));
+      if (!step || step <= 0) return c;
+      const k = Math.round((c - min) / step);
+      return Number((min + k * step).toPrecision(12));
+    };
+
+    if (!this._preferSliderControls()) {
+      return h('div', { class: 'sm-field' }, [
+        h('label', { class: 'sm-field__label' }, [label]),
+        h('input', {
+          class: 'sm-input',
+          type: 'number',
+          value: String(value),
+          min,
+          max,
+          step,
+          ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
+          oninput: (e: Event) => {
+            const v = Number((e.target as HTMLInputElement).value);
+            if (!Number.isNaN(v)) onChange(v);
+          },
+        }),
+      ]);
+    }
+
+    const v0 = snap(value);
+    const range = h('input', {
+      type: 'range',
+      min,
+      max,
+      step,
+      value: String(v0),
+      oninput: (e: Event) => {
+        const s = snap(Number((e.target as HTMLInputElement).value));
+        num.value = String(s);
+        onChange(s);
+      },
+    });
+    const num = h('input', {
+      class: 'sm-input',
+      type: 'number',
+      value: String(v0),
+      min,
+      max,
+      step,
+      ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
+      oninput: (e: Event) => {
+        const raw = Number((e.target as HTMLInputElement).value);
+        if (Number.isNaN(raw)) return;
+        const s = snap(raw);
+        range.value = String(s);
+        (e.target as HTMLInputElement).value = String(s);
+        onChange(s);
+      },
+    });
+
     return h('div', { class: 'sm-field' }, [
       h('label', { class: 'sm-field__label' }, [label]),
-      h('input', {
-        class: 'sm-input',
-        type: 'number',
-        value: String(value),
-        min,
-        max,
-        step,
-        ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
-        oninput: (e: Event) => {
-          const v = Number((e.target as HTMLInputElement).value);
-          if (!Number.isNaN(v)) onChange(v);
-        },
-      }),
+      h('div', { class: 'sm-field__slider-row' }, [range, num]),
     ]);
   }
   private _colorField(
@@ -912,34 +1009,323 @@ export class RightPanel {
     [t, r, b, l]: (number | undefined)[],
     onChange: (vals: number[]) => void,
     focusPrefix?: string,
+    resetQuad?: [number, number, number, number],
   ) {
-    const make = (v: number | undefined, idx: number) =>
+    const titles = ['上', '右', '下', '左'];
+    const clampPad = (n: number) => Math.max(0, Math.min(200, Math.round(n)));
+
+    /** 右栏聚焦时会跳过整栏重绘，闭包里的 t/r/b/l 会过时；用同一数组累积四边，避免改一边再改另一边时覆盖。 */
+    const current: number[] = [
+      clampPad(Number(t ?? 0)),
+      clampPad(Number(r ?? 0)),
+      clampPad(Number(b ?? 0)),
+      clampPad(Number(l ?? 0)),
+    ];
+    const emit = () => onChange([...current]);
+
+    const makePlain = (v: number | undefined, idx: number) =>
       h('input', {
         class: 'sm-input',
         type: 'number',
         min: 0,
         max: 200,
         value: String(v ?? 0),
-        title: ['上', '右', '下', '左'][idx],
+        title: titles[idx],
         ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:${idx}` } : {}),
         oninput: (e: Event) => {
-          const next = [t ?? 0, r ?? 0, b ?? 0, l ?? 0];
-          next[idx] = Number((e.target as HTMLInputElement).value) || 0;
-          onChange(next);
+          const raw = Number((e.target as HTMLInputElement).value);
+          current[idx] = clampPad(Number.isNaN(raw) ? 0 : raw);
+          emit();
         },
       });
+
+    const makeSliderRow = (v: number | undefined, idx: number) => {
+      const cur = clampPad(v ?? 0);
+      const range = h('input', {
+        type: 'range',
+        min: 0,
+        max: 200,
+        step: 1,
+        value: String(cur),
+        title: titles[idx],
+        oninput: (e: Event) => {
+          const c = clampPad(Number((e.target as HTMLInputElement).value));
+          current[idx] = c;
+          num.value = String(c);
+          emit();
+        },
+      });
+      const num = h('input', {
+        class: 'sm-input',
+        type: 'number',
+        min: 0,
+        max: 200,
+        value: String(cur),
+        title: titles[idx],
+        ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:${idx}` } : {}),
+        oninput: (e: Event) => {
+          const rawN = Number((e.target as HTMLInputElement).value);
+          if (Number.isNaN(rawN)) return;
+          const c = clampPad(rawN);
+          current[idx] = c;
+          range.value = String(c);
+          (e.target as HTMLInputElement).value = String(c);
+          emit();
+        },
+      });
+      return h('div', { class: 'sm-spacing-row' }, [
+        h('span', { class: 'sm-spacing-row__axis' }, [titles[idx]]),
+        range,
+        num,
+      ]);
+    };
+
     return h('div', { class: 'sm-field' }, [
-      h('label', { class: 'sm-field__label' }, [`${label}（上/右/下/左）`]),
-      h('div', { class: 'sm-spacing-grid' }, [
-        make(t, 0),
-        make(r, 1),
-        make(b, 2),
-        make(l, 3),
+      h('div', { class: 'sm-spacing-field__label-row' }, [
+        h('label', { class: 'sm-field__label' }, [`${label}（上/右/下/左）`]),
+        resetQuad
+          ? h(
+              'button',
+              {
+                type: 'button',
+                class: 'sm-btn sm-btn--ghost sm-spacing-field__reset',
+                onclick: () => {
+                  const next = resetQuad.map((n) => clampPad(Number(n)));
+                  for (let i = 0; i < 4; i++) current[i] = next[i];
+                  onChange([...current]);
+                },
+              },
+              ['恢复默认'],
+            )
+          : null,
       ]),
+      this._preferSliderControls()
+        ? h(
+            'div',
+            { class: 'sm-spacing-rows' },
+            [0, 1, 2, 3].map((idx) => makeSliderRow([t, r, b, l][idx], idx)),
+          )
+        : h(
+            'div',
+            { class: 'sm-spacing-grid' },
+            [0, 1, 2, 3].map((idx) => makePlain([t, r, b, l][idx], idx)),
+          ),
     ]);
   }
 
-  /* ----------------------------- Block 代码视图 ---------------------------- */
+  private _snapFontSizeToPx(value: string): number {
+    const t = (value ?? '').trim();
+    const m = t.match(/^(\d+(\.\d+)?)/);
+    if (m) return Math.min(48, Math.max(10, Math.round(parseFloat(m[1]))));
+    return 16;
+  }
+
+  private _fontSizeSliderField(
+    label: string,
+    value: string,
+    onChange: (v: string) => void,
+    focusToken: string,
+    help?: string,
+  ) {
+    if (!this._preferSliderControls()) {
+      return this._textField(label, value ?? '', onChange, '', focusToken);
+    }
+    const min = 10;
+    const max = 48;
+    const step = 1;
+    const snap = (n: number) => Math.min(max, Math.max(min, Math.round(n)));
+    const px = snap(this._snapFontSizeToPx(value ?? ''));
+
+    const range = h('input', {
+      type: 'range',
+      min,
+      max,
+      step,
+      value: String(px),
+      oninput: (e: Event) => {
+        const s = snap(Number((e.target as HTMLInputElement).value));
+        num.value = String(s);
+        onChange(`${s}px`);
+      },
+    });
+    const num = h('input', {
+      class: 'sm-input',
+      type: 'number',
+      min,
+      max,
+      step,
+      value: String(px),
+      'data-sm-focus': focusToken,
+      oninput: (e: Event) => {
+        const rawN = Number((e.target as HTMLInputElement).value);
+        if (Number.isNaN(rawN)) return;
+        const s = snap(rawN);
+        range.value = String(s);
+        (e.target as HTMLInputElement).value = String(s);
+        onChange(`${s}px`);
+      },
+    });
+
+    const wrap = h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, [label]),
+      h('div', { class: 'sm-field__slider-row' }, [range, num]),
+    ]);
+    if (help) wrap.append(h('div', { class: 'sm-field__help' }, [help]));
+    return wrap;
+  }
+
+  private _docFontSizeField(value: string, onChange: (v: string) => void, focusToken: string) {
+    return this._fontSizeSliderField(
+      '字号',
+      value,
+      onChange,
+      focusToken,
+      '滑块与数字均以 px 写入（如 16px）',
+    );
+  }
+
+  private _layoutWidthField(
+    label: string,
+    raw: string,
+    onChange: (v: string) => void,
+    focusToken: string,
+    help?: string,
+  ) {
+    if (!this._preferSliderControls()) {
+      const tf = this._textField(label, raw, onChange, '', focusToken);
+      if (help) tf.append(h('div', { class: 'sm-field__help' }, [help]));
+      return tf;
+    }
+
+    const kind = classifyLayoutWidth(raw);
+    if (kind === 'custom') {
+      const wrap = h('div', { class: 'sm-field' });
+      wrap.append(h('label', { class: 'sm-field__label' }, [label]));
+      wrap.append(
+        h('div', { class: 'sm-field__help' }, [
+          '当前值为自定义写法，请直接编辑；清空后可选「自适应」再用滑块。',
+        ]),
+      );
+      wrap.append(
+        h('input', {
+          class: 'sm-input',
+          type: 'text',
+          value: raw,
+          placeholder: '如 480px、90%',
+          'data-sm-focus': focusToken,
+          oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
+        }),
+      );
+      if (help) wrap.append(h('div', { class: 'sm-field__help' }, [help]));
+      return wrap;
+    }
+
+    const mode: 'auto' | 'px' | '%' = kind;
+    const max = mode === '%' ? 100 : 1200;
+    const min = 1;
+    const displayN = mode === 'auto' ? 280 : layoutWidthNumeric(raw, mode === '%' ? '%' : 'px');
+
+    const range = h('input', {
+      type: 'range',
+      min,
+      max,
+      step: 1,
+      value: String(displayN),
+      disabled: mode === 'auto',
+      oninput: (e: Event) => {
+        if (mode === 'auto') return;
+        const c = Math.max(min, Math.min(max, Math.round(Number((e.target as HTMLInputElement).value))));
+        num.value = String(c);
+        onChange(mode === '%' ? `${c}%` : `${c}px`);
+      },
+    });
+    const num = h('input', {
+      class: 'sm-input',
+      type: 'number',
+      min,
+      max,
+      step: 1,
+      value: String(displayN),
+      disabled: mode === 'auto',
+      ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
+      oninput: (e: Event) => {
+        if (mode === 'auto') return;
+        const rawN = Number((e.target as HTMLInputElement).value);
+        if (Number.isNaN(rawN)) return;
+        const c = Math.max(min, Math.min(max, Math.round(rawN)));
+        range.value = String(c);
+        (e.target as HTMLInputElement).value = String(c);
+        onChange(mode === '%' ? `${c}%` : `${c}px`);
+      },
+    });
+
+    const sliderRow = h(
+      'div',
+      { class: `sm-width-field__slider-row ${mode === 'auto' ? 'is-disabled' : ''}` },
+      [range, num],
+    );
+
+    const modesWrap = h('div', { class: 'sm-segmented sm-segmented--wrap sm-width-field__modes' });
+    const addModeBtn = (m: 'auto' | 'px' | '%', text: string) => {
+      modesWrap.append(
+        h(
+          'button',
+          {
+            type: 'button',
+            class: `sm-segmented__item ${mode === m ? 'sm-segmented__item--active' : ''}`,
+            onclick: () => {
+              if (m === 'auto') onChange('');
+              else if (m === 'px') onChange(`${layoutWidthNumeric(raw, 'px')}px`);
+              else onChange(`${layoutWidthNumeric(raw, '%')}%`);
+            },
+          },
+          [text],
+        ),
+      );
+    };
+    addModeBtn('auto', '自适应');
+    addModeBtn('px', 'px');
+    addModeBtn('%', '%');
+
+    const wrap = h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, [label]),
+      modesWrap,
+      sliderRow,
+    ]);
+    if (help) wrap.append(h('div', { class: 'sm-field__help' }, [help]));
+    return wrap;
+  }
+
+  private _docFontWeightField(value: string, onChange: (v: string) => void, focusToken: string) {
+    const opts = [
+      { label: '常规', value: 'normal' },
+      { label: '中等 500', value: '500' },
+      { label: '半粗 600', value: '600' },
+      { label: '加粗 700', value: 'bold' },
+    ];
+    if (!this._preferSliderControls()) {
+      return this._selectField('字重', value ?? 'normal', opts, onChange, focusToken);
+    }
+    const cur = value || 'normal';
+    const row = h('div', { class: 'sm-segmented sm-segmented--wrap' });
+    for (const o of opts) {
+      row.append(
+        h(
+          'button',
+          {
+            type: 'button',
+            class: `sm-segmented__item ${o.value === cur ? 'sm-segmented__item--active' : ''}`,
+            onclick: () => onChange(o.value),
+          },
+          [o.label],
+        ),
+      );
+    }
+    return h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, ['字重']),
+      row,
+    ]);
+  }
 
   private _renderBlockCodeView(block: Block): HTMLElement {
     const def = this.opts.registry.get(block.type);
