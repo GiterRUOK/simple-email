@@ -113,6 +113,8 @@
 
 /* 顶栏 -------------------------------------------------------------------- */
 .sm-topbar {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -138,6 +140,32 @@
 
 .sm-topbar__theme-seg {
   flex-shrink: 0;
+}
+.sm-topbar__theme-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sm-topbar__accent {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.sm-topbar__accent-input {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-sm);
+  background: var(--sm-surface);
+  cursor: pointer;
+}
+.sm-topbar__accent-input::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+.sm-topbar__accent-input::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
 }
 .sm-topbar__theme-btn {
   min-width: 28px;
@@ -213,6 +241,8 @@
 
 /* 主体三栏 ---------------------------------------------------------------- */
 .sm-body {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: 240px 1fr 300px;
   min-height: 0;
@@ -280,7 +310,7 @@
 /* 中栏：画布 ------------------------------------------------------------- */
 .sm-canvas-wrap {
   background: var(--sm-canvas-bg);
-  padding: 24px;
+  padding: 48px 24px 24px;
   overflow: auto;
 }
 
@@ -304,6 +334,10 @@
   color: var(--sm-editor-link-color) !important;
 }
 
+.sm-canvas .sm-text-content :where(p) {
+  margin: 0;
+}
+
 /* Section 在画布中的呈现层（包了一层壳便于选中/排序） */
 .sm-section {
   position: relative;
@@ -321,7 +355,7 @@
   bottom: 100%;
   right: 8px;
   margin-bottom: 10px;
-  z-index: 5;
+  z-index: 1;
   display: none;
   align-items: center;
   gap: 6px;
@@ -377,13 +411,15 @@
 .sm-tool-btn--danger { background: var(--sm-danger); }
 
 .sm-section__columns {
+  position: relative;
+  z-index: 2;
   display: flex;
   width: 100%;
 }
 
 .sm-column {
   flex: 1 1 auto;
-  min-height: 40px;
+  min-height: 0;
   padding: 0;
   border: 1px dashed transparent;
   position: relative;
@@ -428,7 +464,7 @@
   bottom: 100%;
   right: 0;
   margin-bottom: 8px;
-  z-index: 6;
+  z-index: 20;
   display: none;
   align-items: center;
   gap: 6px;
@@ -517,28 +553,6 @@
 }
 .sm-drag {
   box-shadow: var(--sm-shadow-md);
-}
-
-/* 拖动 Block 时的画布提示——只有在 sm-allow-auto-wrap 启用时才显示，
-   告诉运营"释放在画布任意位置都行；会自动加一列"。
-   当 autoWrapSection=false 时，运营拖到 sections 间隙会被 SortableJS 显示为禁止图标，无提示。
-   仅用顶栏文案提示即可；给整块画布加虚线框易与选中态混淆、且与文案重复。 */
-html.sm-dragging-block .sm-root.sm-allow-auto-wrap .sm-canvas-wrap::before {
-  content: '🪄 释放在 Section 之间会自动加一列';
-  position: sticky;
-  top: 0;
-  z-index: 5;
-  display: block;
-  padding: 6px 12px;
-  margin-bottom: 12px;
-  background: var(--sm-primary);
-  color: var(--sm-on-primary);
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-  border-radius: 6px;
-  box-shadow: var(--sm-shadow-md);
-  pointer-events: none;
 }
 
 /* 添加 Section 占位条 */

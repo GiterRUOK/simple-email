@@ -1,4 +1,5 @@
 import type { Store } from '../store/store';
+import { normalizeAccentHex, rgbCssToHex } from '../utils/accentColor';
 import { h, clear } from '../utils/dom';
 import type { EditorTheme } from './theme';
 
@@ -8,6 +9,11 @@ export interface TopbarOptions {
   store: Store;
   mode: EditorMode;
   theme: EditorTheme;
+  /** 用于读取解析后的 `--sm-primary`，同步到原生 color 输入 */
+  accentPickerRoot?: HTMLElement;
+  /** 为 true 时在顶栏显示主题色拾取器（需同时提供 `onAccentChange`） */
+  showAccentColorPicker?: boolean;
+  onAccentChange?: (hex: string) => void;
   onThemeChange: (t: EditorTheme) => void;
   onModeChange: (m: EditorMode) => void;
   onUndo: () => void;
@@ -26,6 +32,7 @@ export class Topbar {
   private redoBtn!: HTMLButtonElement;
   private themeButtons!: Record<EditorTheme, HTMLButtonElement>;
   private modeButtons: Record<EditorMode, HTMLButtonElement> = {} as any;
+  private accentInput?: HTMLInputElement;
 
   constructor(opts: TopbarOptions) {
     this.opts = opts;
@@ -49,6 +56,18 @@ export class Topbar {
       this.themeButtons[k].classList.toggle('sm-segmented__item--active', on);
       this.themeButtons[k].setAttribute('aria-pressed', on ? 'true' : 'false');
     }
+  }
+
+  /** 根据 `.sm-root` 上计算后的 `--sm-primary` 更新拾取器显示（无拾取器或未挂 root 时忽略） */
+  syncAccentPicker() {
+    if (!this.accentInput || !this.opts.accentPickerRoot) return;
+    const raw = getComputedStyle(this.opts.accentPickerRoot).getPropertyValue('--sm-primary').trim();
+    const base = normalizeAccentHex(raw) || rgbCssToHex(raw);
+    if (!base) return;
+    const norm = normalizeAccentHex(base);
+    if (!norm) return;
+    const forInput = `#${norm.slice(1).toLowerCase()}`;
+    if (this.accentInput.value.toLowerCase() !== forInput) this.accentInput.value = forInput;
   }
 
   private _render() {
@@ -101,6 +120,22 @@ export class Topbar {
       system: themeBtn('system', '跟随系统', iconThemeAuto()),
     };
     themeSeg.append(this.themeButtons.light, this.themeButtons.dark, this.themeButtons.system);
+
+    const themeGroupKids: Node[] = [themeSeg];
+    if (this.opts.showAccentColorPicker && this.opts.onAccentChange) {
+      const inputEl = h('input', {
+        type: 'color',
+        class: 'sm-topbar__accent-input',
+        'aria-label': '主题色',
+        title: '主题色',
+        value: '#4f46e5',
+      }) as HTMLInputElement;
+      inputEl.addEventListener('input', () => this.opts.onAccentChange!(inputEl.value));
+      this.accentInput = inputEl;
+      themeGroupKids.push(h('div', { class: 'sm-topbar__accent' }, [inputEl]));
+    } else {
+      this.accentInput = undefined;
+    }
 
     this.undoBtn = h(
       'button',
@@ -159,7 +194,7 @@ export class Topbar {
     this.el.append(
       title,
       h('div', { class: 'sm-topbar__group' }, [segmented]),
-      h('div', { class: 'sm-topbar__group' }, [themeSeg]),
+      h('div', { class: 'sm-topbar__group sm-topbar__theme-group' }, themeGroupKids),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),
       h('div', { class: 'sm-topbar__spacer' }),
       h('div', { class: 'sm-topbar__group' }, [mailSettingsBtn, insertVar, previewBtn, exportBtn]),

@@ -170,7 +170,7 @@ export class Canvas {
     this.inner.style.fontSize = doc.styles.fontSize;
     this.inner.style.fontWeight = doc.styles.fontWeight || 'normal';
     this.inner.style.color = doc.styles.color;
-    this.inner.style.lineHeight = doc.styles.lineHeight ?? '1.5';
+    this.inner.style.lineHeight = doc.styles.lineHeight ?? '1.25';
     this.inner.style.setProperty('--sm-editor-link-color', doc.styles.linkColor);
 
     if (!doc.sections.length) {
@@ -330,8 +330,6 @@ export class Canvas {
       ghostClass: 'sm-ghost',
       chosenClass: 'sm-chosen',
       dragClass: 'sm-drag',
-      onStart: () => document.documentElement.classList.add('sm-dragging-block'),
-      onEnd: () => document.documentElement.classList.remove('sm-dragging-block'),
       onAdd: (e) => this._handleBlockAdd(e, section.id, columnIndex),
       onUpdate: (e) => this._handleBlockMove(e, section.id, columnIndex),
       onRemove: () => {

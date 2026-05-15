@@ -117,8 +117,6 @@ export class LeftPanel {
       ghostClass: 'sm-ghost',
       chosenClass: 'sm-chosen',
       dragClass: 'sm-drag',
-      onStart: () => document.documentElement.classList.add('sm-dragging-block'),
-      onEnd: () => document.documentElement.classList.remove('sm-dragging-block'),
     });
     return h('section', { class: 'sm-blocks__group' }, [
       h('div', { class: 'sm-panel__title' }, [title]),

@@ -16,7 +16,7 @@ export interface MjRawCellTypography {
 export function mjRawCellTypographyFromStyles(s: GlobalStyles): MjRawCellTypography {
   return {
     fontSize: (s.fontSize || '16px').trim(),
-    lineHeight: (s.lineHeight || '1.5').trim(),
+    lineHeight: (s.lineHeight || '1.25').trim(),
     color: (s.color || '#433f3f').trim(),
     fontFamily: (s.fontFamily || 'sans-serif').trim(),
     fontWeight: (s.fontWeight ?? 'normal').trim(),

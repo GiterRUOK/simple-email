@@ -303,12 +303,12 @@ export class RightPanel {
       ),
       this._textField(
         '行高',
-        doc.styles.lineHeight ?? '1.5',
+        doc.styles.lineHeight ?? '1.25',
         (v) =>
           this.opts.store.update((d) => {
             d.styles.lineHeight = v;
           }),
-        '如 1.5 或 24px',
+        '如 1.25 或 24px',
         'doc:styles.lineHeight',
       ),
       this._colorField(

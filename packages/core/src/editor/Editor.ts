@@ -20,6 +20,7 @@ import { SourceView } from './SourceView';
 import { Topbar, type EditorMode } from './Topbar';
 import type { EditorTheme } from './theme';
 import type { ImageAssetsHandlers } from './imageAssets';
+import { accentPrimarySoftRgba, normalizeAccentHex } from '../utils/accentColor';
 
 import './styles.css';
 
@@ -45,6 +46,13 @@ export interface EditorOptions {
   clearSelectionOnCanvasMargin?: boolean;
   /** 文档变更回调（防抖发出） */
   onChange?: (doc: EmailDoc) => void;
+  /**
+   * 品牌/主题色（#RRGGBB），映射为界面上的 --sm-primary / --sm-primary-soft（强调、选区、主按钮等）。
+   * 不传则使用 styles 里与 light/dark/system 配套的默认紫/靛。
+   */
+  accentColor?: string;
+  /** 为 true 时在顶栏显示主题色拾取（原生 color 控件）；默认 false，仅通过 accentColor / setAccentColor 由宿主控制也可 */
+  showAccentColorPicker?: boolean;
   /**
    * 编辑器外框主题。`system` 随 `prefers-color-scheme`；邮件画布仍默认白纸以便预览成品。
    * @default 'light'
@@ -85,6 +93,12 @@ export class MailEditor {
   private toolbar!: RichTextToolbar;
   private body: HTMLElement;
   private changeTimer: number | null = null;
+  /** 显式品牌色时覆盖 CSS 变量；未设置则由 styles 按 light/dark 使用默认紫/靛 */
+  private accentColorOverride: string | undefined;
+  private systemThemeMq: MediaQueryList | null = null;
+  private readonly _onSystemThemeMqChange = () => {
+    if (this.accentColorOverride) this._applyAccentVars();
+  };
 
   /** design 态 Esc：块 → 父级 Section → 邮件设置；选中 Section 时一次 Esc 即回邮件设置 */
   private _mailEscHandler = (e: KeyboardEvent) => {
@@ -139,6 +153,16 @@ export class MailEditor {
     const initialDoc = createDefaultDoc(opts.initialDoc);
     this.store = new Store(initialDoc);
 
+    const initialAccent = normalizeAccentHex(this.opts.accentColor ?? '');
+    if (
+      this.opts.accentColor != null &&
+      String(this.opts.accentColor).trim() !== '' &&
+      !initialAccent
+    ) {
+      console.warn('[simple-mail] accentColor 无效，已忽略:', this.opts.accentColor);
+    }
+    this.accentColorOverride = initialAccent ?? undefined;
+
     this.theme = opts.theme ?? 'light';
     this.root = h('div', { class: 'sm-root' });
     this._applyThemeAttr();
@@ -147,6 +171,10 @@ export class MailEditor {
 
     this._buildUI();
     this._bindKeyboard();
+
+    this._applyAccentVars();
+    this._refreshAccentMqBinding();
+    this._syncTopbarAccentPicker();
 
     this.store.subscribe(() => this._onChange());
   }
@@ -182,7 +210,34 @@ export class MailEditor {
     if (this.theme === t) return;
     this.theme = t;
     this._applyThemeAttr();
+    this._applyAccentVars();
+    this._refreshAccentMqBinding();
     this.topbar?.syncTheme(t);
+    this._syncTopbarAccentPicker();
+  }
+
+  /**
+   * 品牌/主题色（#RRGGBB）。传 null、undefined 或空字符串则恢复为 light/dark/system 下的 CSS 默认色。
+   */
+  setAccentColor(hex: string | null | undefined) {
+    if (hex == null || String(hex).trim() === '') {
+      this.accentColorOverride = undefined;
+    } else {
+      const n = normalizeAccentHex(String(hex));
+      if (!n) {
+        console.warn('[simple-mail] setAccentColor 无效，已忽略:', hex);
+        return;
+      }
+      this.accentColorOverride = n;
+    }
+    this._applyAccentVars();
+    this._refreshAccentMqBinding();
+    this._syncTopbarAccentPicker();
+  }
+
+  /** 当前由选项或 setAccentColor 显式设置的品牌色；未覆盖时为 undefined。 */
+  getAccentColor(): string | undefined {
+    return this.accentColorOverride;
   }
 
   /** 导出 MJML 与编译后的 HTML。withSampleVariables=true 时把 {{var}} 替换为 sample 值用于预览。 */
@@ -203,6 +258,7 @@ export class MailEditor {
   }
 
   destroy() {
+    this._unbindSystemThemeMqForAccent();
     if (this.changeTimer) window.clearTimeout(this.changeTimer);
     document.removeEventListener('keydown', this._mailEscHandler, true);
     document.removeEventListener('keydown', this._mailUndoRedoHandler, true);
@@ -218,11 +274,52 @@ export class MailEditor {
     this.root.setAttribute('data-sm-theme', this.theme);
   }
 
+  private _chromeIsEffectivelyDark(): boolean {
+    if (this.theme === 'dark') return true;
+    if (this.theme === 'light') return false;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+
+  private _applyAccentVars() {
+    if (!this.accentColorOverride) {
+      this.root.style.removeProperty('--sm-primary');
+      this.root.style.removeProperty('--sm-primary-soft');
+      return;
+    }
+    const dark = this._chromeIsEffectivelyDark();
+    this.root.style.setProperty('--sm-primary', this.accentColorOverride);
+    this.root.style.setProperty('--sm-primary-soft', accentPrimarySoftRgba(this.accentColorOverride, dark));
+  }
+
+  private _unbindSystemThemeMqForAccent() {
+    if (this.systemThemeMq) {
+      this.systemThemeMq.removeEventListener('change', this._onSystemThemeMqChange);
+      this.systemThemeMq = null;
+    }
+  }
+
+  /** `system` 主题且存在品牌色覆盖时，随系统深浅刷新 --sm-primary-soft */
+  private _refreshAccentMqBinding() {
+    this._unbindSystemThemeMqForAccent();
+    if (this.theme === 'system' && this.accentColorOverride) {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      mq.addEventListener('change', this._onSystemThemeMqChange);
+      this.systemThemeMq = mq;
+    }
+  }
+
+  private _syncTopbarAccentPicker() {
+    this.topbar?.syncAccentPicker();
+  }
+
   private _buildUI() {
     this.topbar = new Topbar({
       store: this.store,
       mode: this.mode,
       theme: this.theme,
+      accentPickerRoot: this.root,
+      showAccentColorPicker: this.opts.showAccentColorPicker === true,
+      onAccentChange: (hx) => this.setAccentColor(hx),
       onThemeChange: (t) => this.setTheme(t),
       onModeChange: (m) => this._setMode(m),
       onUndo: () => {
@@ -462,7 +559,7 @@ function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
     fontWeight: 'normal',
     color: '#433f3f',
     linkColor: '#ff5a00',
-    lineHeight: '1.5',
+    lineHeight: '1.25',
     ...(partial?.styles ?? {}),
   };
   return {
@@ -477,7 +574,7 @@ function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
     styles: {
       ...mergedStyles,
       fontWeight: mergedStyles.fontWeight ?? 'normal',
-      lineHeight: mergedStyles.lineHeight ?? '1.5',
+      lineHeight: mergedStyles.lineHeight ?? '1.25',
     },
     sections: partial?.sections ?? [],
   };

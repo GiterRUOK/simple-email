@@ -112,7 +112,7 @@ export const textBlock = defineBlock<TextProps>({
     const ff = p.fontFamily ? `font-family:${p.fontFamily};` : '';
     const fw = p.fontWeight && p.fontWeight !== 'normal' ? `font-weight:${p.fontWeight};` : '';
     const lhRaw = String(p.lineHeight ?? '').trim();
-    const lh = lhRaw ? `line-height:${lhRaw};` : '';
+    const lh = lhRaw ? `line-height:${lhRaw};` : 'line-height:normal;';
     return `<div class="sm-text-content" style="text-align:${p.align};color:${p.color};font-size:${p.fontSize};${lh}${ff}${fw}padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;">${p.content}</div>`;
   },
 });

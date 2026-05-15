@@ -32,7 +32,7 @@ export interface GlobalStyles {
   fontWeight: string;
   color: string;
   linkColor: string;
-  /** 无单位倍数（如 1.5）或固定值（如 24px） */
+  /** 无单位倍数（如 1.25）或固定值（如 24px） */
   lineHeight: string;
 }
 

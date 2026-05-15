@@ -100,6 +100,8 @@ const editor = new MailEditor({
   },
   /** 体验：右栏数字 / 内边距 / 字号滑块 + 字重分段 */
   ui: { preferSliderControls: true },
+  /** 顶栏主题色拾色器；未设 accentColor 时使用样式表随 light/dark/system 的默认紫/靛 */
+  showAccentColorPicker: true,
 });
 
 (window as unknown as { editor: MailEditor }).editor = editor;
