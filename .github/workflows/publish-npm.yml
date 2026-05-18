@@ -1,0 +1,31 @@
+name: Publish NPM Package
+
+# 触发条件：打tag推送时自动发布
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      - name: 安装Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 项目打包编译
+        run: npm run build # 替换成你自己的打包命令
+
+      - name: 发布到NPM
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish
