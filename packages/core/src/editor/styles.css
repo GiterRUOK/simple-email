@@ -261,6 +261,9 @@
   background: var(--sm-surface);
 }
 .sm-segmented__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   height: 28px;
   padding: 0 12px;
   border: 0;
@@ -273,6 +276,16 @@
   background: var(--sm-primary-soft);
   color: var(--sm-primary);
   font-weight: 600;
+}
+.sm-segmented--fill {
+  display: flex;
+  width: 100%;
+  align-self: stretch;
+}
+.sm-segmented--fill .sm-segmented__item {
+  flex: 1;
+  min-width: 0;
+  padding: 0 6px;
 }
 
 /* 主体三栏 ---------------------------------------------------------------- */

@@ -1,6 +1,6 @@
 {
   "name": "mail-editor-pancake",
-  "version": "0.0.0",
+  "version": "0.0.7",
   "private": false,
   "description": "面向运营的轻量邮件可视化编辑器（monorepo 根）",
   "scripts": {

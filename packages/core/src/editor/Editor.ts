@@ -609,7 +609,7 @@ function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
     contentBackgroundColor: '#ffffff',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
     fontSize: '16px',
-    fontWeight: 'normal',
+    fontWeight: '400',
     color: '#433f3f',
     linkColor: '#ff5a00',
     lineHeight: '1.25',
@@ -626,7 +626,7 @@ function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
     variables: partial?.variables ?? [],
     styles: {
       ...mergedStyles,
-      fontWeight: mergedStyles.fontWeight ?? 'normal',
+      fontWeight: mergedStyles.fontWeight ?? '400',
       lineHeight: mergedStyles.lineHeight ?? '1.25',
     },
     sections: partial?.sections ?? [],

@@ -1,4 +1,4 @@
-import { defineBlock } from '@simple-mail/core';
+import { defineBlock, FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '@simple-mail/core';
 import { icons } from './icons';
 import {
   escAttr,
@@ -46,7 +46,7 @@ export const socialGroupBlock = defineBlock<SocialGroupProps>({
     iconBorderRadius: 999,
     iconSpacing: 10,
     labelFontSize: 13,
-    labelFontWeight: 'normal',
+    labelFontWeight: '400',
     labelColor: '#333333',
     paddingTop: 8,
     paddingRight: 0,
@@ -73,22 +73,15 @@ export const socialGroupBlock = defineBlock<SocialGroupProps>({
       key: 'labelFontWeight',
       label: '标签字重',
       type: 'select',
-      options: [
-        { label: '较细 (300)', value: '300' },
-        { label: '常规', value: 'normal' },
-        { label: '400', value: '400' },
-        { label: '500', value: '500' },
-        { label: '600', value: '600' },
-        { label: '700', value: '700' },
-        { label: '粗体', value: 'bold' },
-        { label: '更粗 (800)', value: '800' },
-      ],
+      selectVariant: 'segmented',
+      options: [...FONT_WEIGHT_STEP_OPTIONS],
     },
     { key: 'labelColor', label: '标签颜色', type: 'color' },
     {
       key: 'align',
       label: '对齐',
       type: 'select',
+      selectVariant: 'segmented',
       options: [
         { label: '左', value: 'left' },
         { label: '居中', value: 'center' },
@@ -124,7 +117,7 @@ export const socialGroupBlock = defineBlock<SocialGroupProps>({
     const filtered = p.elements.filter((e) => e.href?.trim());
     const labelStyle = {
       labelFontSize: Number(p.labelFontSize ?? 13),
-      labelFontWeight: String(p.labelFontWeight ?? 'normal'),
+      labelFontWeight: normalizeFontWeightStep(String(p.labelFontWeight ?? '400')),
       labelColor: String(p.labelColor ?? '#333333'),
     };
     const inner = mjSocialElementsLines(filtered, labelStyle);
@@ -138,7 +131,7 @@ ${inner}
   renderPreview: (p) => {
     const fsRaw = p.labelFontSize != null && p.labelFontSize > 0 ? p.labelFontSize : 13;
     const fs = Math.max(8, Math.min(48, fsRaw));
-    const fw = p.labelFontWeight?.trim() || 'normal';
+    const fw = normalizeFontWeightStep(p.labelFontWeight);
     const textColor = p.labelColor?.trim() || '#333333';
     const radiusCss = socialIconBorderRadiusCss(p.iconSize, p.iconBorderRadius ?? 999);
     const gap = socialIconSpacingPx(p.iconSpacing, 10);

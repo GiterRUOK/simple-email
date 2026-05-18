@@ -98,7 +98,7 @@ const editor = new MailEditor({
   onChange: (doc) => {
     console.debug('[doc changed]', doc);
   },
-  /** 体验：右栏数字 / 内边距 / 字号滑块 + 字重分段 */
+  /** 体验：右栏数字 / 内边距 / 字号滑块等（字重恒为五档平铺） */
   ui: { preferSliderControls: true },
   /** 顶栏主题色拾色器；未设 accentColor 时使用样式表随 light/dark/system 的默认紫/靛 */
   showAccentColorPicker: true,

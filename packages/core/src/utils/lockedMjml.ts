@@ -1,4 +1,5 @@
 import type { GlobalStyles } from '../types';
+import { normalizeFontWeightStep } from './fontWeightSteps';
 
 /**
  * mj-column 编译结果外层会有 `font-size:0`（多列 inline-block 间距技巧），
@@ -19,7 +20,7 @@ export function mjRawCellTypographyFromStyles(s: GlobalStyles): MjRawCellTypogra
     lineHeight: (s.lineHeight || '1.25').trim(),
     color: (s.color || '#433f3f').trim(),
     fontFamily: (s.fontFamily || 'sans-serif').trim(),
-    fontWeight: (s.fontWeight ?? 'normal').trim(),
+    fontWeight: normalizeFontWeightStep(s.fontWeight),
   };
 }
 

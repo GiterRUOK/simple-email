@@ -13,6 +13,7 @@ import type {
 import { defaultSocialIconBackground } from '../socialDefaults';
 import { clear, h } from '../utils/dom';
 import { metaWidthInputString, parseMetaWidthFromUserInput, parseSectionWidthFromUserInput, sectionWidthInputString } from '../utils/contentWidth';
+import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import type { ImageAssetsHandlers, ImageFieldContext } from './imageAssets';
 import { openImageGalleryModal } from './ImageGalleryModal';
 
@@ -306,7 +307,7 @@ export class RightPanel {
         'doc:styles.fontSize',
       ),
       this._docFontWeightField(
-        doc.styles.fontWeight ?? 'normal',
+        doc.styles.fontWeight ?? '400',
         (v) =>
           this.opts.store.update((d) => {
             d.styles.fontWeight = v;
@@ -461,8 +462,15 @@ export class RightPanel {
         );
       case 'color':
         return this._colorField(field.label, String(value ?? ''), onChange, fp);
-      case 'select':
-        return this._selectField(field.label, String(value ?? ''), field.options ?? [], onChange, fp);
+      case 'select': {
+        const isFw = field.key === 'fontWeight' || field.key === 'labelFontWeight';
+        const displayVal = isFw ? normalizeFontWeightStep(String(value ?? '')) : String(value ?? '');
+        const opts = isFw ? FONT_WEIGHT_STEP_OPTIONS : (field.options ?? []);
+        if (isFw || field.selectVariant === 'segmented') {
+          return this._segmentedSelectField(field.label, displayVal, opts, onChange, fp);
+        }
+        return this._selectField(field.label, displayVal, opts, onChange, fp);
+      }
       case 'switch':
         return this._switchField(field.label, !!value, onChange, field.help, fp);
       case 'image':
@@ -902,21 +910,53 @@ export class RightPanel {
     };
 
     if (!this._preferSliderControls()) {
+      const inp = h('input', {
+        class: 'sm-input',
+        type: 'number',
+        value: String(value),
+        min,
+        max,
+        step,
+        ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
+      }) as HTMLInputElement;
+
+      const commitPlain = () => {
+        const t = inp.value.trim();
+        const fb = snap(value);
+        if (t === '') {
+          inp.value = String(fb);
+          onChange(fb);
+          return;
+        }
+        const v = Number(t);
+        const s = snap(Number.isNaN(v) ? fb : v);
+        inp.value = String(s);
+        onChange(s);
+      };
+
+      /** min>0 时中途输入会被 snap 打断（如想输入 16 会先变成 10），仅失焦/Enter 提交 */
+      if (min > 0) {
+        inp.addEventListener('blur', commitPlain);
+        inp.addEventListener('keydown', (e) => {
+          if ((e as KeyboardEvent).key === 'Enter') inp.blur();
+        });
+      } else {
+        inp.addEventListener('input', () => {
+          const t = inp.value.trim();
+          if (t === '') return;
+          const v = Number(t);
+          if (Number.isNaN(v)) return;
+          onChange(snap(v));
+        });
+        inp.addEventListener('blur', commitPlain);
+        inp.addEventListener('keydown', (e) => {
+          if ((e as KeyboardEvent).key === 'Enter') commitPlain();
+        });
+      }
+
       return h('div', { class: 'sm-field' }, [
         h('label', { class: 'sm-field__label' }, [label]),
-        h('input', {
-          class: 'sm-input',
-          type: 'number',
-          value: String(value),
-          min,
-          max,
-          step,
-          ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
-          oninput: (e: Event) => {
-            const v = Number((e.target as HTMLInputElement).value);
-            if (!Number.isNaN(v)) onChange(v);
-          },
-        }),
+        inp,
       ]);
     }
 
@@ -927,28 +967,54 @@ export class RightPanel {
       max,
       step,
       value: String(v0),
-      oninput: (e: Event) => {
-        const s = snap(Number((e.target as HTMLInputElement).value));
-        num.value = String(s);
-        onChange(s);
-      },
-    });
+    }) as HTMLInputElement;
+
     const num = h('input', {
       class: 'sm-input',
       type: 'number',
-      value: String(v0),
       min,
       max,
       step,
+      value: String(v0),
       ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
-      oninput: (e: Event) => {
-        const raw = Number((e.target as HTMLInputElement).value);
-        if (Number.isNaN(raw)) return;
-        const s = snap(raw);
-        range.value = String(s);
-        (e.target as HTMLInputElement).value = String(s);
-        onChange(s);
-      },
+    }) as HTMLInputElement;
+
+    const syncFromSlider = (n: number) => {
+      const s = snap(n);
+      range.value = String(s);
+      num.value = String(s);
+      onChange(s);
+    };
+
+    range.addEventListener('input', () => {
+      syncFromSlider(Number(range.value));
+    });
+
+    num.addEventListener('input', () => {
+      const t = num.value.trim();
+      if (t === '') return;
+      const raw = Number(t);
+      if (Number.isNaN(raw)) return;
+      range.value = String(snap(raw));
+    });
+
+    num.addEventListener('blur', () => {
+      const t = num.value.trim();
+      const fb = snap(Number(range.value));
+      if (t === '') {
+        syncFromSlider(fb);
+        return;
+      }
+      const raw = Number(t);
+      if (Number.isNaN(raw)) {
+        syncFromSlider(fb);
+        return;
+      }
+      syncFromSlider(raw);
+    });
+
+    num.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') num.blur();
     });
 
     return h('div', { class: 'sm-field' }, [
@@ -1008,6 +1074,42 @@ export class RightPanel {
       sel,
     ]);
   }
+
+  /** select 平铺：与顶栏 sm-segmented 视觉一致，占满右栏宽度 */
+  private _segmentedSelectField(
+    label: string,
+    value: string,
+    options: { label: string; value: string }[],
+    onChange: (v: string) => void,
+    focusToken?: string,
+  ) {
+    const group = h('div', {
+      class: 'sm-segmented sm-segmented--fill',
+      role: 'group',
+      'aria-label': label,
+    });
+    for (const o of options) {
+      const active = o.value === value;
+      group.append(
+        h(
+          'button',
+          {
+            type: 'button',
+            class: `sm-segmented__item${active ? ' sm-segmented__item--active' : ''}`,
+            'aria-pressed': active ? 'true' : 'false',
+            title: o.label,
+            ...(focusToken ? { 'data-sm-focus': `${focusToken}:${o.value}` } : {}),
+            onclick: () => onChange(o.value),
+          },
+          [o.label],
+        ),
+      );
+    }
+    return h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, [label]),
+      group,
+    ]);
+  }
   private _switchField(
     label: string,
     value: boolean,
@@ -1052,8 +1154,8 @@ export class RightPanel {
     ];
     const emit = () => onChange([...current]);
 
-    const makePlain = (v: number | undefined, idx: number) =>
-      h('input', {
+    const makePlain = (v: number | undefined, idx: number) => {
+      const inp = h('input', {
         class: 'sm-input',
         type: 'number',
         min: 0,
@@ -1061,12 +1163,32 @@ export class RightPanel {
         value: String(v ?? 0),
         title: titles[idx],
         ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:${idx}` } : {}),
-        oninput: (e: Event) => {
-          const raw = Number((e.target as HTMLInputElement).value);
-          current[idx] = clampPad(Number.isNaN(raw) ? 0 : raw);
-          emit();
-        },
+      }) as HTMLInputElement;
+      inp.addEventListener('input', () => {
+        const t = inp.value.trim();
+        if (t === '') return;
+        const raw = Number(t);
+        if (Number.isNaN(raw)) return;
+        current[idx] = clampPad(raw);
+        emit();
       });
+      inp.addEventListener('blur', () => {
+        const t = inp.value.trim();
+        if (t === '') {
+          inp.value = String(current[idx]);
+          return;
+        }
+        const raw = Number(t);
+        const c = clampPad(Number.isNaN(raw) ? current[idx] : raw);
+        inp.value = String(c);
+        current[idx] = c;
+        emit();
+      });
+      inp.addEventListener('keydown', (e) => {
+        if ((e as KeyboardEvent).key === 'Enter') inp.blur();
+      });
+      return inp;
+    };
 
     const makeSliderRow = (v: number | undefined, idx: number) => {
       const cur = clampPad(v ?? 0);
@@ -1077,13 +1199,15 @@ export class RightPanel {
         step: 1,
         value: String(cur),
         title: titles[idx],
-        oninput: (e: Event) => {
-          const c = clampPad(Number((e.target as HTMLInputElement).value));
-          current[idx] = c;
-          num.value = String(c);
-          emit();
-        },
+      }) as HTMLInputElement;
+
+      range.addEventListener('input', () => {
+        const c = clampPad(Number(range.value));
+        current[idx] = c;
+        num.value = String(c);
+        emit();
       });
+
       const num = h('input', {
         class: 'sm-input',
         type: 'number',
@@ -1092,16 +1216,38 @@ export class RightPanel {
         value: String(cur),
         title: titles[idx],
         ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:${idx}` } : {}),
-        oninput: (e: Event) => {
-          const rawN = Number((e.target as HTMLInputElement).value);
-          if (Number.isNaN(rawN)) return;
-          const c = clampPad(rawN);
-          current[idx] = c;
-          range.value = String(c);
-          (e.target as HTMLInputElement).value = String(c);
-          emit();
-        },
+      }) as HTMLInputElement;
+
+      num.addEventListener('input', () => {
+        const t = num.value.trim();
+        if (t === '') return;
+        const rawN = Number(t);
+        if (Number.isNaN(rawN)) return;
+        const c = clampPad(rawN);
+        range.value = String(c);
+        current[idx] = c;
+        emit();
       });
+
+      num.addEventListener('blur', () => {
+        const t = num.value.trim();
+        if (t === '') {
+          num.value = String(current[idx]);
+          range.value = String(current[idx]);
+          return;
+        }
+        const rawN = Number(t);
+        const c = clampPad(Number.isNaN(rawN) ? current[idx] : rawN);
+        num.value = String(c);
+        range.value = String(c);
+        current[idx] = c;
+        emit();
+      });
+
+      num.addEventListener('keydown', (e) => {
+        if ((e as KeyboardEvent).key === 'Enter') num.blur();
+      });
+
       return h('div', { class: 'sm-spacing-row' }, [
         h('span', { class: 'sm-spacing-row__axis' }, [titles[idx]]),
         range,
@@ -1171,12 +1317,8 @@ export class RightPanel {
       max,
       step,
       value: String(px),
-      oninput: (e: Event) => {
-        const s = snap(Number((e.target as HTMLInputElement).value));
-        num.value = String(s);
-        onChange(`${s}px`);
-      },
-    });
+    }) as HTMLInputElement;
+
     const num = h('input', {
       class: 'sm-input',
       type: 'number',
@@ -1185,14 +1327,41 @@ export class RightPanel {
       step,
       value: String(px),
       'data-sm-focus': focusToken,
-      oninput: (e: Event) => {
-        const rawN = Number((e.target as HTMLInputElement).value);
-        if (Number.isNaN(rawN)) return;
-        const s = snap(rawN);
-        range.value = String(s);
-        (e.target as HTMLInputElement).value = String(s);
-        onChange(`${s}px`);
-      },
+    }) as HTMLInputElement;
+
+    range.addEventListener('input', () => {
+      const s = snap(Number(range.value));
+      num.value = String(s);
+      onChange(`${s}px`);
+    });
+
+    num.addEventListener('input', () => {
+      const t = num.value.trim();
+      if (t === '') return;
+      const rawN = Number(t);
+      if (Number.isNaN(rawN)) return;
+      range.value = String(snap(rawN));
+    });
+
+    num.addEventListener('blur', () => {
+      const t = num.value.trim();
+      const fb = snap(Number(range.value));
+      if (t === '') {
+        const r = fb;
+        num.value = String(r);
+        range.value = String(r);
+        onChange(`${r}px`);
+        return;
+      }
+      const rawN = Number(t);
+      const s = snap(Number.isNaN(rawN) ? fb : rawN);
+      num.value = String(s);
+      range.value = String(s);
+      onChange(`${s}px`);
+    });
+
+    num.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') num.blur();
     });
 
     const wrap = h('div', { class: 'sm-field' }, [
@@ -1254,6 +1423,8 @@ export class RightPanel {
     const min = 1;
     const displayN = mode === 'auto' ? 280 : layoutWidthNumeric(raw, mode === '%' ? '%' : 'px');
 
+    const clampW = (n: number) => Math.max(min, Math.min(max, Math.round(n)));
+
     const range = h('input', {
       type: 'range',
       min,
@@ -1261,13 +1432,8 @@ export class RightPanel {
       step: 1,
       value: String(displayN),
       disabled: mode === 'auto',
-      oninput: (e: Event) => {
-        if (mode === 'auto') return;
-        const c = Math.max(min, Math.min(max, Math.round(Number((e.target as HTMLInputElement).value))));
-        num.value = String(c);
-        onChange(mode === '%' ? `${c}%` : `${c}px`);
-      },
-    });
+    }) as HTMLInputElement;
+
     const num = h('input', {
       class: 'sm-input',
       type: 'number',
@@ -1277,15 +1443,44 @@ export class RightPanel {
       value: String(displayN),
       disabled: mode === 'auto',
       ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
-      oninput: (e: Event) => {
-        if (mode === 'auto') return;
-        const rawN = Number((e.target as HTMLInputElement).value);
-        if (Number.isNaN(rawN)) return;
-        const c = Math.max(min, Math.min(max, Math.round(rawN)));
-        range.value = String(c);
-        (e.target as HTMLInputElement).value = String(c);
-        onChange(mode === '%' ? `${c}%` : `${c}px`);
-      },
+    }) as HTMLInputElement;
+
+    const emitW = (c: number) => {
+      const v = clampW(c);
+      range.value = String(v);
+      num.value = String(v);
+      onChange(mode === '%' ? `${v}%` : `${v}px`);
+    };
+
+    range.addEventListener('input', () => {
+      if (mode === 'auto') return;
+      emitW(Number(range.value));
+    });
+
+    num.addEventListener('input', () => {
+      if (mode === 'auto') return;
+      const t = num.value.trim();
+      if (t === '') return;
+      const rawN = Number(t);
+      if (Number.isNaN(rawN)) return;
+      range.value = String(clampW(rawN));
+    });
+
+    num.addEventListener('blur', () => {
+      if (mode === 'auto') return;
+      const t = num.value.trim();
+      const fb = clampW(Number(range.value));
+      if (t === '') {
+        emitW(fb);
+        return;
+      }
+      const rawN = Number(t);
+      emitW(Number.isNaN(rawN) ? fb : rawN);
+    });
+
+    num.addEventListener('keydown', (e) => {
+      if (mode === 'auto') return;
+      if ((e as KeyboardEvent).key === 'Enter') num.blur();
     });
 
     const sliderRow = h(
@@ -1326,34 +1521,8 @@ export class RightPanel {
   }
 
   private _docFontWeightField(value: string, onChange: (v: string) => void, focusToken: string) {
-    const opts = [
-      { label: '常规', value: 'normal' },
-      { label: '中等 500', value: '500' },
-      { label: '半粗 600', value: '600' },
-      { label: '加粗 700', value: 'bold' },
-    ];
-    if (!this._preferSliderControls()) {
-      return this._selectField('字重', value ?? 'normal', opts, onChange, focusToken);
-    }
-    const cur = value || 'normal';
-    const row = h('div', { class: 'sm-segmented sm-segmented--wrap' });
-    for (const o of opts) {
-      row.append(
-        h(
-          'button',
-          {
-            type: 'button',
-            class: `sm-segmented__item ${o.value === cur ? 'sm-segmented__item--active' : ''}`,
-            onclick: () => onChange(o.value),
-          },
-          [o.label],
-        ),
-      );
-    }
-    return h('div', { class: 'sm-field' }, [
-      h('label', { class: 'sm-field__label' }, ['字重']),
-      row,
-    ]);
+    const cur = normalizeFontWeightStep(value);
+    return this._segmentedSelectField('字重', cur, FONT_WEIGHT_STEP_OPTIONS, onChange, focusToken);
   }
 
   private _renderBlockCodeView(block: Block): HTMLElement {

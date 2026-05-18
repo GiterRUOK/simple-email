@@ -46,6 +46,7 @@ export const heroBlock = defineBlock<HeroProps>({
       key: 'verticalAlign',
       label: '文字垂直位置',
       type: 'select',
+      selectVariant: 'segmented',
       options: [
         { label: '靠上', value: 'top' },
         { label: '居中', value: 'middle' },
@@ -56,6 +57,7 @@ export const heroBlock = defineBlock<HeroProps>({
       key: 'textAlign',
       label: '文字水平对齐',
       type: 'select',
+      selectVariant: 'segmented',
       options: [
         { label: '左', value: 'left' },
         { label: '居中', value: 'center' },

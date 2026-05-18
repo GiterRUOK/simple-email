@@ -1,3 +1,5 @@
+import { normalizeFontWeightStep } from '@simple-mail/core';
+
 /** 生成 mj-social-element 的 name 属性（与 MJML 内置图标对齐；未知平台退化为 web）。 */
 export function mjSocialElementName(network: string): string {
   const n = network.trim();
@@ -123,7 +125,7 @@ export function mjSocialElementsLines(
 ): string {
   const fontSizeRaw = labelStyle.labelFontSize > 0 ? labelStyle.labelFontSize : 13;
   const fontSize = Math.max(8, Math.min(48, fontSizeRaw));
-  const fontWeight = labelStyle.labelFontWeight?.trim() || 'normal';
+  const fontWeight = normalizeFontWeightStep(labelStyle.labelFontWeight);
   const textColor = labelStyle.labelColor?.trim() || '#333333';
   const fwEsc = escAttr(fontWeight);
   return links

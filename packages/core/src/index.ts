@@ -5,6 +5,12 @@ export { renderDoc, replaceVariables } from './renderer';
 export { docToMjml } from './renderer/mjml';
 export { Store, createSection, findSection, findBlockLocation, pruneEmptySections } from './store/store';
 export type { MjRawCellTypography } from './utils/lockedMjml';
+export {
+  FONT_WEIGHT_STEP_OPTIONS,
+  FONT_WEIGHT_STEP_VALUES,
+  normalizeFontWeightStep,
+} from './utils/fontWeightSteps';
+export type { FontWeightStep } from './utils/fontWeightSteps';
 export type {
   Block,
   BlockDefinition,

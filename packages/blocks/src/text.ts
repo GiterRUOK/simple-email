@@ -1,4 +1,4 @@
-import { defineBlock } from '@simple-mail/core';
+import { defineBlock, FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '@simple-mail/core';
 import { icons } from './icons';
 
 interface TextProps {
@@ -31,7 +31,7 @@ export const textBlock = defineBlock<TextProps>({
     color: '#433f3f',
     fontSize: '16px',
     fontFamily: '',
-    fontWeight: 'normal',
+    fontWeight: '400',
     lineHeight: '',
     paddingTop: 8,
     paddingRight: 0,
@@ -43,6 +43,7 @@ export const textBlock = defineBlock<TextProps>({
       key: 'align',
       label: '默认对齐',
       type: 'select',
+      selectVariant: 'segmented',
       options: [
         { label: '左', value: 'left' },
         { label: '居中', value: 'center' },
@@ -56,12 +57,8 @@ export const textBlock = defineBlock<TextProps>({
       key: 'fontWeight',
       label: '字重',
       type: 'select',
-      options: [
-        { label: '常规 400', value: 'normal' },
-        { label: '中等 500', value: '500' },
-        { label: '半粗 600', value: '600' },
-        { label: '加粗 700', value: 'bold' },
-      ],
+      selectVariant: 'segmented',
+      options: [...FONT_WEIGHT_STEP_OPTIONS],
     },
     {
       key: 'lineHeight',
@@ -101,7 +98,8 @@ export const textBlock = defineBlock<TextProps>({
   toMjml: (p) => {
     const padding = `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;
     const ff = p.fontFamily ? ` font-family="${escapeAttr(p.fontFamily)}"` : '';
-    const fw = p.fontWeight && p.fontWeight !== 'normal' ? ` font-weight="${p.fontWeight}"` : '';
+    const fwN = normalizeFontWeightStep(p.fontWeight);
+    const fw = fwN !== '400' ? ` font-weight="${escapeAttr(fwN)}"` : '';
     const lh = String(p.lineHeight ?? '').trim();
     const lhAttr = lh ? ` line-height="${escapeAttr(lh)}"` : '';
     return `<mj-text align="${p.align}" color="${escapeAttr(p.color)}" font-size="${escapeAttr(
@@ -110,7 +108,8 @@ export const textBlock = defineBlock<TextProps>({
   },
   renderPreview: (p) => {
     const ff = p.fontFamily ? `font-family:${p.fontFamily};` : '';
-    const fw = p.fontWeight && p.fontWeight !== 'normal' ? `font-weight:${p.fontWeight};` : '';
+    const fwN = normalizeFontWeightStep(p.fontWeight);
+    const fw = fwN !== '400' ? `font-weight:${fwN};` : '';
     const lhRaw = String(p.lineHeight ?? '').trim();
     const lh = lhRaw ? `line-height:${lhRaw};` : 'line-height:normal;';
     return `<div class="sm-text-content" style="text-align:${p.align};color:${p.color};font-size:${p.fontSize};${lh}${ff}${fw}padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;">${p.content}</div>`;

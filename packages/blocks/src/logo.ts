@@ -31,6 +31,7 @@ export const logoBlock = defineBlock<LogoProps>({
       key: 'align',
       label: '对齐',
       type: 'select',
+      selectVariant: 'segmented',
       options: [
         { label: '左', value: 'left' },
         { label: '居中', value: 'center' },

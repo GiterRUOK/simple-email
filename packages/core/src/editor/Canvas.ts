@@ -9,6 +9,7 @@ import {
 } from '../store/store';
 import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
 import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
+import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import { clear, escapeHtml, h } from '../utils/dom';
 import { htmlFragmentForLockedHtmlBlockCanvas } from '../utils/lockedMjml';
 import { BlockCodeModal } from './BlockCodeModal';
@@ -173,7 +174,7 @@ export class Canvas {
     this.inner.style.background = doc.styles.contentBackgroundColor;
     this.inner.style.fontFamily = doc.styles.fontFamily;
     this.inner.style.fontSize = doc.styles.fontSize;
-    this.inner.style.fontWeight = doc.styles.fontWeight || 'normal';
+    this.inner.style.fontWeight = normalizeFontWeightStep(doc.styles.fontWeight);
     this.inner.style.color = doc.styles.color;
     this.inner.style.lineHeight = doc.styles.lineHeight ?? '1.25';
     this.inner.style.setProperty('--sm-editor-link-color', doc.styles.linkColor);
