@@ -101,6 +101,11 @@ export class MailEditor {
     if (this.accentColorOverride) this._applyAccentVars();
   };
 
+  private readonly _onFullscreenChange = () => {
+    const el = smGetFullscreenElement();
+    this.topbar?.setFullscreenActive(el === this.root);
+  };
+
   /** design 态 Esc：块 → 父级 Section → 文档级面板（邮件设置或版式/全局样式，取决于 `ui.hideMailMeta`） */
   private _mailEscHandler = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
@@ -172,6 +177,7 @@ export class MailEditor {
 
     this._buildUI();
     this._bindKeyboard();
+    this._bindFullscreen();
 
     this._applyAccentVars();
     this._refreshAccentMqBinding();
@@ -259,8 +265,10 @@ export class MailEditor {
   }
 
   destroy() {
+    this._unbindFullscreen();
     this._unbindSystemThemeMqForAccent();
     if (this.changeTimer) window.clearTimeout(this.changeTimer);
+    if (smGetFullscreenElement() === this.root) void smExitFullscreen();
     document.removeEventListener('keydown', this._mailEscHandler, true);
     document.removeEventListener('keydown', this._mailUndoRedoHandler, true);
     this.canvas?.destroy?.();
@@ -335,6 +343,8 @@ export class MailEditor {
       onInsertVariable: (anchor) => this._showVariablePopover(anchor),
       onPreview: () => this._showPreview(),
       onExport: () => this._showExport(),
+      showFullscreenButton: this.opts.ui?.hideTopbarFullscreen !== true,
+      onFullscreenToggle: () => void this._toggleFullscreen(),
     });
 
     this.toolbar = new RichTextToolbar({ positionRoot: this.root });
@@ -551,6 +561,44 @@ export class MailEditor {
     });
     modal.open(this.root);
   }
+
+  private _bindFullscreen() {
+    if (this.opts.ui?.hideTopbarFullscreen === true) return;
+    document.addEventListener('fullscreenchange', this._onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', this._onFullscreenChange);
+    this._onFullscreenChange();
+  }
+
+  private _unbindFullscreen() {
+    document.removeEventListener('fullscreenchange', this._onFullscreenChange);
+    document.removeEventListener('webkitfullscreenchange', this._onFullscreenChange);
+  }
+
+  private async _toggleFullscreen() {
+    try {
+      if (smGetFullscreenElement() === this.root) await smExitFullscreen();
+      else await smRequestFullscreen(this.root);
+    } catch (err) {
+      console.warn('[simple-mail] 全屏不可用:', err);
+    }
+  }
+}
+
+function smGetFullscreenElement(): Element | null {
+  const d = document as Document & { webkitFullscreenElement?: Element | null };
+  return document.fullscreenElement ?? d.webkitFullscreenElement ?? null;
+}
+
+async function smRequestFullscreen(el: HTMLElement): Promise<void> {
+  const anyEl = el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+  if (typeof anyEl.requestFullscreen === 'function') await anyEl.requestFullscreen();
+  else if (typeof anyEl.webkitRequestFullscreen === 'function') await anyEl.webkitRequestFullscreen();
+}
+
+async function smExitFullscreen(): Promise<void> {
+  const d = document as Document & { webkitExitFullscreen?: () => Promise<void> | void };
+  if (typeof document.exitFullscreen === 'function') await document.exitFullscreen();
+  else if (typeof d.webkitExitFullscreen === 'function') await d.webkitExitFullscreen();
 }
 
 /* ----------------------------- 默认空文档 ------------------------------- */

@@ -213,6 +213,10 @@ export interface EditorUiOptions {
    * 为 true 时隐藏顶栏「邮件设置」按钮。
    */
   hideTopbarMailSettings?: boolean;
+  /**
+   * 为 true 时隐藏顶栏「全屏」图标按钮（浏览器原生全屏 API，作用于编辑器根节点）。
+   */
+  hideTopbarFullscreen?: boolean;
 }
 
 export interface EditorEvents {

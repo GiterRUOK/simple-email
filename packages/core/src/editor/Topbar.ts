@@ -23,6 +23,10 @@ export interface TopbarOptions {
   onInsertVariable: (anchor: HTMLElement) => void;
   onPreview: () => void;
   onExport: () => void;
+  /** 切换编辑器根节点浏览器全屏（由 Editor 实现 Fullscreen API） */
+  onFullscreenToggle?: () => void;
+  /** 为 false 时不展示全屏按钮（也可用 `ui.hideTopbarFullscreen`） */
+  showFullscreenButton?: boolean;
   /** 为 false 时不展示「邮件设置」按钮（也可用 `ui.hideTopbarMailSettings`） */
   showMailSettingsButton?: boolean;
   /** 为 false 时不渲染左侧产品标题 */
@@ -37,6 +41,7 @@ export class Topbar {
   private themeButtons!: Record<EditorTheme, HTMLButtonElement>;
   private modeButtons: Record<EditorMode, HTMLButtonElement> = {} as any;
   private accentInput?: HTMLInputElement;
+  private fullscreenBtn?: HTMLButtonElement;
 
   constructor(opts: TopbarOptions) {
     this.opts = opts;
@@ -72,6 +77,16 @@ export class Topbar {
     if (!norm) return;
     const forInput = `#${norm.slice(1).toLowerCase()}`;
     if (this.accentInput.value.toLowerCase() !== forInput) this.accentInput.value = forInput;
+  }
+
+  /** 与 document fullscreen 状态同步图标与 aria（按钮不存在时忽略） */
+  setFullscreenActive(active: boolean) {
+    const btn = this.fullscreenBtn;
+    if (!btn) return;
+    btn.replaceChildren(active ? iconFullscreenExit() : iconFullscreenEnter());
+    btn.title = active ? '退出全屏' : '全屏';
+    btn.setAttribute('aria-label', active ? '退出全屏' : '全屏');
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   }
 
   private _render() {
@@ -200,6 +215,27 @@ export class Topbar {
     }
     trailingGroup.push(insertVar, previewBtn, exportBtn);
 
+    const showFs =
+      this.opts.showFullscreenButton !== false &&
+      typeof this.opts.onFullscreenToggle === 'function';
+    const fsGroup =
+      showFs &&
+      h('div', { class: 'sm-topbar__group' }, [
+        (this.fullscreenBtn = h(
+          'button',
+          {
+            class: 'sm-btn sm-btn--ghost sm-topbar__icon-btn',
+            type: 'button',
+            title: '全屏',
+            'aria-label': '全屏',
+            'aria-pressed': 'false',
+            onclick: () => this.opts.onFullscreenToggle!(),
+          },
+          [iconFullscreenEnter()],
+        ) as HTMLButtonElement),
+      ]);
+    if (!showFs) this.fullscreenBtn = undefined;
+
     const headKids: HTMLElement[] = [];
     if (this.opts.showTitle !== false) {
       headKids.push(h('div', { class: 'sm-topbar__title' }, ['Simple Mail Editor']));
@@ -210,6 +246,7 @@ export class Topbar {
       h('div', { class: 'sm-topbar__group' }, [segmented]),
       h('div', { class: 'sm-topbar__group sm-topbar__theme-group' }, themeGroupKids),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),
+      ...(fsGroup ? [fsGroup] : []),
       h('div', { class: 'sm-topbar__spacer' }),
       h('div', { class: 'sm-topbar__group' }, trailingGroup),
     );
@@ -237,6 +274,18 @@ function iconRedo(): SVGElement {
 function iconEye(): SVGElement {
   return svg(
     '<path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="10" cy="10" r="2.4" stroke="currentColor" stroke-width="1.5" fill="none"/>',
+  );
+}
+/** 进入全屏：四角向外 */
+function iconFullscreenEnter(): SVGElement {
+  return svg(
+    '<path d="M6 4H4v2M14 4h2v2M6 16H4v-2M14 16h2v-2M4 6V4h2M16 6V4h-2M4 14v2h2M16 14v2h-2" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>',
+  );
+}
+/** 退出全屏：四角向内 */
+function iconFullscreenExit(): SVGElement {
+  return svg(
+    '<path d="M8 4v4H4M12 4v4h4M8 16v-4H4M12 16v-4h4M4 8h4v4H4M16 8h-4v4h4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/>',
   );
 }
 function iconSun(): SVGElement {

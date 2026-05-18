@@ -55,6 +55,13 @@
   background: var(--sm-bg);
 }
 
+.sm-root:fullscreen,
+.sm-root:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  background: var(--sm-bg);
+}
+
 .sm-root *,
 .sm-root *::before,
 .sm-root *::after {
@@ -181,6 +188,20 @@
   justify-content: center;
 }
 .sm-topbar__theme-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.sm-topbar__icon-btn {
+  flex-shrink: 0;
+  min-width: 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+}
+.sm-topbar__icon-btn svg {
   display: block;
   flex-shrink: 0;
 }
@@ -1165,6 +1186,28 @@
   transform: translateY(0) scale(1);
 }
 
+/* 预览邮件：弹框高度随内容（JS 测量 iframe），整体不超过视口 */
+.sm-modal__card.sm-modal--preview {
+  max-height: calc(100vh - 24px);
+  min-height: 50%;
+  height: auto;
+}
+.sm-modal__card.sm-modal--preview .sm-modal__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.sm-modal__card.sm-modal--preview .sm-modal__body.sm-modal__body--center {
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+}
+.sm-modal__card.sm-modal--preview .sm-preview__viewport {
+  flex: 0 0 auto;
+  width: var(--sm-preview-w);
+  max-width: 100%;
+}
+
 .sm-modal__header {
   display: flex;
   align-items: center;
@@ -1446,11 +1489,10 @@
 /* Preview ------------------------------------------------------------------ */
 .sm-preview__viewport {
   --sm-preview-w: 800px;
-  --sm-preview-h: 700px;
   width: var(--sm-preview-w);
   max-width: 100%;
-  height: var(--sm-preview-h);
-  max-height: 100%;
+  min-height: 200px;
+  /* 高度由 PreviewModal 根据 iframe 文档 scrollHeight 写入 */
   /* 预览 iframe 内为邮件 HTML，外框保持白纸 */
   background: #ffffff;
   border-radius: 12px;

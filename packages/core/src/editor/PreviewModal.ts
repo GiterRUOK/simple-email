@@ -8,14 +8,13 @@ export type PreviewDevice = 'pc' | 'pad' | 'phone';
 
 interface DeviceSpec {
   width: number;
-  height: number;
   label: string;
 }
 
 const DEVICES: Record<PreviewDevice, DeviceSpec> = {
-  pc: { width: 800, height: 700, label: 'PC' },
-  pad: { width: 640, height: 800, label: 'Pad' },
-  phone: { width: 375, height: 667, label: 'Phone' },
+  pc: { width: 800, label: 'PC' },
+  pad: { width: 640, label: 'Pad' },
+  phone: { width: 375, label: 'Phone' },
 };
 
 export interface PreviewModalOptions {
@@ -35,14 +34,18 @@ export class PreviewModal {
   private iframe: HTMLIFrameElement;
   private viewport: HTMLElement;
   private deviceBtns: Record<PreviewDevice, HTMLButtonElement> = {} as any;
+  private iframeRo?: ResizeObserver;
+  private layoutRaf: number | null = null;
+  private onWinResize?: () => void;
 
   constructor(opts: PreviewModalOptions) {
     this.opts = opts;
     this.modal = new Modal({
       title: '预览邮件',
       className: 'sm-modal--preview',
-      width: 'min(960px, 96vw)',
-      height: 'min(820px, 92vh)',
+      width: 'min(960px, calc(100vw - 32px))',
+      /** 高度随 iframe 内容测量，见 _fitPreviewHeight；不超过屏高由 CSS max-height 约束 */
+      onClose: () => this._teardownLayoutHooks(),
     });
 
     this.iframe = h('iframe', {
@@ -50,6 +53,10 @@ export class PreviewModal {
       sandbox: 'allow-same-origin',
       title: 'preview',
     }) as HTMLIFrameElement;
+    this.iframe.addEventListener('load', () => {
+      this._bindIframeResizeObserver();
+      this._scheduleFitPreviewHeight();
+    });
 
     this.viewport = h('div', { class: 'sm-preview__viewport' }, [this.iframe]);
     this.modal.body.classList.add('sm-modal__body--center');
@@ -77,16 +84,20 @@ export class PreviewModal {
     this._render();
     this.setDevice(this.device);
     this.modal.open(parent);
+    this.onWinResize = () => this._scheduleFitPreviewHeight();
+    window.addEventListener('resize', this.onWinResize);
   }
 
   setDevice(d: PreviewDevice) {
     this.device = d;
     const spec = DEVICES[d];
     this.viewport.style.setProperty('--sm-preview-w', `${spec.width}px`);
-    this.viewport.style.setProperty('--sm-preview-h', `${spec.height}px`);
     for (const k of Object.keys(this.deviceBtns) as PreviewDevice[]) {
       this.deviceBtns[k].classList.toggle('sm-segmented__item--active', k === d);
     }
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => this._scheduleFitPreviewHeight()),
+    );
   }
 
   private _render() {
@@ -95,6 +106,65 @@ export class PreviewModal {
     });
     // 用 srcdoc 而非 src=blob:，避免 about:srcdoc 偶发的相对资源问题
     this.iframe.srcdoc = result.html;
+  }
+
+  /** 标题栏 + body 上下 padding + 与视口的小间距 */
+  private static readonly VIEWPORT_RESERVED_Y = 112;
+
+  private _scheduleFitPreviewHeight() {
+    if (this.layoutRaf != null) cancelAnimationFrame(this.layoutRaf);
+    this.layoutRaf = requestAnimationFrame(() => {
+      this.layoutRaf = null;
+      this._fitPreviewHeight();
+    });
+  }
+
+  private _fitPreviewHeight() {
+    if (!this.iframe.isConnected) return;
+    try {
+      const doc = this.iframe.contentDocument;
+      const root = doc?.documentElement;
+      const body = doc?.body;
+      if (!root || !body) return;
+      const raw = Math.max(root.scrollHeight, body.scrollHeight);
+      const maxPx = Math.max(
+        240,
+        window.innerHeight - PreviewModal.VIEWPORT_RESERVED_Y,
+      );
+      const minPx = 200;
+      const next = Math.min(Math.max(Math.ceil(raw), minPx), maxPx);
+      this.viewport.style.height = `${next}px`;
+    } catch {
+      /* srcdoc 同域，极端情况下忽略 */
+    }
+  }
+
+  private _bindIframeResizeObserver() {
+    this.iframeRo?.disconnect();
+    try {
+      const doc = this.iframe.contentDocument;
+      const body = doc?.body;
+      if (!body || typeof ResizeObserver === 'undefined') return;
+      this.iframeRo = new ResizeObserver(() => this._scheduleFitPreviewHeight());
+      this.iframeRo.observe(body);
+      const html = doc.documentElement;
+      if (html) this.iframeRo.observe(html);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  private _teardownLayoutHooks() {
+    if (this.onWinResize) {
+      window.removeEventListener('resize', this.onWinResize);
+      this.onWinResize = undefined;
+    }
+    this.iframeRo?.disconnect();
+    this.iframeRo = undefined;
+    if (this.layoutRaf != null) {
+      cancelAnimationFrame(this.layoutRaf);
+      this.layoutRaf = null;
+    }
   }
 }
 
