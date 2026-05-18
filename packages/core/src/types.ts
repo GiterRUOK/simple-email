@@ -160,6 +160,12 @@ export interface BlockDefinition<P extends object = Record<string, unknown>> {
    * 在用户提交时按 `mode` 写回 props（rich：清理后的 innerHTML；html：原始 innerHTML；plain：textContent）。
    */
   inlineEditable?: InlineEditableConfig<P>;
+  /**
+   * 从左栏拖入时在目标列（或自动包裹的单列 Section）中一次性插入多个块，
+   * 用于「组合模板」：画布内仅为通用 image/text 等，便于逐项修改。
+   * 文档里不会出现本定义的 `type`，仅作左栏入口；若需提供请返回内置块的实例。
+   */
+  expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
 }
 
 export interface InlineEditableConfig<P extends object = Record<string, unknown>> {
@@ -194,10 +200,19 @@ export interface EditorUiOptions {
    */
   preferSliderControls?: boolean;
   /**
-   * 为 true 时隐藏右栏「主题 / Preheader」及顶栏「邮件设置」入口；仍保留「内容宽度」与「全局样式」。
+   * 为 true 时隐藏右栏「主题 / Preheader」；仍保留「内容宽度」与「全局样式」。
+   * 顶栏「邮件设置」默认仍会显示，用于回到文档级面板；若需一并隐藏请设 `hideTopbarMailSettings`。
    * 适合只搭建正文、发件主题由宿主系统管理的场景。
    */
   hideMailMeta?: boolean;
+  /**
+   * 为 true 时隐藏顶栏左侧「Simple Mail Editor」标题（嵌入宿主页面时常用）。
+   */
+  hideTopbarTitle?: boolean;
+  /**
+   * 为 true 时隐藏顶栏「邮件设置」按钮。
+   */
+  hideTopbarMailSettings?: boolean;
 }
 
 export interface EditorEvents {

@@ -330,7 +330,8 @@ export class MailEditor {
         this.store.redo();
       },
       onMailSettings: () => this._focusMailSettings(),
-      showMailSettingsButton: this.opts.ui?.hideMailMeta !== true,
+      showMailSettingsButton: this.opts.ui?.hideTopbarMailSettings !== true,
+      showTitle: this.opts.ui?.hideTopbarTitle !== true,
       onInsertVariable: (anchor) => this._showVariablePopover(anchor),
       onPreview: () => this._showPreview(),
       onExport: () => this._showExport(),
@@ -554,7 +555,7 @@ export class MailEditor {
 
 function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
   const mergedStyles = {
-    backgroundColor: '#f4f4f6',
+    backgroundColor: '#ffffff',
     contentBackgroundColor: '#ffffff',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
     fontSize: '16px',

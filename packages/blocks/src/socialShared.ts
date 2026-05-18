@@ -2,7 +2,7 @@
 export function mjSocialElementName(network: string): string {
   const n = network.trim();
   if (n === 'ig') return 'instagram';
-  if (n === 'rabbit' || n === 'tiktok') return 'web';
+  if (n === 'rabbit' || n === 'tiktok' || n === 'reddit') return 'web';
   return n;
 }
 
@@ -25,6 +25,7 @@ export const SOCIAL_NETWORK_OPTIONS: { label: string; value: string }[] = [
   { label: 'Facebook', value: 'facebook' },
   { label: 'Instagram', value: 'instagram' },
   { label: 'YouTube', value: 'youtube' },
+  { label: 'Reddit', value: 'reddit' },
   { label: '网页', value: 'web' },
 ];
 
@@ -38,6 +39,7 @@ const NETWORK_META: Record<string, { color: string; preview: string }> = {
   instagram: { color: '#E4405F', preview: '◎' },
   ig: { color: '#E4405F', preview: '◎' },
   youtube: { color: '#FF0000', preview: '▶' },
+  reddit: { color: '#FF4500', preview: 'r' },
   tiktok: { color: '#000000', preview: '♪' },
   rabbit: { color: '#FF2442', preview: 'R' },
   website: { color: '#6b7280', preview: '◇' },
@@ -80,6 +82,39 @@ export function paddingQuad(p: {
   paddingLeft: number;
 }): string {
   return `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;
+}
+
+/** mj-social `border-radius`：0 直角；≥999 或 ≥图标半边 → 圆形裁切（999px） */
+export function socialIconBorderRadiusMjml(iconSize: number, radiusPx: unknown): string {
+  const size = Math.max(1, Number(iconSize) || 28);
+  const r = Number(radiusPx);
+  if (!Number.isFinite(r) || r <= 0) return '0px';
+  const half = size / 2;
+  if (r >= 999 || r >= half) return '999px';
+  return `${Math.min(r, size)}px`;
+}
+
+/** 画布预览用图标圆角 CSS（与 {@link socialIconBorderRadiusMjml} 语义一致） */
+export function socialIconBorderRadiusCss(iconSize: number, radiusPx: unknown): string {
+  const size = Math.max(1, Number(iconSize) || 28);
+  const r = Number(radiusPx);
+  if (!Number.isFinite(r) || r <= 0) return '0';
+  const half = size / 2;
+  if (r >= 999 || r >= half) return '50%';
+  return `${Math.min(r, size)}px`;
+}
+
+/** mj-social `inner-padding`，控制图标之间的可视间距 */
+export function socialIconSpacingPx(spacing: unknown, fallback = 10): number {
+  const n = Number(spacing);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return Math.min(64, Math.round(n));
+}
+
+export function flexJustifyFromAlign(align: 'left' | 'center' | 'right'): string {
+  if (align === 'right') return 'flex-end';
+  if (align === 'left') return 'flex-start';
+  return 'center';
 }
 
 export function mjSocialElementsLines(

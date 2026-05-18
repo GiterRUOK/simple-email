@@ -59,7 +59,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
   const loadMoreBtn = h(
     'button',
     {
-      class: 'sm-btn sm-gallery-modal__loadmore',
+      class: 'sm-btn sm-btn--secondary sm-gallery-modal__loadmore',
       type: 'button',
       style: 'display:none',
       onclick: () => {
@@ -141,7 +141,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
       }) as HTMLImageElement;
       img.src = thumb;
       img.onerror = () => {
-        img.style.opacity = '0.35';
+        img.style.opacity = '0.72';
       };
       const cap = h('div', { class: 'sm-gallery-modal__caption' }, [
         it.title?.trim() ? it.title : '图片',
@@ -288,7 +288,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
     h(
       'button',
       {
-        class: 'sm-btn',
+        class: 'sm-btn sm-btn--secondary',
         type: 'button',
         onclick: () => modal.close(),
       },

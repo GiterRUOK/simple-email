@@ -112,8 +112,9 @@ export class InlineEditor {
   exec(command: string, value?: string) {
     this._ensureFocus();
     this._restoreSelection();
-    // styleWithCSS=true 让浏览器把 bold 之类输出成 <span style="font-weight:..."> 而不是 <b>，方便邮件 inline 化
-    document.execCommand('styleWithCSS', false, 'true' as any);
+    // 列表：Chrome 等在 styleWithCSS=true 下 insertOrderedList / insertUnorderedList 常失灵，需退回 HTML 列表标签
+    const isListCmd = command === 'insertOrderedList' || command === 'insertUnorderedList';
+    document.execCommand('styleWithCSS', false, isListCmd ? ('false' as any) : ('true' as any));
     document.execCommand(command, false, value);
     // 命令执行后选区可能已经变化（例如插入链接会扩展），刷新存档
     this.saveSelection();

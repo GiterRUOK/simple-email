@@ -23,8 +23,10 @@ export interface TopbarOptions {
   onInsertVariable: (anchor: HTMLElement) => void;
   onPreview: () => void;
   onExport: () => void;
-  /** 为 false 时不展示「邮件设置」按钮（与 `ui.hideMailMeta` 配套） */
+  /** 为 false 时不展示「邮件设置」按钮（也可用 `ui.hideTopbarMailSettings`） */
   showMailSettingsButton?: boolean;
+  /** 为 false 时不渲染左侧产品标题 */
+  showTitle?: boolean;
 }
 
 export class Topbar {
@@ -74,8 +76,6 @@ export class Topbar {
 
   private _render() {
     clear(this.el);
-
-    const title = h('div', { class: 'sm-topbar__title' }, ['Simple Mail Editor']);
 
     const segmented = h('div', { class: 'sm-segmented' });
     const designBtn = h(
@@ -200,8 +200,13 @@ export class Topbar {
     }
     trailingGroup.push(insertVar, previewBtn, exportBtn);
 
+    const headKids: HTMLElement[] = [];
+    if (this.opts.showTitle !== false) {
+      headKids.push(h('div', { class: 'sm-topbar__title' }, ['Simple Mail Editor']));
+    }
+
     this.el.append(
-      title,
+      ...headKids,
       h('div', { class: 'sm-topbar__group' }, [segmented]),
       h('div', { class: 'sm-topbar__group sm-topbar__theme-group' }, themeGroupKids),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),

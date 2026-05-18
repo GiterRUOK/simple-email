@@ -199,20 +199,23 @@ export function MailEditorView({ value, onChange }: {
 
 ```vue
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, ref } from 'vue';
-import { MailEditor, type EmailDoc } from '@simple-mail/core';
+import { markRaw, onMounted, onBeforeUnmount, ref } from 'vue';
+import { MailEditor, type BlockDefinition, type EmailDoc } from '@simple-mail/core';
 import '@simple-mail/core/style.css';
 import { allBlocks } from '@simple-mail/blocks';
 
-const props = defineProps<{ modelValue?: EmailDoc }>();
+const props = defineProps<{ modelValue?: EmailDoc; blocks?: BlockDefinition<any>[] }>();
 const emit = defineEmits<{ 'update:modelValue': [EmailDoc] }>();
 const el = ref<HTMLDivElement>();
 let editor: MailEditor | null = null;
 
 onMounted(() => {
+  const defs = props.blocks ?? allBlocks;
+  // expandPaletteDrop / schema 等依赖块定义上的函数；props 深度代理可能导致丢失，建议 markRaw
+  const stable = defs.map((d) => markRaw(d));
   editor = new MailEditor({
     container: el.value!,
-    blocks: allBlocks,
+    blocks: stable,
     initialDoc: props.modelValue,
     onChange: (doc) => emit('update:modelValue', doc),
   });
@@ -265,7 +268,8 @@ export const couponBlock = defineBlock<{ title: string; code: string; expiresAt:
 new MailEditor({ container, blocks: [...allBlocks, couponBlock] });
 ```
 
-`schema` 字段类型支持：`text | textarea | number | color | select | switch | image | url | spacing | socialLinkList`。其中 **`image`** 渲染为「URL 输入 +（可选）上传 +（可选）图库」，由 `MailEditor` 的 **`imageAssets`** 控制，见上文「图片资源 imageAssets」。
+`schema` 字段类型支持：`text | textarea | number | color | select | switch | image | url | spacing | socialLinkList`。其中 **`image`** 渲染为「URL 输入 +（可选）上传 +（可选）图库」，由 `MailEditor` 的 **`imageAssets`** 控制，见上文「图片资源 imageAssets」。  
+**社交组**（`social-group`）另有 **`iconBorderRadius`**（px，默认圆形）、**`iconSpacing`**（图标间距 px，对应 MJML `mj-social` 的 `inner-padding`），画布预览与导出共用同一套圆角/间距逻辑。
 所有字段会在右栏自动渲染表单，change 事件回写 `block.props`。
 
 ### 内联编辑 inlineEditable
@@ -279,6 +283,26 @@ new MailEditor({ container, blocks: [...allBlocks, couponBlock] });
 | `placeholder` | 当字段为空时显示的占位提示 |
 
 提交时机：失焦 / 单行 Enter / Esc 取消。富文本提交前会过一次白名单清洗（保留 `a/b/strong/i/em/u/s/span/p/div/ul/ol/li/h1-h6/br`，属性仅留 `href/target/rel/style/class`，`<font>` 自动转为 `<span style="...">`）。
+
+### 左栏组合模板 `expandPaletteDrop`（可选）
+
+用于「一次拖入、画布内仍是多个通用块」的预设（例如页脚 = 图片 + 若干文本），避免整段 raw MJML，又省去运营逐个从左侧拖组件。
+
+在 `BlockDefinition` 上可选声明：
+
+```ts
+expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
+```
+
+- 从左栏拖入该条目时，引擎会在目标列（或拖到 Section 间隙时自动包裹的**单列 Section**）内 **`splice` 插入**回调返回的多个块；**文档 JSON 里不会出现该定义的 `type`**，仅在注册表中作为左栏卡片存在。
+- 回调内请使用传入的 `createBlock('image' | 'text' | …)`，以便 ID、`defaultProps` 与内置块一致。
+- `toMjml` / `renderPreview` 仍须在类型上满足 `BlockDefinition`；组合入口可选用占位的 `toMjml: () => ''`（正常不应出现在 `sections` 里）。
+
+**宿主集成注意**
+
+- 修改 `packages/core` 源码（含拖拽、`expandPaletteDrop` 等）后，请在 monorepo 根目录执行 **`pnpm build`** 或 **`pnpm --filter @simple-mail/core build`**，保证 npm/link 宿主的 **`dist`** 与类型声明同步。
+- **Vue**：若把 `blocks` 数组作为 **props** 传入再交给 `MailEditor`，响应式代理可能导致块定义上的**函数字段**不可靠；应对每个 `BlockDefinition` 使用 **`markRaw`**（或与之一致的「非响应式」引用）后再传入构造器。参见上文「Vue 集成」示例注释。
+- **Vite**：宿主若通过 **`link:` / workspace** 引用本仓库包，建议将 **`@simple-mail/core`、`@simple-mail/blocks`**（以及项目中实际 import 的等价路径，如指向本 monorepo 子包的 specifier）列入 **`optimizeDeps.exclude`**，避免 **依赖预构建缓存**与本地刚构建的 **`dist`** 不一致（常见现象：画布拖拽、`expandPaletteDrop` 等与当前源码不符）。仍异常时可删除宿主项目的 **`node_modules/.vite`** 后重启 dev。
 
 ## 操作手册
 

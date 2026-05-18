@@ -1,9 +1,14 @@
 import Sortable from 'sortablejs';
 import type { Registry } from '../registry/registry';
-import { createSection, findBlockLocation, findSection, pruneEmptySections } from '../store/store';
-import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
-import type { Store } from '../store/store';
+import {
+  createSection,
+  findBlockLocation,
+  findSection,
+  pruneEmptySections,
+  type Store,
+} from '../store/store';
 import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
+import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import { clear, escapeHtml, h } from '../utils/dom';
 import { htmlFragmentForLockedHtmlBlockCanvas } from '../utils/lockedMjml';
 import { BlockCodeModal } from './BlockCodeModal';
@@ -663,6 +668,14 @@ export class Canvas {
 
   /* -------------------------------- 拖拽 ---------------------------------- */
 
+  private _blocksFromPaletteDrop(blockType: string): Block[] {
+    const def = this.opts.registry.get(blockType);
+    if (def?.expandPaletteDrop) {
+      return def.expandPaletteDrop((t) => this.opts.registry.createBlock(t));
+    }
+    return [this.opts.registry.createBlock(blockType)];
+  }
+
   private _handleSectionAdd(e: Sortable.SortableEvent) {
     const item = e.item;
     const layout = item.getAttribute('data-layout') as SectionLayout | null;
@@ -683,18 +696,21 @@ export class Canvas {
     // 路径 B：左栏内容/自定义卡片拖到 sections 之间 → 自动裹一列 Section
     if (sourceGroup === 'blocks' && blockType) {
       item.parentElement?.removeChild(item);
-      const newBlock = this.opts.registry.createBlock(blockType);
+      const blocks = this._blocksFromPaletteDrop(blockType);
       const newSection = createSection('1');
-      newSection.columns[0].blocks.push(newBlock);
+      newSection.columns[0].blocks.splice(newIndex, 0, ...blocks);
       this.opts.store.update((d) => {
         d.sections.splice(newIndex, 0, newSection);
       });
-      this.opts.store.setSelection({
-        kind: 'block',
-        sectionId: newSection.id,
-        columnIndex: 0,
-        blockId: newBlock.id,
-      });
+      const head = blocks[0];
+      if (head) {
+        this.opts.store.setSelection({
+          kind: 'block',
+          sectionId: newSection.id,
+          columnIndex: 0,
+          blockId: head.id,
+        });
+      }
       return;
     }
 
@@ -744,18 +760,21 @@ export class Canvas {
 
     if (sourceGroup === 'blocks' && blockType) {
       item.parentElement?.removeChild(item);
-      const newBlock = this.opts.registry.createBlock(blockType);
+      const blocks = this._blocksFromPaletteDrop(blockType);
       this.opts.store.update((d) => {
         const sec = d.sections.find((s) => s.id === sectionId);
         if (!sec) return;
-        sec.columns[columnIndex]?.blocks.splice(newIndex, 0, newBlock);
+        sec.columns[columnIndex]?.blocks.splice(newIndex, 0, ...blocks);
       });
-      this.opts.store.setSelection({
-        kind: 'block',
-        sectionId,
-        columnIndex,
-        blockId: newBlock.id,
-      });
+      const head = blocks[0];
+      if (head) {
+        this.opts.store.setSelection({
+          kind: 'block',
+          sectionId,
+          columnIndex,
+          blockId: head.id,
+        });
+      }
       return;
     }
 

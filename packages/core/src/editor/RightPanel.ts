@@ -439,12 +439,16 @@ export class RightPanel {
   private _field(field: BlockSchemaField, block: Block): HTMLElement {
     const blockId = block.id;
     const fp = `block:${blockId}:${field.key}`;
-    const value = (block.props as any)[field.key];
+    const def = this.opts.registry.get(block.type);
+    const defaults = def?.defaultProps as Record<string, unknown> | undefined;
+    const raw = (block.props as Record<string, unknown>)[field.key];
+    const value: unknown =
+      raw !== undefined && raw !== null ? raw : defaults?.[field.key];
     const onChange = (v: any) => this._updateBlock(blockId, field.key, v);
 
     switch (field.type) {
       case 'textarea':
-        return this._textareaField(field.label, value ?? '', onChange, field.help, fp);
+        return this._textareaField(field.label, String(value ?? ''), onChange, field.help, fp);
       case 'number':
         return this._numberField(
           field.label,
@@ -456,15 +460,15 @@ export class RightPanel {
           fp,
         );
       case 'color':
-        return this._colorField(field.label, value ?? '', onChange, fp);
+        return this._colorField(field.label, String(value ?? ''), onChange, fp);
       case 'select':
-        return this._selectField(field.label, value ?? '', field.options ?? [], onChange, fp);
+        return this._selectField(field.label, String(value ?? ''), field.options ?? [], onChange, fp);
       case 'switch':
         return this._switchField(field.label, !!value, onChange, field.help, fp);
       case 'image':
         return this._imageField(
           field.label,
-          value ?? '',
+          String(value ?? ''),
           onChange,
           field.placeholder ?? 'https://',
           fp,
@@ -498,7 +502,13 @@ export class RightPanel {
           }
           return el;
         }
-        const row = this._textField(field.label, value ?? '', onChange, field.placeholder ?? '', fp);
+        const row = this._textField(
+          field.label,
+          String(value ?? ''),
+          onChange,
+          field.placeholder ?? '',
+          fp,
+        );
         if (field.help) row.append(h('div', { class: 'sm-field__help' }, [field.help]));
         return row;
       }
@@ -528,16 +538,22 @@ export class RightPanel {
           });
         }, `${fp}:pad`, resetQuad);
       }
-      case 'socialLinkList':
+      case 'socialLinkList': {
+        const rows = Array.isArray(value)
+          ? (value as SocialLinkRow[])
+          : Array.isArray(defaults?.[field.key])
+            ? (defaults[field.key] as SocialLinkRow[])
+            : [];
         return this._socialLinkListField(
           field.label,
-          Array.isArray(value) ? (value as SocialLinkRow[]) : [],
+          rows,
           field.options ?? [],
           blockId,
           field.key,
           field.help,
           fp,
         );
+      }
       default:
         return h('div');
     }
