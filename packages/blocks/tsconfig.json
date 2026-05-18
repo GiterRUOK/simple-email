@@ -4,9 +4,6 @@
     "outDir": "dist",
     "noEmit": true,
     "baseUrl": ".",
-    "paths": {
-      "@simple-mail/core": ["../core/src/index.ts"]
-    },
     "types": []
   },
   "include": ["src", "../core/src/shims.d.ts"]

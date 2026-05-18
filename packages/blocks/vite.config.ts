@@ -7,6 +7,8 @@ export default defineConfig({
     dts({
       rollupTypes: true,
       tsconfigPath: resolve(__dirname, 'tsconfig.dts.json'),
+      /** 与 JS 打包一致，避免 .d.ts rollup 把 core 打进 blocks */
+      external: ['@simple-mail/core'],
     }),
   ],
   build: {
