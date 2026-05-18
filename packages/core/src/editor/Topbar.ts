@@ -23,6 +23,8 @@ export interface TopbarOptions {
   onInsertVariable: (anchor: HTMLElement) => void;
   onPreview: () => void;
   onExport: () => void;
+  /** 为 false 时不展示「邮件设置」按钮（与 `ui.hideMailMeta` 配套） */
+  showMailSettingsButton?: boolean;
 }
 
 export class Topbar {
@@ -158,17 +160,6 @@ export class Topbar {
       [iconRedo(), '重做'],
     );
 
-    const mailSettingsBtn = h(
-      'button',
-      {
-        class: 'sm-btn sm-btn--ghost',
-        type: 'button',
-        title: '邮件主题、宽度与全局样式',
-        onclick: () => this.opts.onMailSettings(),
-      },
-      ['邮件设置'],
-    );
-
     const insertVar = h(
       'button',
       {
@@ -191,13 +182,31 @@ export class Topbar {
       ['导出 HTML'],
     );
 
+    const showMailSettings = this.opts.showMailSettingsButton !== false;
+    const trailingGroup: HTMLElement[] = [];
+    if (showMailSettings) {
+      trailingGroup.push(
+        h(
+          'button',
+          {
+            class: 'sm-btn sm-btn--ghost',
+            type: 'button',
+            title: '邮件主题、宽度与全局样式',
+            onclick: () => this.opts.onMailSettings(),
+          },
+          ['邮件设置'],
+        ),
+      );
+    }
+    trailingGroup.push(insertVar, previewBtn, exportBtn);
+
     this.el.append(
       title,
       h('div', { class: 'sm-topbar__group' }, [segmented]),
       h('div', { class: 'sm-topbar__group sm-topbar__theme-group' }, themeGroupKids),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),
       h('div', { class: 'sm-topbar__spacer' }),
-      h('div', { class: 'sm-topbar__group' }, [mailSettingsBtn, insertVar, previewBtn, exportBtn]),
+      h('div', { class: 'sm-topbar__group' }, trailingGroup),
     );
 
     this.setMode(this.opts.mode);

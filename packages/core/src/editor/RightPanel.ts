@@ -71,6 +71,10 @@ export class RightPanel {
     return this.opts.ui?.preferSliderControls === true;
   }
 
+  private _hideMailMeta(): boolean {
+    return this.opts.ui?.hideMailMeta === true;
+  }
+
   constructor(opts: RightPanelOptions) {
     this.opts = opts;
     this.el = h('aside', { class: 'sm-panel sm-panel--right' });
@@ -230,22 +234,30 @@ export class RightPanel {
   /* ------------------------------ 文档级表单 ------------------------------- */
 
   private _renderDocForm(doc: EmailDoc): HTMLElement {
-    return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, [
-      h('div', { class: 'sm-panel__title' }, ['邮件设置']),
-      this._textField('主题', doc.meta.subject, (v) =>
-        this.opts.store.update((d) => {
-          d.meta.subject = v;
-        }),
-        '',
-        'doc:meta.subject',
-      ),
-      this._textField('Preheader', doc.meta.preheader ?? '', (v) =>
-        this.opts.store.update((d) => {
-          d.meta.preheader = v;
-        }),
-        '',
-        'doc:meta.preheader',
-      ),
+    const hideMeta = this._hideMailMeta();
+    const rows: HTMLElement[] = [];
+    if (!hideMeta) {
+      rows.push(
+        h('div', { class: 'sm-panel__title' }, ['邮件设置']),
+        this._textField('主题', doc.meta.subject, (v) =>
+          this.opts.store.update((d) => {
+            d.meta.subject = v;
+          }),
+          '',
+          'doc:meta.subject',
+        ),
+        this._textField('Preheader', doc.meta.preheader ?? '', (v) =>
+          this.opts.store.update((d) => {
+            d.meta.preheader = v;
+          }),
+          '',
+          'doc:meta.preheader',
+        ),
+      );
+    } else {
+      rows.push(h('div', { class: 'sm-panel__title' }, ['版式']));
+    }
+    rows.push(
       this._textField(
         '内容宽度',
         metaWidthInputString(doc.meta.width),
@@ -329,7 +341,8 @@ export class RightPanel {
           }),
         'doc:styles.linkColor',
       ),
-    ]);
+    );
+    return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, rows);
   }
 
   /* ------------------------------ Section 表单 ----------------------------- */

@@ -21,6 +21,8 @@ Doc → Section → Column → Block       // 仅四层，不允许 Block 再含
 - **图片字段**：`type: 'image'` 支持手输 URL；可选 **右侧「上传」**（`uploadImage`）与 **内置图库弹层**（`imageGallery` + `showGallery: true`）；仍支持完全自管的 `pickImageFromGallery`
 - 撤销/重做、键盘删除、复制 Section/Block
 - **界面主题**：顶栏 **太阳 / 月亮 / 显示器** 图标切换浅色、深色、跟随系统（`prefers-color-scheme`）；中间邮件画布仍为白纸以贴近成品
+- **品牌色**：可选 `accentColor` / `setAccentColor`，覆盖强调色与选区色；可选顶栏拾色器
+- **仅搭正文**：`ui.hideMailMeta` 隐藏主题 / Preheader 与顶栏「邮件设置」，保留版式宽度与全局样式
 - 包体可控：核心 + MJML + CodeMirror + 富文本，gzip ≈ 586KB
 
 ## 仓库结构
@@ -55,11 +57,17 @@ import { allBlocks } from '@simple-mail/blocks';
 const editor = new MailEditor({
   container: document.getElementById('app')!,
   blocks: allBlocks,
+  /**
+   * initialDoc 为 Partial<EmailDoc>：可预置 meta / styles / variables / sections（画布结构）。
+   * 未写的字段会与默认空邮件合并；仅搭正文且由宿主管发件主题时可将 subject、preheader 留空，并配合 ui.hideMailMeta。
+   */
   initialDoc: {
     meta: { subject: '欢迎', width: 600 },
     variables: [{ key: 'user.name', label: '用户名', sample: '张三' }],
     sections: [],
   },
+  /** 右栏控件形态等，见下文「UI 选项 ui」 */
+  // ui: { preferSliderControls: true, hideMailMeta: true },
   // autoWrapSection: true（默认）— 把 Block 拖到 Section 之间空白处时
   // 自动包一个一列 Section。设为 false 则强制只能拖入现有列内。
   // 唯一块被删或拖走后，会去掉因此变空的 Section，无需再删一次壳子。
@@ -73,6 +81,9 @@ const editor = new MailEditor({
 });
 
 const { mjml, html } = editor.export({ withSampleVariables: true });
+
+// 整份替换文档（例如切换模板）；会先失焦右栏避免旧值残留
+// editor.setValue(nextDoc);
 ```
 
 ### 界面主题
@@ -86,6 +97,28 @@ editor.getTheme();
 ```
 
 根节点会设置 `data-sm-theme`，也可在宿主侧用 CSS 变量（`.sm-root` 上）覆盖配色。
+
+### 品牌色（强调色）
+
+界面主色对应 CSS 变量 `--sm-primary`、`--sm-primary-soft`（主按钮、选区、链接强调等）。不传则随 light/dark/system 使用内置紫/靛。
+
+| 方式 | 说明 |
+|------|------|
+| 构造参数 `accentColor?: string` | `#RRGGBB`（支持 3/6 位 hex）；无效值会告警并忽略 |
+| 构造参数 `showAccentColorPicker?: boolean` | 为 `true` 时在顶栏显示原生颜色控件；默认 `false` |
+| `editor.setAccentColor('#RRGGBB' \| null \| '')` | 运行时覆盖；`null` / 空字符串 表示恢复 CSS 默认 |
+| `editor.getAccentColor()` | 仅返回**当前显式覆盖**；未设置时为 `undefined` |
+
+当 `theme` 为 `system` 且设置了品牌色时，浅色/深色下的 soft 透明度会随 `prefers-color-scheme` 更新。
+
+### UI 选项 `ui`
+
+`MailEditor` 的 `ui?: EditorUiOptions`：
+
+| 字段 | 说明 |
+|------|------|
+| `preferSliderControls?: boolean` | 为 `true` 时右栏数值、内边距、全局/组件字号等使用滑块等增强控件。默认 `false`。 |
+| `hideMailMeta?: boolean` | 为 `true` 时：**不展示**右栏「主题」「Preheader」以及顶栏「邮件设置」按钮；右栏文档级面板改为 **「版式」（内容宽度）+「全局样式」**。`doc.meta.subject` / `preheader` 仍在数据模型中，导出 MJML 仍会生成 `<mj-title>`（可为空）、有值时才生成 `<mj-preview>`，适合发件主题由宿主系统单独维护的场景。 |
 
 ### 图片资源 `imageAssets`
 
@@ -262,6 +295,7 @@ new MailEditor({ container, blocks: [...allBlocks, couponBlock] });
 | 插入变量 | 顶栏 `{{ }}`：编辑中插到光标处；否则插到聚焦输入框 |
 | 切换源码 / 设计 | 顶栏切换 |
 | 导出 HTML | 顶栏右上 |
+| 文档级设置（主题 / Preheader / 宽度 / 全局样式） | 未选中画布时右栏展示；`ui.hideMailMeta` 时无主题与 Preheader，且无顶栏「邮件设置」按钮 |
 
 ## 设计与代码模式
 
@@ -272,6 +306,8 @@ new MailEditor({ container, blocks: [...allBlocks, couponBlock] });
 - **导出 HTML**：顶栏右上角，下载经 `withSampleVariables` 替换后的 HTML 文件。
 
 ## 数据模型 速览
+
+`EmailDoc` 为单一事实来源；设计 / 导出 / 宿主保存均围绕该 JSON。构造器中的 `initialDoc` 为 `Partial<EmailDoc>`，会与默认空邮件合并。**预置模板**可传入完整或部分 `sections`、`styles`、`variables` 等。运行时用 **`editor.setValue(doc)`** 可整份替换（例如切换模板），调用前会尽量失焦右栏输入，避免面板显示旧值。
 
 ```ts
 interface EmailDoc {

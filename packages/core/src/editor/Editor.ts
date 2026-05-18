@@ -40,7 +40,8 @@ export interface EditorOptions {
    */
   autoWrapSection?: boolean;
   /**
-   * 为 true 时：点击中栏灰色衬底、画布内空白（未点到 Section/块）等会提交内联编辑并清空选中，右栏回到「邮件设置 / 全局样式」。
+   * 为 true 时：点击中栏灰色衬底、画布内空白（未点到 Section/块）等会提交内联编辑并清空选中，
+   * 右栏回到文档级面板（邮件设置 / 版式与全局样式；若 `ui.hideMailMeta` 则仅版式与全局样式）。
    * 默认 false；需要「点空白取消选中」的宿主再设为 true。
    */
   clearSelectionOnCanvasMargin?: boolean;
@@ -100,7 +101,7 @@ export class MailEditor {
     if (this.accentColorOverride) this._applyAccentVars();
   };
 
-  /** design 态 Esc：块 → 父级 Section → 邮件设置；选中 Section 时一次 Esc 即回邮件设置 */
+  /** design 态 Esc：块 → 父级 Section → 文档级面板（邮件设置或版式/全局样式，取决于 `ui.hideMailMeta`） */
   private _mailEscHandler = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
     if (this.mode !== 'design') return;
@@ -329,6 +330,7 @@ export class MailEditor {
         this.store.redo();
       },
       onMailSettings: () => this._focusMailSettings(),
+      showMailSettingsButton: this.opts.ui?.hideMailMeta !== true,
       onInsertVariable: (anchor) => this._showVariablePopover(anchor),
       onPreview: () => this._showPreview(),
       onExport: () => this._showExport(),
@@ -364,7 +366,7 @@ export class MailEditor {
     if (ae && this.rightPanel.el.contains(ae)) ae.blur();
   }
 
-  /** 提交内联编辑并清空选中，右栏回到邮件设置 / 全局样式 */
+  /** 提交内联编辑并清空选中，右栏回到文档级面板 */
   private _focusMailSettings() {
     this.canvas.commitInlineEdit();
     this.store.setSelection(null);

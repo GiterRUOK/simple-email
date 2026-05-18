@@ -193,6 +193,11 @@ export interface EditorUiOptions {
    * 默认 false。
    */
   preferSliderControls?: boolean;
+  /**
+   * 为 true 时隐藏右栏「主题 / Preheader」及顶栏「邮件设置」入口；仍保留「内容宽度」与「全局样式」。
+   * 适合只搭建正文、发件主题由宿主系统管理的场景。
+   */
+  hideMailMeta?: boolean;
 }
 
 export interface EditorEvents {
