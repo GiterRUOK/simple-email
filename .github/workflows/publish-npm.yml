@@ -1,6 +1,5 @@
-name: Publish NPM Package
+name: Publish NPM Package (pnpm)
 
-# 触发条件：打tag推送时自动发布
 on:
   push:
     tags:
@@ -13,19 +12,24 @@ jobs:
       - name: 拉取代码
         uses: actions/checkout@v4
 
-      - name: 安装Node.js
+      - name: 安装 Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22.21.1
           registry-url: https://registry.npmjs.org/
 
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+
       - name: 安装依赖
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: 项目打包编译
-        run: npm run build # 替换成你自己的打包命令
+        run: pnpm run build 
 
-      - name: 发布到NPM
+      - name: 发布到 NPM
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish
+        run: pnpm publish --no-git-checks
