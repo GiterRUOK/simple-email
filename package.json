@@ -1,5 +1,5 @@
 {
-  "name": "simple-mail",
+  "name": "mail-editor-pancake",
   "version": "0.0.0",
   "private": false,
   "description": "面向运营的轻量邮件可视化编辑器（monorepo 根）",
