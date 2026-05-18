@@ -41,6 +41,7 @@ simple-mail/
 ```bash
 pnpm install
 pnpm dev                 # 启动 vanilla playground，默认 http://localhost:5173
+pnpm build               # 构建 packages/core、packages/blocks（产出 dist/index.js、dist/style.css、dist/index.d.ts 等）
 pnpm typecheck           # 全包类型检查
 pnpm --filter @simple-mail/playground-vanilla build   # 产出静态站点
 ```
