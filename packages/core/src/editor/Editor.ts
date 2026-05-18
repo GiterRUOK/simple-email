@@ -380,10 +380,12 @@ export class MailEditor {
     this.topbar.setMode(m);
     clear(this.body);
     if (m === 'design') {
-      this.body.style.gridTemplateColumns = '240px 1fr 300px';
+      this.body.classList.remove('sm-body--source');
+      this.body.style.removeProperty('grid-template-columns');
       this.body.append(this.leftPanel.el, this.canvas.el, this.rightPanel.el);
     } else {
-      this.body.style.gridTemplateColumns = '1fr';
+      this.body.classList.add('sm-body--source');
+      this.body.style.removeProperty('grid-template-columns');
       this.body.append(this.sourceView.el);
       // 见 SourceView.refreshDoc：设计态源码面板未挂载时不更新，否则会一直显示构造函数时的旧快照
       queueMicrotask(() => this.sourceView.refreshDoc());
