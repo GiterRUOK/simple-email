@@ -2,13 +2,21 @@ import { EditorView, basicSetup } from 'codemirror';
 import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
 import type { Registry } from '../registry/registry';
-import { findBlockLocation, findSection, type Store, type DocChangedDetail } from '../store/store';
+import {
+  findBlockLocation,
+  findSection,
+  isTwoColumnLayout,
+  setSectionLayout,
+  type Store,
+  type DocChangedDetail,
+} from '../store/store';
 import type {
   Block,
   BlockSchemaField,
   EditorUiOptions,
   EmailDoc,
   Section,
+  SectionLayout,
 } from '../types';
 import { defaultSocialIconBackground } from '../socialDefaults';
 import { clear, h } from '../utils/dom';
@@ -352,6 +360,19 @@ export class RightPanel {
     const a = section.attrs;
     return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, [
       h('div', { class: 'sm-panel__title' }, ['Section 设置']),
+      ...(isTwoColumnLayout(section.layout)
+        ? [
+            this._twoColumnRatioField(
+              section.layout,
+              (layout) =>
+                this.opts.store.update((d) => {
+                  const s = findSection(d, section.id);
+                  if (s) setSectionLayout(s, layout);
+                }),
+              `section:${section.id}:layout`,
+            ),
+          ]
+        : []),
       this._colorField(
         '背景色',
         a.backgroundColor ?? '',
@@ -1523,6 +1544,24 @@ export class RightPanel {
   private _docFontWeightField(value: string, onChange: (v: string) => void, focusToken: string) {
     const cur = normalizeFontWeightStep(value);
     return this._segmentedSelectField('字重', cur, FONT_WEIGHT_STEP_OPTIONS, onChange, focusToken);
+  }
+
+  private _twoColumnRatioField(
+    layout: SectionLayout,
+    onChange: (layout: SectionLayout) => void,
+    focusToken: string,
+  ) {
+    return this._segmentedSelectField(
+      '列比例',
+      layout,
+      [
+        { label: '1:1', value: '1-1' },
+        { label: '1:2', value: '1-2' },
+        { label: '2:1', value: '2-1' },
+      ],
+      (v) => onChange(v as SectionLayout),
+      focusToken,
+    );
   }
 
   private _renderBlockCodeView(block: Block): HTMLElement {

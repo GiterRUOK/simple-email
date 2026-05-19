@@ -15,9 +15,8 @@ interface LayoutCard {
 
 const LAYOUT_CARDS: LayoutCard[] = [
   { layout: '1', name: '一列', icon: layoutSvg([1]) },
+  /** 默认 1:1；1:2 / 2:1 在选中 Section 后于右栏「列比例」切换 */
   { layout: '1-1', name: '两列', icon: layoutSvg([1, 1]) },
-  { layout: '1-2', name: '1:2', icon: layoutSvg([1, 2]) },
-  { layout: '2-1', name: '2:1', icon: layoutSvg([2, 1]) },
   { layout: '1-1-1', name: '三列', icon: layoutSvg([1, 1, 1]) },
 ];
 

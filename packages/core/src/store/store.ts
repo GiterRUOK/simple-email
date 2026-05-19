@@ -136,6 +136,36 @@ export function pruneEmptySections(draft: EmailDoc) {
   );
 }
 
+/** 两列 Section 的列宽比例（左栏拖入默认 `1-1`，右栏可改为 `1-2` / `2-1`） */
+export const TWO_COLUMN_LAYOUTS = ['1-1', '1-2', '2-1'] as const;
+export type TwoColumnLayout = (typeof TWO_COLUMN_LAYOUTS)[number];
+
+export function isTwoColumnLayout(layout: SectionLayout): layout is TwoColumnLayout {
+  return layout === '1-1' || layout === '1-2' || layout === '2-1';
+}
+
+/** 仅更新 layout 字段；两列间切换时列数不变，列内块按列下标保留 */
+export function setSectionLayout(section: Section, layout: SectionLayout): void {
+  const nextCols = layout.split('-').length;
+  const curCols = section.columns.length;
+  if (nextCols === curCols) {
+    section.layout = layout;
+    return;
+  }
+  if (nextCols > curCols) {
+    for (let i = curCols; i < nextCols; i++) {
+      section.columns.push({ id: uid('col'), attrs: {}, blocks: [] });
+    }
+  } else {
+    const removed = section.columns.splice(nextCols);
+    const last = section.columns[nextCols - 1];
+    if (last) {
+      for (const col of removed) last.blocks.push(...col.blocks);
+    }
+  }
+  section.layout = layout;
+}
+
 export function createSection(layout: SectionLayout): Section {
   const colCount = layout.split('-').length;
   const columns: Column[] = Array.from({ length: colCount }, () => ({
