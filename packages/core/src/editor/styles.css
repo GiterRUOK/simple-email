@@ -456,8 +456,8 @@
   position: absolute;
   top: auto;
   bottom: 100%;
-  right: 8px;
-  margin-bottom: 10px;
+  /* right: 8px; */
+  /* margin-bottom: 10px; */
   z-index: 10;
   display: none;
   align-items: center;
@@ -474,7 +474,7 @@
 .sm-section-host:has(.sm-block:hover) .sm-section__toolbar,
 .sm-section-host:has(.sm-block.is-selected) .sm-section__toolbar,
 .sm-section-host:has(.sm-block.is-editing) .sm-section__toolbar {
-  margin-bottom: calc(10px + 44px);
+  /* margin-bottom: 34px; */
 }
 .sm-section-host.is-selected .sm-section__toolbar,
 .sm-section-host:hover .sm-section__toolbar,
@@ -589,7 +589,7 @@
   top: auto;
   bottom: 100%;
   right: 0;
-  margin-bottom: 8px;
+  /* margin-bottom: 8px; */
   z-index: 30;
   display: none;
   align-items: center;
