@@ -4,7 +4,7 @@ import {
   createSection,
   findBlockLocation,
   findSection,
-  pruneEmptySections,
+  pruneSectionIfEmpty,
   type Store,
 } from '../store/store';
 import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
@@ -201,7 +201,7 @@ export class Canvas {
       group: { name: 'sections', pull: false, put: topPut },
       animation: 150,
       handle: '.sm-section__handle',
-      draggable: '.sm-section',
+      draggable: '> .sm-section-host',
       ghostClass: 'sm-ghost',
       chosenClass: 'sm-chosen',
       dragClass: 'sm-drag',
@@ -226,9 +226,13 @@ export class Canvas {
     const box =
       sw != null ? `max-width:${sw};width:100%;margin-left:auto;margin-right:auto;box-sizing:border-box;` : '';
 
+    const host = h('div', {
+      class: 'sm-section-host',
+      'data-id': section.id,
+    });
+
     const wrap = h('div', {
       class: 'sm-section',
-      'data-id': section.id,
       title: `${sectionChip}。子组件铺满列内时：按 Esc 或 Alt+点击块可选中本节。`,
       style: `padding:${padding};${a.backgroundColor ? `background:${a.backgroundColor};` : ''}${box}`,
     });
@@ -242,7 +246,6 @@ export class Canvas {
             class: 'sm-tool-btn sm-section__handle',
             type: 'button',
             title: '拖拽排序',
-            onmousedown: (e: Event) => e.stopPropagation(),
           },
           [iconDrag()],
         ),
@@ -284,15 +287,17 @@ export class Canvas {
       cols.append(this._renderColumn(section, col, i, doc));
     });
 
-    wrap.append(toolbar, cols);
+    wrap.append(cols);
 
-    wrap.addEventListener('click', (e) => {
+    host.append(wrap, toolbar);
+
+    host.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('.sm-block')) return;
       e.stopPropagation();
       this.opts.store.setSelection({ kind: 'section', sectionId: section.id });
     });
 
-    return wrap;
+    return host;
   }
 
   private _renderColumn(
@@ -729,7 +734,7 @@ export class Canvas {
         // 由于来源 column 内的 block 不属于 inner 的直接子节点，
         // newIndex 在 inner 的可视位置上是准确的。
         d.sections.splice(newIndex, 0, newSection);
-        pruneEmptySections(d);
+        pruneSectionIfEmpty(d, loc.section.id);
       });
       this.opts.store.setSelection({
         kind: 'block',
@@ -787,7 +792,7 @@ export class Canvas {
         const [moved] = fromCol.blocks.splice(idx, 1);
         const targetSec = d.sections.find((s) => s.id === sectionId);
         targetSec?.columns[columnIndex]?.blocks.splice(newIndex, 0, moved);
-        pruneEmptySections(d);
+        pruneSectionIfEmpty(d, loc.section.id);
       });
     }
   }
@@ -835,7 +840,7 @@ export class Canvas {
       if (!loc) return;
       const col = loc.section.columns[loc.columnIndex];
       col.blocks = col.blocks.filter((b) => b.id !== id);
-      pruneEmptySections(d);
+      pruneSectionIfEmpty(d, loc.section.id);
     });
     this.opts.store.setSelection(null);
   }
@@ -859,7 +864,7 @@ export class Canvas {
     if (!sel) return;
     if (sel.kind === 'section') {
       this.inner
-        .querySelector(`.sm-section[data-id="${cssEscape(sel.sectionId)}"]`)
+        .querySelector(`.sm-section-host[data-id="${cssEscape(sel.sectionId)}"]`)
         ?.classList.add('is-selected');
     } else {
       this.inner

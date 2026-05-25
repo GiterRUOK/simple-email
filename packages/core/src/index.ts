@@ -9,6 +9,7 @@ export {
   findSection,
   findBlockLocation,
   pruneEmptySections,
+  pruneSectionIfEmpty,
   isTwoColumnLayout,
   setSectionLayout,
   TWO_COLUMN_LAYOUTS,

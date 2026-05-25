@@ -430,15 +430,26 @@
   list-style-type: decimal;
 }
 
-/* Section 在画布中的呈现层（包了一层壳便于选中/排序） */
+/* Section 外层：Sortable 拖拽壳，与列内 Sortable 分离避免嵌套冲突 */
+.sm-section-host {
+  position: relative;
+}
+.sm-section-host:hover,
+.sm-section-host.is-selected,
+.sm-section-host.sm-chosen,
+.sm-section-host.sm-drag {
+  z-index: 5;
+}
+
+/* Section 在画布中的呈现层 */
 .sm-section {
   position: relative;
   outline: 1px dashed transparent;
   outline-offset: -1px;
   transition: outline-color 0.12s;
 }
-.sm-section:hover { outline-color: var(--sm-outline-muted); }
-.sm-section.is-selected {
+.sm-section-host:hover .sm-section { outline-color: var(--sm-outline-muted); }
+.sm-section-host.is-selected .sm-section {
   outline: 2px solid var(--sm-primary);
 }
 .sm-section__toolbar {
@@ -447,18 +458,28 @@
   bottom: 100%;
   right: 8px;
   margin-bottom: 10px;
-  z-index: 1;
+  z-index: 10;
   display: none;
   align-items: center;
   gap: 6px;
   flex-direction: row;
   flex-wrap: nowrap;
   max-width: calc(100% - 16px);
+  pointer-events: auto;
+  transition: margin-bottom 0.12s ease;
   /* 贴在 Section 上沿之上，避免压住白纸圆角与选中描边（translateY(-100%) 在部分布局下仍会叠在内容上） */
   transform: none;
 }
-.sm-section.is-selected .sm-section__toolbar,
-.sm-section:hover .sm-section__toolbar {
+/* 内部 Block 工具条可见时，Section 工具条上移让位，Block 条保持原位且可点击 */
+.sm-section-host:has(.sm-block:hover) .sm-section__toolbar,
+.sm-section-host:has(.sm-block.is-selected) .sm-section__toolbar,
+.sm-section-host:has(.sm-block.is-editing) .sm-section__toolbar {
+  margin-bottom: calc(10px + 44px);
+}
+.sm-section-host.is-selected .sm-section__toolbar,
+.sm-section-host:hover .sm-section__toolbar,
+.sm-section-host.sm-chosen .sm-section__toolbar,
+.sm-section-host.sm-drag .sm-section__toolbar {
   display: inline-flex;
 }
 .sm-section__toolbar-label {
@@ -474,7 +495,7 @@
   user-select: none;
   flex-shrink: 0;
 }
-.sm-section.is-selected .sm-section__toolbar-label {
+.sm-section-host.is-selected .sm-section__toolbar-label {
   border-color: var(--sm-primary-soft);
   color: var(--sm-primary);
 }
@@ -484,7 +505,10 @@
   gap: 4px;
   flex-shrink: 0;
 }
-.sm-section.is-selected .sm-section__toolbar-actions {
+.sm-section-host.is-selected .sm-section__toolbar-actions,
+.sm-section-host:hover .sm-section__toolbar-actions,
+.sm-section-host.sm-chosen .sm-section__toolbar-actions,
+.sm-section-host.sm-drag .sm-section__toolbar-actions {
   display: inline-flex;
 }
 .sm-tool-btn {
@@ -501,12 +525,17 @@
 }
 .sm-tool-btn:hover { filter: brightness(1.1); }
 .sm-tool-btn--danger { background: var(--sm-danger); }
+.sm-section__handle { cursor: grab; }
+.sm-section__handle:active { cursor: grabbing; }
 
 .sm-section__columns {
   position: relative;
-  z-index: 2;
   display: flex;
   width: 100%;
+}
+.sm-section-host.sm-chosen .sm-section__columns,
+.sm-section-host.sm-drag .sm-section__columns {
+  pointer-events: none;
 }
 
 .sm-column {
@@ -561,7 +590,7 @@
   bottom: 100%;
   right: 0;
   margin-bottom: 8px;
-  z-index: 20;
+  z-index: 30;
   display: none;
   align-items: center;
   gap: 6px;
