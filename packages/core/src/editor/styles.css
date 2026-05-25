@@ -546,7 +546,6 @@
 .sm-block:hover { outline-color: var(--sm-outline-muted); }
 .sm-block.is-selected:not(.is-editing) {
   outline: 2px solid var(--sm-primary);
-  outline-offset: 2px;
 }
 .sm-block.is-editing {
   /* 编辑中：块级虚线框（偏外），与内层 focus 实线区分 */
@@ -1015,16 +1014,25 @@
 
 /* 内联编辑 + 富文本浮动工具条 -------------------------------------------- */
 .sm-inline-editing {
-  /* 外扩 ring，不占用内容区、不遮挡行首 caret（避免 outline + 负 offset） */
-  outline: none !important;
-  box-shadow: 0 0 0 2px var(--sm-primary-soft);
+  /* 编辑中未聚焦（如点浮动工具条）：虚线 + 淡底；正 offset 不挡行首 caret */
+  outline: 2px dashed color-mix(in srgb, var(--sm-primary) 70%, var(--sm-outline-muted)) !important;
+  outline-offset: 2px;
+  box-shadow: none;
   border-radius: 2px;
+  background-color: color-mix(in srgb, var(--sm-primary-soft) 55%, transparent);
   cursor: text;
   min-height: 1em;
   caret-color: var(--sm-primary);
+  transition:
+    outline-color 0.12s ease,
+    box-shadow 0.12s ease,
+    background-color 0.12s ease;
 }
 .sm-inline-editing:focus {
-  box-shadow: 0 0 0 2px var(--sm-primary);
+  outline: 2px solid var(--sm-primary) !important;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--sm-primary-soft);
+  background-color: color-mix(in srgb, var(--sm-primary-soft) 35%, transparent);
 }
 .sm-inline-editing:empty::before {
   content: attr(data-placeholder);
