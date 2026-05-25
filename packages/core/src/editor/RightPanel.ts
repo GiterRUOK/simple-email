@@ -23,6 +23,7 @@ import { clear, h } from '../utils/dom';
 import { metaWidthInputString, parseMetaWidthFromUserInput, parseSectionWidthFromUserInput, sectionWidthInputString } from '../utils/contentWidth';
 import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import type { ImageAssetsHandlers, ImageFieldContext } from './imageAssets';
+import { FocusBreadcrumb } from './FocusBreadcrumb';
 import { openImageGalleryModal } from './ImageGalleryModal';
 
 /** 与社交组 block 中每行元素结构一致（core 不依赖 blocks） */
@@ -56,6 +57,12 @@ function layoutWidthNumeric(raw: string, mode: 'px' | '%'): number {
 export interface RightPanelOptions {
   store: Store;
   registry: Registry;
+  /** 聚焦路径根节点文案（文档级），默认「邮件」 */
+  docRootLabel?: string;
+  /** 点击路径中的 Section 层级 */
+  onFocusSection: (sectionId: string) => void;
+  /** 点击路径中的文档级层级（等同 Esc 从 Section 上浮） */
+  onFocusDocument: () => void;
   /**
    * 可选。配置后，schema 中 `type: 'image'` 的字段会显示「上传 / 图床」按钮并调用对应回调。
    */
@@ -73,6 +80,9 @@ type RightTab = 'props' | 'code';
 export class RightPanel {
   el: HTMLElement;
   private opts: RightPanelOptions;
+  private headEl: HTMLElement;
+  private contentEl: HTMLElement;
+  private focusCrumb: FocusBreadcrumb;
   private currentTab: RightTab = 'props';
   private codeView: EditorView | null = null;
 
@@ -87,6 +97,17 @@ export class RightPanel {
   constructor(opts: RightPanelOptions) {
     this.opts = opts;
     this.el = h('aside', { class: 'sm-panel sm-panel--right' });
+    this.focusCrumb = new FocusBreadcrumb({
+      store: opts.store,
+      registry: opts.registry,
+      docRootLabel: opts.docRootLabel ?? '邮件',
+      onFocusDocument: () => opts.onFocusDocument(),
+      onFocusSection: (id) => opts.onFocusSection(id),
+    });
+    this.headEl = h('div', { class: 'sm-panel__head' }, [this.focusCrumb.el]);
+    this.contentEl = h('div', { class: 'sm-panel__body' });
+    this.el.append(this.headEl, this.contentEl);
+    this._syncHeadVisibility();
     this._render();
     opts.store.subscribe((detail?: DocChangedDetail) => {
       if (detail?.source === 'history') {
@@ -103,8 +124,15 @@ export class RightPanel {
     });
     opts.store.subscribeSelection(() => {
       this.currentTab = 'props';
+      this._syncHeadVisibility();
       this._render();
     });
+  }
+
+  /** 文档级（无选中）时不展示面包屑，避免与「邮件设置」标题重复 */
+  private _syncHeadVisibility() {
+    const show = !!this.opts.store.selection;
+    this.headEl.hidden = !show;
   }
 
   /** 焦点在右栏可编辑控件上时不要整栏重渲染（避免输入/CodeMirror 失焦） */
@@ -152,20 +180,20 @@ export class RightPanel {
 
   private _render() {
     this._destroyCodeView();
-    clear(this.el);
+    clear(this.contentEl);
 
     const sel = this.opts.store.selection;
     const doc = this.opts.store.doc;
 
     if (!sel) {
-      this.el.append(this._renderDocForm(doc));
+      this.contentEl.append(this._renderDocForm(doc));
       return;
     }
 
     if (sel.kind === 'section') {
       const section = findSection(doc, sel.sectionId);
       if (!section) return;
-      this.el.append(this._renderSectionForm(section));
+      this.contentEl.append(this._renderSectionForm(section));
       return;
     }
 
@@ -176,8 +204,8 @@ export class RightPanel {
         this._tabBtn('props', '属性'),
         this._tabBtn('code', '代码'),
       ]);
-      this.el.append(tabs);
-      this.el.append(
+      this.contentEl.append(tabs);
+      this.contentEl.append(
         h('div', { class: 'sm-empty-form' }, ['该组件可能已被删除，请重新选中画布中的块。']),
       );
       return;
@@ -188,11 +216,11 @@ export class RightPanel {
       this._tabBtn('props', '属性'),
       this._tabBtn('code', '代码'),
     ]);
-    this.el.append(tabs);
+    this.contentEl.append(tabs);
 
     if (this.currentTab === 'props') {
       if (loc.block.lockedMjml) {
-        this.el.append(
+        this.contentEl.append(
           h('div', { class: 'sm-empty-form' }, [
             '该组件已被代码模式锁定。',
             h('div', { style: 'margin-top:8px;' }, [
@@ -214,14 +242,14 @@ export class RightPanel {
           ]),
         );
       } else if (def) {
-        this.el.append(this._renderBlockForm(loc.block, def.schema));
+        this.contentEl.append(this._renderBlockForm(loc.block, def.schema));
       } else {
-        this.el.append(
+        this.contentEl.append(
           h('div', { class: 'sm-empty-form' }, [`未注册的组件: ${loc.block.type}`]),
         );
       }
     } else {
-      this.el.append(this._renderBlockCodeView(loc.block));
+      this.contentEl.append(this._renderBlockCodeView(loc.block));
     }
   }
 

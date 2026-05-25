@@ -12,6 +12,7 @@ import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import { clear, escapeHtml, h } from '../utils/dom';
 import { htmlFragmentForLockedHtmlBlockCanvas } from '../utils/lockedMjml';
+import { layoutHumanLabel } from '../utils/sectionLayout';
 import { BlockCodeModal } from './BlockCodeModal';
 import { InlineEditor, type SelectionState } from './InlineEditor';
 import type { RichTextToolbar } from './RichTextToolbar';
@@ -414,7 +415,6 @@ export class Canvas {
             class: 'sm-tool-btn sm-block__handle',
             type: 'button',
             title: '拖拽排序',
-            onmousedown: (e: Event) => e.stopPropagation(),
             onclick: (e: Event) => e.stopPropagation(),
           },
           [iconDrag()],
@@ -880,18 +880,6 @@ export class Canvas {
 }
 
 /* ---------------------------------- utils --------------------------------- */
-
-const LAYOUT_LABELS: Record<SectionLayout, string> = {
-  '1': '一列',
-  '1-1': '两列',
-  '1-2': '1:2',
-  '2-1': '2:1',
-  '1-1-1': '三列',
-};
-
-function layoutHumanLabel(layout: SectionLayout): string {
-  return LAYOUT_LABELS[layout] ?? layout;
-}
 
 function layoutFlexStyle(_layout: SectionLayout, columnGap?: number): string {
   const gap =

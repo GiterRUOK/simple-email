@@ -365,6 +365,12 @@ export class MailEditor {
     this.rightPanel = new RightPanel({
       store: this.store,
       registry: this.registry,
+      docRootLabel: this.opts.ui?.hideMailMeta ? '版式' : '邮件',
+      onFocusSection: (sectionId) => {
+        this.canvas.commitInlineEdit();
+        this.store.setSelection({ kind: 'section', sectionId });
+      },
+      onFocusDocument: () => this._focusMailSettings(),
       imageAssets: this.opts.imageAssets,
       ui: this.opts.ui,
     });
