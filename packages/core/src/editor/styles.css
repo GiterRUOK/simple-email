@@ -205,6 +205,17 @@
   display: block;
   flex-shrink: 0;
 }
+.sm-topbar__toggle-btn[aria-pressed="true"] {
+  background: var(--sm-primary-soft);
+  color: var(--sm-primary);
+}
+.sm-topbar__toggle-btn .sm-layout-borders-check {
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+.sm-topbar__toggle-btn[aria-pressed="true"] .sm-layout-borders-check {
+  opacity: 1;
+}
 
 .sm-btn {
   display: inline-flex;
@@ -448,7 +459,9 @@
   outline-offset: -1px;
   transition: outline-color 0.12s;
 }
-.sm-section-host:hover .sm-section { outline-color: var(--sm-outline-muted); }
+.sm-root.sm-show-layout-borders .sm-section {
+  outline-color: var(--sm-outline-muted);
+}
 .sm-section-host.is-selected .sm-section {
   outline: 2px solid var(--sm-primary);
 }
@@ -572,7 +585,9 @@
   /* 不用负 offset，避免行首 caret 被描边盖住 */
   outline-offset: 0;
 }
-.sm-block:hover { outline-color: var(--sm-outline-muted); }
+.sm-root.sm-show-layout-borders .sm-block:not(.is-selected):not(.is-editing) {
+  outline-color: var(--sm-outline-muted);
+}
 .sm-block.is-selected:not(.is-editing) {
   outline: 2px solid var(--sm-primary);
 }

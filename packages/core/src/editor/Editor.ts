@@ -96,6 +96,8 @@ export class MailEditor {
   private changeTimer: number | null = null;
   /** 显式品牌色时覆盖 CSS 变量；未设置则由 styles 按 light/dark 使用默认紫/靛 */
   private accentColorOverride: string | undefined;
+  /** 顶栏开关：是否在画布上始终显示 Section / Block 轻量虚线边框 */
+  private showLayoutBorders = false;
   private systemThemeMq: MediaQueryList | null = null;
   private readonly _onSystemThemeMqChange = () => {
     if (this.accentColorOverride) this._applyAccentVars();
@@ -345,6 +347,7 @@ export class MailEditor {
       onExport: () => this._showExport(),
       showFullscreenButton: this.opts.ui?.hideTopbarFullscreen !== true,
       onFullscreenToggle: () => void this._toggleFullscreen(),
+      onLayoutBordersToggle: () => this._toggleLayoutBorders(),
     });
 
     this.toolbar = new RichTextToolbar({ positionRoot: this.root });
@@ -581,6 +584,12 @@ export class MailEditor {
     } catch (err) {
       console.warn('[simple-mail] 全屏不可用:', err);
     }
+  }
+
+  private _toggleLayoutBorders() {
+    this.showLayoutBorders = !this.showLayoutBorders;
+    this.root.classList.toggle('sm-show-layout-borders', this.showLayoutBorders);
+    this.topbar.setLayoutBordersActive(this.showLayoutBorders);
   }
 }
 

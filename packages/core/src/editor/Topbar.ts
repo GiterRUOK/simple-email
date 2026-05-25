@@ -25,6 +25,8 @@ export interface TopbarOptions {
   onExport: () => void;
   /** 切换编辑器根节点浏览器全屏（由 Editor 实现 Fullscreen API） */
   onFullscreenToggle?: () => void;
+  /** 切换画布 Section / Block 布局虚线边框 */
+  onLayoutBordersToggle?: () => void;
   /** 为 false 时不展示全屏按钮（也可用 `ui.hideTopbarFullscreen`） */
   showFullscreenButton?: boolean;
   /** 为 false 时不展示「邮件设置」按钮（也可用 `ui.hideTopbarMailSettings`） */
@@ -42,6 +44,7 @@ export class Topbar {
   private modeButtons: Record<EditorMode, HTMLButtonElement> = {} as any;
   private accentInput?: HTMLInputElement;
   private fullscreenBtn?: HTMLButtonElement;
+  private layoutBordersBtn?: HTMLButtonElement;
 
   constructor(opts: TopbarOptions) {
     this.opts = opts;
@@ -87,6 +90,15 @@ export class Topbar {
     btn.title = active ? '退出全屏' : '全屏';
     btn.setAttribute('aria-label', active ? '退出全屏' : '全屏');
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+
+  /** 与画布布局边框开关同步按钮高亮（按钮不存在时忽略） */
+  setLayoutBordersActive(active: boolean) {
+    const btn = this.layoutBordersBtn;
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    btn.title = active ? '隐藏 Section / Block 边框' : '显示 Section / Block 边框';
+    btn.setAttribute('aria-label', active ? '隐藏 Section / Block 边框' : '显示 Section / Block 边框');
   }
 
   private _render() {
@@ -215,12 +227,32 @@ export class Topbar {
     }
     trailingGroup.push(insertVar, previewBtn, exportBtn);
 
+    const canvasToolKids: HTMLElement[] = [];
+
+    if (typeof this.opts.onLayoutBordersToggle === 'function') {
+      canvasToolKids.push(
+        (this.layoutBordersBtn = h(
+          'button',
+          {
+            class: 'sm-btn sm-btn--ghost sm-topbar__icon-btn sm-topbar__toggle-btn',
+            type: 'button',
+            title: '显示 Section / Block 边框',
+            'aria-label': '显示 Section / Block 边框',
+            'aria-pressed': 'false',
+            onclick: () => this.opts.onLayoutBordersToggle!(),
+          },
+          [iconLayoutBorders()],
+        ) as HTMLButtonElement),
+      );
+    } else {
+      this.layoutBordersBtn = undefined;
+    }
+
     const showFs =
       this.opts.showFullscreenButton !== false &&
       typeof this.opts.onFullscreenToggle === 'function';
-    const fsGroup =
-      showFs &&
-      h('div', { class: 'sm-topbar__group' }, [
+    if (showFs) {
+      canvasToolKids.push(
         (this.fullscreenBtn = h(
           'button',
           {
@@ -233,8 +265,13 @@ export class Topbar {
           },
           [iconFullscreenEnter()],
         ) as HTMLButtonElement),
-      ]);
-    if (!showFs) this.fullscreenBtn = undefined;
+      );
+    } else {
+      this.fullscreenBtn = undefined;
+    }
+
+    const canvasToolsGroup =
+      canvasToolKids.length > 0 && h('div', { class: 'sm-topbar__group' }, canvasToolKids);
 
     const headKids: HTMLElement[] = [];
     if (this.opts.showTitle !== false) {
@@ -246,7 +283,7 @@ export class Topbar {
       h('div', { class: 'sm-topbar__group' }, [segmented]),
       h('div', { class: 'sm-topbar__group sm-topbar__theme-group' }, themeGroupKids),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),
-      ...(fsGroup ? [fsGroup] : []),
+      ...(canvasToolsGroup ? [canvasToolsGroup] : []),
       h('div', { class: 'sm-topbar__spacer' }),
       h('div', { class: 'sm-topbar__group' }, trailingGroup),
     );
@@ -275,6 +312,13 @@ function iconEye(): SVGElement {
   return svg(
     '<path d="M2 10s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5z" stroke="currentColor" stroke-width="1.5" fill="none"/><circle cx="10" cy="10" r="2.4" stroke="currentColor" stroke-width="1.5" fill="none"/>',
   );
+}
+/** 布局边框：虚线框 + 勾选（点亮时显示勾） */
+function iconLayoutBorders(): SVGElement {
+  const el = svg(
+    '<rect x="4.5" y="4.5" width="11" height="11" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-dasharray="2.5 2"/><path d="M7.2 10.1l1.8 1.8 3.8-3.9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" class="sm-layout-borders-check"/>',
+  );
+  return el;
 }
 /** 进入全屏：四角向外 */
 function iconFullscreenEnter(): SVGElement {
