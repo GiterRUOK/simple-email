@@ -1,5 +1,5 @@
 import { h } from '../utils/dom';
-import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
+import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import type { InlineEditor, SelectionState } from './InlineEditor';
 
 /**
@@ -34,13 +34,6 @@ const FONT_FAMILIES = [
 ];
 
 const FONT_SIZES = ['12px', '13px', '14px', '15px', '16px', '18px', '20px', '24px', '28px', '32px'];
-
-const FONT_WEIGHTS = [
-  { label: '常规', value: '400' },
-  { label: '中等', value: '500' },
-  { label: '半粗', value: '600' },
-  { label: '加粗', value: '700' },
-];
 
 export class RichTextToolbar {
   el: HTMLElement;
@@ -245,7 +238,7 @@ export class RichTextToolbar {
       placeholder.textContent = '字重';
       this.selectFontWeight.append(placeholder);
     }
-    for (const w of FONT_WEIGHTS) {
+    for (const w of FONT_WEIGHT_STEP_OPTIONS) {
       const opt = document.createElement('option');
       opt.value = w.value;
       opt.textContent = w.label;
@@ -475,7 +468,7 @@ function matchFontSize(raw: string | null): string {
 function matchFontWeight(raw: string | null): string {
   if (!raw) return '';
   const step = normalizeFontWeightStep(raw);
-  return FONT_WEIGHTS.some((w) => w.value === step) ? step : '';
+  return FONT_WEIGHT_STEP_OPTIONS.some((w) => w.value === step) ? step : '';
 }
 
 function colorToHexInput(color: string): string | null {
