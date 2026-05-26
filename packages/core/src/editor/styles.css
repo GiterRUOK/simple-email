@@ -722,6 +722,13 @@
   outline: 1px dashed color-mix(in srgb, var(--sm-primary) 55%, var(--sm-border));
   outline-offset: 3px;
   cursor: text;
+  /* 列内 Block 按 DOM 顺序绘制；下方块（如 padding-top:0 的分割线）会盖住 offset 描边 */
+  z-index: 3;
+}
+/* hover / 选中态同样抬升，避免 2px 实线描边被相邻块遮挡（编辑态 z-index 更高，见 .is-editing） */
+.sm-block:hover:not(.is-editing),
+.sm-block.is-selected:not(.is-editing) {
+  z-index: 2;
 }
 .sm-block__content { position: relative; }
 
