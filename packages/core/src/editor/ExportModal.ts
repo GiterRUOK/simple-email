@@ -6,6 +6,7 @@ import { renderDoc } from '../renderer';
 import type { Store } from '../store/store';
 import { prettyHtml } from '../utils/html';
 import { h } from '../utils/dom';
+import { richTextExecCommand } from '../utils/richTextCommand';
 import { Modal } from './Modal';
 
 export interface ExportModalOptions {
@@ -99,7 +100,7 @@ export class ExportModal {
       ta.value = this.current;
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      richTextExecCommand('copy');
       document.body.removeChild(ta);
       this._toast('已复制');
     }

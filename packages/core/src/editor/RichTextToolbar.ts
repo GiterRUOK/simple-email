@@ -1,4 +1,5 @@
 import { h } from '../utils/dom';
+import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import type { InlineEditor, SelectionState } from './InlineEditor';
 
 /**
@@ -115,14 +116,15 @@ export class RichTextToolbar {
     this.btns.unlink.style.display = hasLink ? '' : 'none';
 
     if (f.foreColor) {
-      const hex = rgbToHex(f.foreColor);
+      const hex = colorToHexInput(f.foreColor);
       if (hex) this.inputColor.value = hex;
     }
+    this.inputBgColor.value = f.backColor
+      ? (colorToHexInput(f.backColor) ?? '#ffffff')
+      : '#ffffff';
     if (f.fontName) this.selectFontFamily.value = matchFamily(f.fontName);
-    if (f.fontSize) {
-      const px = f.fontSize.match(/\d+px/)?.[0];
-      if (px && FONT_SIZES.includes(px)) this.selectFontSize.value = px;
-    }
+    this.selectFontSize.value = matchFontSize(f.fontSize);
+    this.selectFontWeight.value = matchFontWeight(f.fontWeight);
 
     const ed = this.editor;
     requestAnimationFrame(() => {
@@ -212,7 +214,7 @@ export class RichTextToolbar {
       title: '字号',
       onchange: (e: Event) => {
         const v = (e.target as HTMLSelectElement).value;
-        if (v) this._wrapStyle('font-size', v);
+        if (v) this.editor?.applyFontSize(v);
       },
     });
     {
@@ -234,7 +236,7 @@ export class RichTextToolbar {
       title: '字重',
       onchange: (e: Event) => {
         const v = (e.target as HTMLSelectElement).value;
-        if (v) this._wrapStyle('font-weight', v);
+        if (v) this.editor?.applyFontWeight(v);
       },
     });
     {
@@ -361,30 +363,6 @@ export class RichTextToolbar {
     this.inputLink.value = '';
   }
 
-  private _wrapStyle(prop: string, value: string) {
-    if (!this.editor) return;
-    // execCommand 没有"任意 inline style"命令；自己处理：把存档选区的内容包到一个 span。
-    this.editor.refocus(); // focus + restoreSelection
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0) return;
-    const range = sel.getRangeAt(0);
-    if (range.collapsed) return; // 没选中文字，无意义
-    const span = document.createElement('span');
-    span.setAttribute('style', `${prop}:${value};`);
-    try {
-      span.appendChild(range.extractContents());
-      range.insertNode(span);
-      // 选中 span 内容方便连续操作
-      const newRange = document.createRange();
-      newRange.selectNodeContents(span);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-      this.editor.saveSelection();
-    } catch {
-      // 跨节点结构复杂时 extractContents 偶尔抛错，忽略并保持原样
-    }
-  }
-
   /**
    * 相对 `positionRoot` 定位：默认贴在**正文容器**上沿上方，避免压在选区文字上；
    * 若顶端空间不足则贴在容器下沿下方。
@@ -475,9 +453,45 @@ function matchFamily(name: string): string {
   return '';
 }
 
-function rgbToHex(rgb: string): string | null {
-  if (rgb.startsWith('#')) return rgb;
-  const m = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+function matchFontSize(raw: string | null): string {
+  if (!raw) return '';
+  const m = raw.trim().match(/^(\d+(?:\.\d+)?)px$/i);
+  if (!m) return '';
+  const px = `${Math.round(parseFloat(m[1]))}px`;
+  if (FONT_SIZES.includes(px)) return px;
+  const num = parseFloat(px);
+  let best = FONT_SIZES[0];
+  let bestD = Infinity;
+  for (const s of FONT_SIZES) {
+    const d = Math.abs(parseFloat(s) - num);
+    if (d < bestD) {
+      bestD = d;
+      best = s;
+    }
+  }
+  return best;
+}
+
+function matchFontWeight(raw: string | null): string {
+  if (!raw) return '';
+  const step = normalizeFontWeightStep(raw);
+  return FONT_WEIGHTS.some((w) => w.value === step) ? step : '';
+}
+
+function colorToHexInput(color: string): string | null {
+  const s = color.trim();
+  if (!s) return null;
+  if (s.startsWith('#')) {
+    if (/^#[0-9a-f]{3}$/i.test(s)) {
+      const r = s[1];
+      const g = s[2];
+      const b = s[3];
+      return `#${r}${r}${g}${g}${b}${b}`.toLowerCase();
+    }
+    if (/^#[0-9a-f]{6}$/i.test(s)) return s.toLowerCase();
+    return s;
+  }
+  const m = s.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
   if (!m) return null;
   const toHex = (n: string) => Number(n).toString(16).padStart(2, '0');
   return `#${toHex(m[1])}${toHex(m[2])}${toHex(m[3])}`;

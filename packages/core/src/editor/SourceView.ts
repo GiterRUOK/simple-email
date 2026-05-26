@@ -5,6 +5,7 @@ import type { Registry } from '../registry/registry';
 import { renderDoc } from '../renderer';
 import type { Store } from '../store/store';
 import { clear, h } from '../utils/dom';
+import { richTextExecCommand } from '../utils/richTextCommand';
 
 export interface SourceViewOptions {
   store: Store;
@@ -110,7 +111,7 @@ export class SourceView {
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();
-      document.execCommand('copy');
+      richTextExecCommand('copy');
       document.body.removeChild(ta);
     }
   }
