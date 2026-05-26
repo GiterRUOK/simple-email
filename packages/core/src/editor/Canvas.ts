@@ -294,6 +294,8 @@ export class Canvas {
 
     host.addEventListener('click', (e) => {
       if ((e.target as HTMLElement).closest('.sm-block')) return;
+      // 文本拖选时在 Section padding 等区域松开会冒泡 click，不应误切成 Section 选中
+      if (!e.altKey && this._shouldSuppressSectionSelectFromTextInteraction()) return;
       e.stopPropagation();
       this.opts.store.setSelection({ kind: 'section', sectionId: section.id });
     });
@@ -865,6 +867,24 @@ export class Canvas {
       clone.id = `${clone.id}_c${Date.now().toString(36)}`;
       col.blocks.splice(idx + 1, 0, clone);
     });
+  }
+
+  /**
+   * 内联编辑中拖选文字，若 mouseup 落在 Section padding 等非 Block 区域，
+   * 浏览器仍会向 Section 冒泡 click；此时选区仍在编辑区内，不应切换右侧面板到 Section。
+   */
+  private _shouldSuppressSectionSelectFromTextInteraction(): boolean {
+    if (!this.editingBlockId) return false;
+    const editingEl = this.inner.querySelector('.sm-inline-editing');
+    if (!editingEl) return false;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
+    const nodeInEditing = (n: Node | null): boolean => {
+      if (!n) return false;
+      const el = n.nodeType === Node.TEXT_NODE ? n.parentNode : n;
+      return !!el && editingEl.contains(el);
+    };
+    return nodeInEditing(sel.anchorNode) || nodeInEditing(sel.focusNode);
   }
 
   private _syncSelection() {
