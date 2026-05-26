@@ -213,13 +213,21 @@ export class InlineEditor {
         document.execCommand('insertLineBreak');
       }
     };
-    const onBlur = () => {
+    const onBlur = (e: FocusEvent) => {
       // 给点钟摆余地，避免点击工具条按钮时立刻提交
       setTimeout(() => {
         if (!this.alive) return;
-        const active = document.activeElement;
+        const active = document.activeElement as HTMLElement | null;
         if (active && (active === el || el.contains(active))) return;
-        if (active && (active as HTMLElement).closest?.('.sm-floating-toolbar')) return;
+        if (active?.closest?.('.sm-floating-toolbar')) return;
+        // 从左栏拖入 / 画布内 Sortable 排序：mousedown 会先 blur，若在此时提交会触发画布重渲染并拆掉 drop 目标
+        if (active?.closest?.('.sm-panel--left')) return;
+        if (active?.closest?.('.sm-block__handle, .sm-section__handle')) return;
+        const related = e.relatedTarget as HTMLElement | null;
+        if (related?.closest?.('.sm-panel--left')) return;
+        if (related?.closest?.('.sm-block-card')) return;
+        if (related?.closest?.('.sm-block__handle, .sm-section__handle')) return;
+        if (document.querySelector('.sm-root .sm-drag, .sm-root .sm-chosen')) return;
         this.commit();
       }, 0);
     };

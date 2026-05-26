@@ -672,6 +672,11 @@ export class Canvas {
 
   /* -------------------------------- 拖拽 ---------------------------------- */
 
+  /** 结构变更（拖入/排序）前提交内联编辑，避免编辑态 pendingRender 与 Sortable DOM 不同步 */
+  private _commitEditingBeforeStructureChange() {
+    if (this.editingBlockId) this.commitInlineEdit();
+  }
+
   private _blocksFromPaletteDrop(blockType: string): Block[] {
     const def = this.opts.registry.get(blockType);
     if (def?.expandPaletteDrop) {
@@ -681,6 +686,7 @@ export class Canvas {
   }
 
   private _handleSectionAdd(e: Sortable.SortableEvent) {
+    this._commitEditingBeforeStructureChange();
     const item = e.item;
     const layout = item.getAttribute('data-layout') as SectionLayout | null;
     const blockType = item.getAttribute('data-block-type');
@@ -746,6 +752,7 @@ export class Canvas {
   }
 
   private _handleSectionMove(e: Sortable.SortableEvent) {
+    this._commitEditingBeforeStructureChange();
     const oldIndex = e.oldIndex ?? 0;
     const newIndex = e.newIndex ?? 0;
     if (oldIndex === newIndex) return;
@@ -756,6 +763,7 @@ export class Canvas {
   }
 
   private _handleBlockAdd(e: Sortable.SortableEvent, sectionId: string, columnIndex: number) {
+    this._commitEditingBeforeStructureChange();
     const item = e.item;
     const newIndex = e.newIndex ?? 0;
     const sourceGroup = item.getAttribute('data-source-group');
@@ -798,6 +806,7 @@ export class Canvas {
   }
 
   private _handleBlockMove(e: Sortable.SortableEvent, sectionId: string, columnIndex: number) {
+    this._commitEditingBeforeStructureChange();
     const oldIndex = e.oldIndex ?? 0;
     const newIndex = e.newIndex ?? 0;
     if (oldIndex === newIndex) return;
