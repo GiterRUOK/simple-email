@@ -499,6 +499,30 @@
   margin: 0;
 }
 
+/* 宿主全局 reset（如 p/strong { font-weight:400 }）会盖过块级字重配置，子节点须继承容器 */
+.sm-canvas .sm-text-content :where(
+    p,
+    li,
+    td,
+    th,
+    span,
+    div,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    address,
+    caption
+  ) {
+  font-weight: inherit;
+}
+
+.sm-canvas .sm-text-content :where(strong, b) {
+  font-weight: bolder;
+}
+
 .sm-canvas .sm-text-content :where(ul, ol) {
   margin: 0.5em 0;
   padding-left: 1.5em;
