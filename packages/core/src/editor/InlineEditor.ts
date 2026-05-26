@@ -263,6 +263,18 @@ export class InlineEditor {
       placeCaretAtEnd(el);
     });
 
+    let imeComposing = false;
+    /** 部分浏览器在 compositionend 之后才派发 Enter keydown，需吞掉紧随其后的这一次 */
+    let suppressNextEnter = false;
+
+    const onCompositionStart = () => {
+      imeComposing = true;
+    };
+    const onCompositionEnd = () => {
+      imeComposing = false;
+      suppressNextEnter = true;
+    };
+
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -270,6 +282,12 @@ export class InlineEditor {
         return;
       }
       if (e.key === 'Enter') {
+        // 拼音等 IME 用 Enter 上屏：不可 preventDefault / insertLineBreak
+        if (e.isComposing || imeComposing || e.keyCode === 229) return;
+        if (suppressNextEnter) {
+          suppressNextEnter = false;
+          return;
+        }
         if (!multiline) {
           e.preventDefault();
           this.commit();
@@ -336,6 +354,8 @@ export class InlineEditor {
     };
 
     el.addEventListener('keydown', onKeyDown);
+    el.addEventListener('compositionstart', onCompositionStart);
+    el.addEventListener('compositionend', onCompositionEnd);
     el.addEventListener('blur', onBlur);
     el.addEventListener('paste', onPaste);
     document.addEventListener('selectionchange', onSelChange);
@@ -349,6 +369,8 @@ export class InlineEditor {
 
     this.listeners.push(
       () => el.removeEventListener('keydown', onKeyDown),
+      () => el.removeEventListener('compositionstart', onCompositionStart),
+      () => el.removeEventListener('compositionend', onCompositionEnd),
       () => el.removeEventListener('blur', onBlur),
       () => el.removeEventListener('paste', onPaste),
       () => document.removeEventListener('selectionchange', onSelChange),
