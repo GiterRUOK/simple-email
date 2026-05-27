@@ -1,4 +1,5 @@
 import type { Store } from '../store/store';
+import { bindColorPickerInput } from './ColorPickerPopover';
 import { normalizeAccentHex, rgbCssToHex } from '../utils/accentColor';
 import { h, clear } from '../utils/dom';
 import type { EditorTheme } from './theme';
@@ -159,7 +160,11 @@ export class Topbar {
         title: '主题色',
         value: '#4f46e5',
       }) as HTMLInputElement;
-      inputEl.addEventListener('input', () => this.opts.onAccentChange!(inputEl.value));
+      bindColorPickerInput(inputEl, {
+        layerRoot: this.opts.accentPickerRoot,
+        liveCommit: true,
+        onCommit: (hex) => this.opts.onAccentChange!(hex),
+      });
       this.accentInput = inputEl;
       themeGroupKids.push(h('div', { class: 'sm-topbar__accent' }, [inputEl]));
     } else {

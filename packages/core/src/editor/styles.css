@@ -915,6 +915,7 @@
   align-items: center;
 }
 .sm-social-link-list__color {
+  cursor: pointer;
   width: 100%;
   height: 32px;
   padding: 2px;
@@ -1185,6 +1186,7 @@
   border: 1px solid var(--sm-border);
   border-radius: 6px;
   background: none;
+  cursor: pointer;
 }
 .sm-color-row input[type='color'].sm-color-row__pick--inherit {
   opacity: 0.55;
@@ -1376,6 +1378,89 @@
 }
 .sm-floating-toolbar__link-panel .sm-input::placeholder { color: rgba(255,255,255,0.5); }
 .sm-floating-toolbar__link-panel .sm-btn { height: 26px; }
+
+/* 自定义色板（右栏 / 富文本色卡） ---------------------------------------- */
+.sm-color-picker-layer {
+  position: absolute;
+  z-index: 210;
+}
+.sm-color-picker {
+  width: 220px;
+  padding: 10px;
+  background: var(--sm-surface, #fff);
+  border: 1px solid var(--sm-border, #e6e8ec);
+  border-radius: var(--sm-radius-sm, 6px);
+  box-shadow: var(--sm-shadow-md, 0 4px 16px rgba(16, 24, 40, 0.08));
+}
+.sm-color-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.sm-color-picker__title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sm-text, #1f2328);
+}
+.sm-color-picker__close {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--sm-radius-sm, 6px);
+  background: transparent;
+  color: var(--sm-text-muted, #6b7280);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+.sm-color-picker__close:hover {
+  background: var(--sm-ghost-hover-bg, #f0f1f4);
+  color: var(--sm-text, #1f2328);
+}
+.sm-color-picker__swatches {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.sm-color-picker__swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.sm-color-picker__swatch:hover {
+  outline: 2px solid var(--sm-primary, #4f46e5);
+  outline-offset: 1px;
+}
+.sm-color-picker__native {
+  width: 100%;
+  height: 32px;
+  margin-bottom: 6px;
+  padding: 0;
+  border: 1px solid var(--sm-border, #e6e8ec);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.sm-color-picker__hex {
+  width: 100%;
+  text-align: center;
+}
+.sm-color-picker__foot {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+.sm-color-picker__clear {
+  height: 26px;
+  font-size: 12px;
+}
 
 /* 弹层（变量插入） ------------------------------------------------------- */
 .sm-popover {

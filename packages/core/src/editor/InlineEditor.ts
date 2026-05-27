@@ -15,6 +15,7 @@ import {
   richTextQueryCommandState,
   richTextQueryCommandValue,
 } from '../utils/richTextCommand';
+import { isColorPickerOpen } from './ColorPickerPopover';
 
 export interface InlineEditorOptions {
   el: HTMLElement;
@@ -304,7 +305,8 @@ export class InlineEditor {
         if (!this.alive) return;
         const active = document.activeElement as HTMLElement | null;
         if (active && (active === el || el.contains(active))) return;
-        if (active?.closest?.('.sm-floating-toolbar')) return;
+        if (isColorPickerOpen()) return;
+        if (active?.closest?.('.sm-floating-toolbar, .sm-color-picker, .sm-color-picker-layer')) return;
         // 从左栏拖入 / 画布内 Sortable 排序：mousedown 会先 blur，若在此时提交会触发画布重渲染并拆掉 drop 目标
         if (active?.closest?.('.sm-panel--left')) return;
         if (active?.closest?.('.sm-block__handle, .sm-section__handle')) return;
@@ -312,6 +314,7 @@ export class InlineEditor {
         if (related?.closest?.('.sm-panel--left')) return;
         if (related?.closest?.('.sm-block-card')) return;
         if (related?.closest?.('.sm-block__handle, .sm-section__handle')) return;
+        if (related?.closest?.('.sm-color-picker, .sm-color-picker-layer')) return;
         if (document.querySelector('.sm-root .sm-drag, .sm-root .sm-chosen')) return;
         this.commit();
       }, 0);
@@ -481,7 +484,10 @@ export class InlineEditor {
     if (
       fallback === null &&
       this.lastSelectionState &&
-      document.activeElement?.closest?.('.sm-floating-toolbar')
+      isColorPickerOpen() ||
+      document.activeElement?.closest?.(
+        '.sm-floating-toolbar, .sm-color-picker, .sm-color-picker-layer',
+      )
     ) {
       this.opts.onSelectionChange?.(this.lastSelectionState);
       return;

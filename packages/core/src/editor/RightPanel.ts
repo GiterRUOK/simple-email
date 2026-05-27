@@ -19,6 +19,7 @@ import type {
   SectionLayout,
 } from '../types';
 import { defaultSocialIconBackground } from '../socialDefaults';
+import { bindColorPickerInput } from './ColorPickerPopover';
 import { normalizeAccentHex } from '../utils/accentColor';
 import { clear, h } from '../utils/dom';
 import { metaWidthInputString, parseMetaWidthFromUserInput, parseSectionWidthFromUserInput, sectionWidthInputString } from '../utils/contentWidth';
@@ -754,16 +755,18 @@ export class RightPanel {
           ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:icon` } : {}),
           oninput: (e: Event) => syncItem(i, { iconSrc: (e.target as HTMLInputElement).value }),
         }),
-        h('input', {
-          class: 'sm-social-link-list__color sm-social-link-list__color--compact',
-          type: 'color',
-          title: '图标背景色',
-          value: bgDisplay.length >= 4 ? bgDisplay : bgResolved,
-          ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:bg` } : {}),
-          oninput: (e: Event) =>
-            syncItem(i, { backgroundColor: (e.target as HTMLInputElement).value }),
-        }),
       );
+      const bgPick = h('input', {
+        class: 'sm-social-link-list__color sm-social-link-list__color--compact',
+        type: 'color',
+        value: bgDisplay.length >= 4 ? bgDisplay : bgResolved,
+        ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:bg` } : {}),
+      }) as HTMLInputElement;
+      bindColorPickerInput(bgPick, {
+        liveCommit: true,
+        onCommit: (hex) => syncItem(i, { backgroundColor: hex }),
+      });
+      extras.append(bgPick);
       rowWrap.append(extras);
 
       listEl.append(rowWrap);
@@ -1142,13 +1145,30 @@ export class RightPanel {
 
     applyStored(value);
 
-    pick.addEventListener('input', () => {
-      const hex = pick.value;
+    const previewPick = (hex: string) => {
       text.value = hex;
+      pick.value = hex;
       pick.classList.remove('sm-color-row__pick--inherit');
       pick.title = '';
       lastValid = hex;
+    };
+
+    const commitPick = (hex: string) => {
+      previewPick(hex);
       onChange(hex);
+    };
+
+    bindColorPickerInput(pick, {
+      getValue: () => text.value.trim() || pick.value,
+      placeholder,
+      allowClear: true,
+      onPreview: previewPick,
+      onCommit: commitPick,
+      onClear: () => {
+        applyStored('');
+        lastValid = '';
+        onChange('');
+      },
     });
 
     text.addEventListener('input', () => {

@@ -1,3 +1,4 @@
+import { bindColorPickerInput } from './ColorPickerPopover';
 import { h } from '../utils/dom';
 import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import type { InlineEditor, SelectionState } from './InlineEditor';
@@ -251,8 +252,15 @@ export class RichTextToolbar {
       type: 'color',
       title: '文字颜色',
       value: '#433f3f',
-      oninput: (e: Event) => this.editor?.exec('foreColor', (e.target as HTMLInputElement).value),
     }) as HTMLInputElement;
+    bindColorPickerInput(this.inputColor, {
+      layerRoot: this.opts.positionRoot,
+      liveCommit: true,
+      autoFocusHex: false,
+      onBeforeOpen: () => this.editor?.saveSelection(),
+      onCommit: (hex) => this.editor?.exec('foreColor', hex),
+      onClosed: () => this.editor?.refocus(),
+    });
 
     // 文字背景色
     this.inputBgColor = h('input', {
@@ -260,8 +268,15 @@ export class RichTextToolbar {
       type: 'color',
       title: '文字背景色',
       value: '#fff7e6',
-      oninput: (e: Event) => this.editor?.exec('hiliteColor', (e.target as HTMLInputElement).value),
     }) as HTMLInputElement;
+    bindColorPickerInput(this.inputBgColor, {
+      layerRoot: this.opts.positionRoot,
+      liveCommit: true,
+      autoFocusHex: false,
+      onBeforeOpen: () => this.editor?.saveSelection(),
+      onCommit: (hex) => this.editor?.exec('hiliteColor', hex),
+      onClosed: () => this.editor?.refocus(),
+    });
 
     // 链接：插入链接（无链接时显示）
     this.btns.link = this._iconBtn(
