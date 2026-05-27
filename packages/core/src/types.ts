@@ -225,6 +225,10 @@ export interface EditorUiOptions {
    * 为 true 时隐藏顶栏「全屏」图标按钮（浏览器原生全屏 API，作用于编辑器根节点）。
    */
   hideTopbarFullscreen?: boolean;
+  /** 为 true 时隐藏顶栏「清空画布」按钮。 */
+  hideTopbarClearCanvas?: boolean;
+  /** 为 true 时隐藏顶栏「重置内容」按钮。 */
+  hideTopbarResetContent?: boolean;
 }
 
 export interface EditorEvents {

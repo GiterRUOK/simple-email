@@ -23,6 +23,7 @@ Doc → Section → Column → Block       // 仅四层，不允许 Block 再含
 - **界面主题**：顶栏 **太阳 / 月亮 / 显示器** 图标切换浅色、深色、跟随系统（`prefers-color-scheme`）；中间邮件画布仍为白纸以贴近成品
 - **品牌色**：可选 `accentColor` / `setAccentColor`，覆盖强调色与选区色；可选顶栏拾色器
 - **仅搭正文**：`ui.hideMailMeta` 隐藏主题 / Preheader 与顶栏「邮件设置」，保留版式宽度与全局样式
+- **画布清空 / 重置**：顶栏「清空画布」「重置内容」；`presetDoc` 与 `initialDoc` 分离，编辑已保存邮件时重置仍回到业务预置模板
 - 包体可控：核心 + MJML + CodeMirror + 富文本，gzip ≈ 586KB
 
 ## 仓库结构
@@ -67,6 +68,12 @@ const editor = new MailEditor({
     variables: [{ key: 'user.name', label: '用户名', sample: '张三' }],
     sections: [],
   },
+  /**
+   * 顶栏「重置内容」恢复的目标（与 initialDoc 独立）。
+   * 编辑页打开已保存邮件时：initialDoc = 当前稿，presetDoc = 业务默认模板。
+   * 未传时与 initialDoc 合并结果一致。
+   */
+  // presetDoc: defaultTemplatePartial,
   /** 右栏控件形态等，见下文「UI 选项 ui」 */
   // ui: { preferSliderControls: true, hideMailMeta: true },
   // autoWrapSection: true（默认）— 把 Block 拖到 Section 之间空白处时
@@ -85,6 +92,36 @@ const { mjml, html } = editor.export({ withSampleVariables: true });
 
 // 整份替换文档（例如切换模板）；会先失焦右栏避免旧值残留
 // editor.setValue(nextDoc);
+
+// 清空画布（仅 sections 置空，保留 meta / styles / variables；可 ⌘Z 撤销）
+// editor.clearCanvas();
+
+// 恢复为 presetDoc（或构造时 initialDoc）快照
+// editor.resetToPreset();
+
+// 异步加载默认模板后更新重置目标
+// editor.setPresetDoc(defaultTemplatePartial);
+```
+
+### 画布清空与重置
+
+顶栏位于 **撤销 / 重做** 右侧（可用 `ui` 隐藏，见下表）：
+
+| 按钮 | 行为 |
+|------|------|
+| **清空画布** | 移除所有 Section / Block；`meta`、`styles`、`variables` 不变。操作前浏览器 `confirm` 确认；记入撤销栈（⌘Z 可恢复）。 |
+| **重置内容** | 整份替换为 **`presetDoc`** 快照（未传 `presetDoc` 时等同构造时的 `initialDoc` 合并结果）。操作前 `confirm` 确认；**不**走撤销栈（与 `setValue` 相同，会清空 history）。 |
+
+**宿主常见写法**：新建页 `initialDoc` 与 `presetDoc` 同为默认模板；编辑页 `initialDoc` 为接口返回的 `jsonContent`，`presetDoc` 仍为业务预置结构，避免「重置」把用户带回打开时的草稿。
+
+```ts
+const editor = new MailEditor({
+  container: el,
+  blocks: allBlocks,
+  initialDoc: loadedFromApi,      // 当前画布
+  presetDoc: businessDefaultTemplate, // 顶栏「重置内容」
+  onChange: (doc) => save(doc),
+});
 ```
 
 ### 界面主题
@@ -120,6 +157,11 @@ editor.getTheme();
 |------|------|
 | `preferSliderControls?: boolean` | 为 `true` 时右栏数值、内边距、全局/组件字号等使用滑块等增强控件。默认 `false`。 |
 | `hideMailMeta?: boolean` | 为 `true` 时：**不展示**右栏「主题」「Preheader」以及顶栏「邮件设置」按钮；右栏文档级面板改为 **「版式」（内容宽度）+「全局样式」**。`doc.meta.subject` / `preheader` 仍在数据模型中，导出 MJML 仍会生成 `<mj-title>`（可为空）、有值时才生成 `<mj-preview>`，适合发件主题由宿主系统单独维护的场景。 |
+| `hideTopbarTitle?: boolean` | 隐藏顶栏左侧产品标题（嵌入宿主页时常用）。 |
+| `hideTopbarMailSettings?: boolean` | 隐藏顶栏「邮件设置」按钮（与 `hideMailMeta` 叠加使用）。 |
+| `hideTopbarFullscreen?: boolean` | 隐藏顶栏全屏按钮。 |
+| `hideTopbarClearCanvas?: boolean` | 隐藏顶栏「清空画布」。 |
+| `hideTopbarResetContent?: boolean` | 隐藏顶栏「重置内容」。 |
 
 ### 图片资源 `imageAssets`
 
@@ -317,6 +359,8 @@ expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
 | 删除 | 选中后按 Delete/Backspace；或工具条 🗑 |
 | 复制 | 工具条 ⎘ 图标 |
 | 撤销 / 重做 | ⌘Z / ⌘⇧Z（顶栏按钮也行） |
+| 清空画布 | 顶栏「清空画布」；移除全部 Section/Block，保留全局样式与变量（可撤销） |
+| 重置内容 | 顶栏「重置内容」；恢复为 `presetDoc`（或构造时的 `initialDoc`） |
 | 插入变量 | 顶栏 `{{ }}`：编辑中插到光标处；否则插到聚焦输入框 |
 | 切换源码 / 设计 | 顶栏切换 |
 | 导出 HTML | 顶栏右上 |
@@ -332,7 +376,12 @@ expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
 
 ## 数据模型 速览
 
-`EmailDoc` 为单一事实来源；设计 / 导出 / 宿主保存均围绕该 JSON。构造器中的 `initialDoc` 为 `Partial<EmailDoc>`，会与默认空邮件合并。**预置模板**可传入完整或部分 `sections`、`styles`、`variables` 等。运行时用 **`editor.setValue(doc)`** 可整份替换（例如切换模板），调用前会尽量失焦右栏输入，避免面板显示旧值。
+`EmailDoc` 为单一事实来源；设计 / 导出 / 宿主保存均围绕该 JSON。
+
+- **`initialDoc`**：`Partial<EmailDoc>`，与默认空邮件合并，作为**首次进入画布**的内容。
+- **`presetDoc`**：可选，与默认空邮件合并，作为顶栏 **「重置内容」** 的目标；未传时与 `initialDoc` 相同。编辑已保存邮件时应单独传入业务默认模板，勿与 `initialDoc` 混用。
+- **`editor.setValue(doc)`**：运行期整份替换（如切换模板）；会清空撤销栈；调用前会尽量失焦右栏输入。
+- **`editor.clearCanvas()`** / **`editor.resetToPreset()`** / **`editor.setPresetDoc(partial)`**：与顶栏按钮等价，供宿主程序化调用。
 
 ```ts
 interface EmailDoc {

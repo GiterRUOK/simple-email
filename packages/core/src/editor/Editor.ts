@@ -65,6 +65,11 @@ export interface EditorOptions {
   imageAssets?: ImageAssetsHandlers;
   /** 右栏控件形态等可选 UI 偏好。 */
   ui?: EditorUiOptions;
+  /**
+   * 顶栏「重置内容」恢复的目标文档（与 `initialDoc` 独立；编辑已保存邮件时仍应指向业务预置模板）。
+   * 未传时与构造时的 `initialDoc` 合并结果一致。
+   */
+  presetDoc?: Partial<EmailDoc>;
 }
 
 /**
@@ -98,6 +103,8 @@ export class MailEditor {
   private accentColorOverride: string | undefined;
   /** 顶栏开关：是否在画布上始终显示 Section / Block 轻量虚线边框 */
   private showLayoutBorders = false;
+  /** 「重置内容」时恢复的文档快照（与当前画布内容无关） */
+  private presetContentDoc: EmailDoc;
   private systemThemeMq: MediaQueryList | null = null;
   private readonly _onSystemThemeMqChange = () => {
     if (this.accentColorOverride) this._applyAccentVars();
@@ -159,6 +166,9 @@ export class MailEditor {
     }
 
     const initialDoc = createDefaultDoc(opts.initialDoc);
+    this.presetContentDoc = structuredClone(
+      createDefaultDoc(opts.presetDoc ?? opts.initialDoc),
+    );
     this.store = new Store(initialDoc);
 
     const initialAccent = normalizeAccentHex(this.opts.accentColor ?? '');
@@ -197,6 +207,31 @@ export class MailEditor {
 
   getValue(): EmailDoc {
     return this.store.doc;
+  }
+
+  /**
+   * 清空画布：移除所有 Section/Block，保留 meta、styles、variables。
+   * 会提交内联编辑并清空选中。
+   */
+  clearCanvas(): void {
+    this.canvas.commitInlineEdit();
+    this._blurRightPanelIfFocused();
+    this.store.update((d) => {
+      d.sections = [];
+    });
+    this.store.setSelection(null);
+  }
+
+  /** 将画布恢复为构造时 `presetDoc`（或 `initialDoc`）对应的预置内容。 */
+  resetToPreset(): void {
+    this._blurRightPanelIfFocused();
+    this.store.replace(structuredClone(this.presetContentDoc));
+    this.store.setSelection(null);
+  }
+
+  /** 更新「重置内容」的目标（例如宿主异步加载默认模板后）。 */
+  setPresetDoc(partial: Partial<EmailDoc>): void {
+    this.presetContentDoc = structuredClone(createDefaultDoc(partial));
   }
 
   setVariables(vars: Variable[]) {
@@ -348,6 +383,10 @@ export class MailEditor {
       showFullscreenButton: this.opts.ui?.hideTopbarFullscreen !== true,
       onFullscreenToggle: () => void this._toggleFullscreen(),
       onLayoutBordersToggle: () => this._toggleLayoutBorders(),
+      showClearCanvasButton: this.opts.ui?.hideTopbarClearCanvas !== true,
+      onClearCanvas: () => this._confirmClearCanvas(),
+      showResetContentButton: this.opts.ui?.hideTopbarResetContent !== true,
+      onResetContent: () => this._confirmResetContent(),
     });
 
     this.toolbar = new RichTextToolbar({ positionRoot: this.root });
@@ -390,6 +429,22 @@ export class MailEditor {
   private _focusMailSettings() {
     this.canvas.commitInlineEdit();
     this.store.setSelection(null);
+  }
+
+  private _confirmClearCanvas(): void {
+    const ok = window.confirm(
+      '将移除画布上所有 Section 与组件，邮件全局样式与变量列表会保留。此操作可用撤销（⌘Z）恢复。',
+    );
+    if (!ok) return;
+    this.clearCanvas();
+  }
+
+  private _confirmResetContent(): void {
+    const ok = window.confirm(
+      '将把邮件正文恢复为预置内容，当前画布上的所有模块将被替换。确定继续？',
+    );
+    if (!ok) return;
+    this.resetToPreset();
   }
 
   private _setMode(m: EditorMode) {

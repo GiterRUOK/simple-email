@@ -34,6 +34,12 @@ export interface TopbarOptions {
   showMailSettingsButton?: boolean;
   /** 为 false 时不渲染左侧产品标题 */
   showTitle?: boolean;
+  /** 为 false 时不展示「清空画布」 */
+  showClearCanvasButton?: boolean;
+  onClearCanvas?: () => void;
+  /** 为 false 时不展示「重置内容」 */
+  showResetContentButton?: boolean;
+  onResetContent?: () => void;
 }
 
 export class Topbar {
@@ -192,6 +198,41 @@ export class Topbar {
       [iconRedo(), '重做'],
     );
 
+    const contentActionKids: HTMLElement[] = [];
+    if (this.opts.showClearCanvasButton !== false && typeof this.opts.onClearCanvas === 'function') {
+      contentActionKids.push(
+        h(
+          'button',
+          {
+            class: 'sm-btn sm-btn--ghost',
+            type: 'button',
+            title: '移除画布上所有 Section 与组件',
+            onclick: () => this.opts.onClearCanvas!(),
+          },
+          ['清空画布'],
+        ),
+      );
+    }
+    if (
+      this.opts.showResetContentButton !== false &&
+      typeof this.opts.onResetContent === 'function'
+    ) {
+      contentActionKids.push(
+        h(
+          'button',
+          {
+            class: 'sm-btn sm-btn--ghost',
+            type: 'button',
+            title: '恢复为预置邮件结构',
+            onclick: () => this.opts.onResetContent!(),
+          },
+          ['重置内容'],
+        ),
+      );
+    }
+    const contentActionsGroup =
+      contentActionKids.length > 0 && h('div', { class: 'sm-topbar__group' }, contentActionKids);
+
     const insertVar = h(
       'button',
       {
@@ -288,6 +329,7 @@ export class Topbar {
       h('div', { class: 'sm-topbar__group' }, [segmented]),
       h('div', { class: 'sm-topbar__group sm-topbar__theme-group' }, themeGroupKids),
       h('div', { class: 'sm-topbar__group' }, [this.undoBtn, this.redoBtn]),
+      ...(contentActionsGroup ? [contentActionsGroup] : []),
       ...(canvasToolsGroup ? [canvasToolsGroup] : []),
       h('div', { class: 'sm-topbar__spacer' }),
       h('div', { class: 'sm-topbar__group' }, trailingGroup),
