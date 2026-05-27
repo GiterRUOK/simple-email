@@ -1035,6 +1035,16 @@
   text-align: center;
   line-height: 1.2;
 }
+.sm-spacing-row input[type='range'],
+.sm-field__slider-row input[type='range'],
+.sm-width-field__slider-row input[type='range'] {
+  cursor: pointer;
+}
+.sm-spacing-row input[type='range']::-webkit-slider-thumb,
+.sm-field__slider-row input[type='range']::-webkit-slider-thumb,
+.sm-width-field__slider-row input[type='range']::-webkit-slider-thumb {
+  cursor: pointer;
+}
 .sm-spacing-row input[type='range'] {
   flex: 1 1 auto;
   min-width: 0;
