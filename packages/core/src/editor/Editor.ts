@@ -384,9 +384,9 @@ export class MailEditor {
       onFullscreenToggle: () => void this._toggleFullscreen(),
       onLayoutBordersToggle: () => this._toggleLayoutBorders(),
       showClearCanvasButton: this.opts.ui?.hideTopbarClearCanvas !== true,
-      onClearCanvas: () => this._confirmClearCanvas(),
+      onClearCanvas: () => this.clearCanvas(),
       showResetContentButton: this.opts.ui?.hideTopbarResetContent !== true,
-      onResetContent: () => this._confirmResetContent(),
+      onResetContent: () => this.resetToPreset(),
     });
 
     this.toolbar = new RichTextToolbar({ positionRoot: this.root });
@@ -429,22 +429,6 @@ export class MailEditor {
   private _focusMailSettings() {
     this.canvas.commitInlineEdit();
     this.store.setSelection(null);
-  }
-
-  private _confirmClearCanvas(): void {
-    const ok = window.confirm(
-      '将移除画布上所有 Section 与组件，邮件全局样式与变量列表会保留。此操作可用撤销（⌘Z）恢复。',
-    );
-    if (!ok) return;
-    this.clearCanvas();
-  }
-
-  private _confirmResetContent(): void {
-    const ok = window.confirm(
-      '将把邮件正文恢复为预置内容，当前画布上的所有模块将被替换。确定继续？',
-    );
-    if (!ok) return;
-    this.resetToPreset();
   }
 
   private _setMode(m: EditorMode) {
