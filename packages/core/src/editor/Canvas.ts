@@ -152,16 +152,30 @@ export class Canvas {
   /** 捕获阶段拦截 <a href>，防止 Chrome 等在画布预览 DOM 上触发跳转（含未进入内联编辑时点到按钮块链接） */
   private _bindDesignModeLinkSuppression() {
     const opts = { capture: true, signal: this.linkNavSuppression.signal } as const;
-    const stop = (e: MouseEvent) => {
-      if (!(e.target instanceof Element)) return;
-      const a = e.target.closest('a');
-      if (!a || !this.inner.contains(a)) return;
-      if (!a.hasAttribute('href')) return;
+    const linkFromTarget = (target: EventTarget | null): HTMLAnchorElement | null => {
+      if (!(target instanceof Element)) return null;
+      const a = target.closest('a');
+      if (!a || !this.inner.contains(a)) return null;
+      if (!a.hasAttribute('href')) return null;
+      return a;
+    };
+    this.inner.addEventListener(
+      'mousedown',
+      (e: MouseEvent) => {
+        const a = linkFromTarget(e.target);
+        if (!a) return;
+        // 内联编辑时保留 mousedown 默认行为，以便在链接文字上拖选
+        if (a.closest('.sm-inline-editing')) return;
+        e.preventDefault();
+      },
+      opts,
+    );
+    const stopNavigate = (e: MouseEvent) => {
+      if (!linkFromTarget(e.target)) return;
       e.preventDefault();
     };
-    this.inner.addEventListener('mousedown', stop, opts);
-    this.inner.addEventListener('click', stop, opts);
-    this.inner.addEventListener('auxclick', stop, opts);
+    this.inner.addEventListener('click', stopNavigate, opts);
+    this.inner.addEventListener('auxclick', stopNavigate, opts);
   }
 
   /* -------------------------------- 渲染 ---------------------------------- */

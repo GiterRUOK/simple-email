@@ -342,14 +342,7 @@ export class InlineEditor {
       return a;
     };
 
-    /** Chrome：contenteditable 里的 <a href> 仍会在 mousedown/click 时导航；阻止后用手动 caret 对齐点击处 */
-    const onLinkMouseDown = (e: MouseEvent) => {
-      if ((mode !== 'rich' && mode !== 'html') || e.button !== 0) return;
-      if (!linkInsideEditing(e.target)) return;
-      e.preventDefault();
-      placeCaretAtClientPoint(el, e.clientX, e.clientY);
-    };
-
+    /** Chrome：contenteditable 里的 <a href> 仍会在 click 时导航；mousedown 不拦截以保留拖选 */
     const stopLinkActivate = (e: MouseEvent) => {
       if (mode !== 'rich' && mode !== 'html') return;
       if (!linkInsideEditing(e.target)) return;
@@ -365,7 +358,6 @@ export class InlineEditor {
     el.addEventListener('input', onSelChange);
     el.addEventListener('mouseup', onSelChange);
     if (mode === 'rich' || mode === 'html') {
-      el.addEventListener('mousedown', onLinkMouseDown, true);
       el.addEventListener('click', stopLinkActivate, true);
       el.addEventListener('auxclick', stopLinkActivate, true);
     }
@@ -381,7 +373,6 @@ export class InlineEditor {
       () => el.removeEventListener('mouseup', onSelChange),
       ...(mode === 'rich' || mode === 'html'
         ? [
-            () => el.removeEventListener('mousedown', onLinkMouseDown, true),
             () => el.removeEventListener('click', stopLinkActivate, true),
             () => el.removeEventListener('auxclick', stopLinkActivate, true),
           ]
@@ -445,6 +436,7 @@ export class InlineEditor {
 
     const inline = resolveInlineFormatsAtSelection(this.el, sel);
 
+    let foreColor = inline.foreColor ?? safeQueryValue('foreColor');
     let backColor = inline.backColor;
     if (
       !backColor &&
@@ -468,7 +460,7 @@ export class InlineEditor {
         orderedList: richTextQueryCommandState('insertOrderedList'),
         align,
         link,
-        foreColor: safeQueryValue('foreColor'),
+        foreColor,
         fontSize: inline.fontSize,
         fontName: safeQueryValue('fontName'),
         fontWeight: inline.fontWeight,
@@ -533,36 +525,6 @@ function placeCaretAtEnd(el: HTMLElement) {
   sel.addRange(range);
 }
 
-/** 在视口坐标处设置折叠选区（用于拦截 <a> 默认行为后补回放光标） */
-function placeCaretAtClientPoint(root: HTMLElement, clientX: number, clientY: number): boolean {
-  const doc = root.ownerDocument;
-  const d = doc as Document & {
-    caretRangeFromPoint?: (x: number, y: number) => Range | null;
-    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
-  };
-  let range: Range | null = null;
-  if (d.caretRangeFromPoint) {
-    range = d.caretRangeFromPoint(clientX, clientY);
-  } else if (d.caretPositionFromPoint) {
-    const pos = d.caretPositionFromPoint(clientX, clientY);
-    if (pos?.offsetNode) {
-      range = doc.createRange();
-      try {
-        range.setStart(pos.offsetNode, pos.offset);
-        range.collapse(true);
-      } catch {
-        range = null;
-      }
-    }
-  }
-  if (!range || !root.contains(range.startContainer)) return false;
-  const sel = doc.getSelection();
-  if (!sel) return false;
-  sel.removeAllRanges();
-  sel.addRange(range);
-  return true;
-}
-
 function safeQueryValue(cmd: string): string | null {
   try {
     const v = richTextQueryCommandValue(cmd);
@@ -572,19 +534,25 @@ function safeQueryValue(cmd: string): string | null {
   }
 }
 
-/** 光标/选区处的字号、字重、背景色（queryCommandValue 对 span style 与 px 字号不可靠） */
+/** 光标/选区处的字号、字重、文字色、背景色（queryCommandValue 对 span style 与链接内颜色不可靠） */
 function resolveInlineFormatsAtSelection(
   root: HTMLElement,
   sel: Selection,
-): { fontSize: string | null; fontWeight: string | null; backColor: string | null } {
+): {
+  fontSize: string | null;
+  fontWeight: string | null;
+  foreColor: string | null;
+  backColor: string | null;
+} {
   const host = selectionHostElement(sel, root);
-  if (!host) return { fontSize: null, fontWeight: null, backColor: null };
+  if (!host) return { fontSize: null, fontWeight: null, foreColor: null, backColor: null };
 
   let fontWeight: string | null = null;
   for (let el: HTMLElement | null = host; el && root.contains(el) && el !== root; el = el.parentElement) {
     if (el.style.fontWeight) fontWeight = el.style.fontWeight;
   }
 
+  const foreColor = resolveForeColorAtSelection(root, host);
   const backColor = resolveBackColorAtSelection(root, host);
   // 用 computed px，避免读到 .sm-text-content 块级默认字号盖掉 <font>/span 上的真实字号
   const fontSize = window.getComputedStyle(host).fontSize;
@@ -597,7 +565,29 @@ function resolveInlineFormatsAtSelection(
     fontWeight = normalizeFontWeightStep(fontWeight);
   }
 
-  return { fontSize, fontWeight, backColor };
+  return { fontSize, fontWeight, foreColor, backColor };
+}
+
+/** 光标处文字色（foreColor / 链接局部 color；queryCommandValue 在 <a> 内常不准） */
+function resolveForeColorAtSelection(root: HTMLElement, host: HTMLElement): string | null {
+  for (let el: HTMLElement | null = host; el && root.contains(el) && el !== root; el = el.parentElement) {
+    const inline = el.style.color?.trim();
+    if (inline) return inline;
+
+    const fromAttr = readColorFromStyleAttr(el.getAttribute('style'));
+    if (fromAttr) return fromAttr;
+  }
+
+  const computed = window.getComputedStyle(host).color;
+  return computed || null;
+}
+
+function readColorFromStyleAttr(styleAttr: string | null): string | null {
+  if (!styleAttr) return null;
+  const m = styleAttr.match(/(?:^|;)\s*color\s*:\s*([^;]+)/i);
+  if (!m) return null;
+  const c = m[1].trim();
+  return c || null;
 }
 
 /** 光标处文字背景/高亮色（hiliteColor 的 queryCommandValue 在 Chrome 常为空，需读 DOM） */

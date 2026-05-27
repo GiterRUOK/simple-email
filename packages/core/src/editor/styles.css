@@ -486,13 +486,16 @@
   /* 由 Canvas 在运行时设为 doc.styles.linkColor；兜底与默认邮件 link 橙一致 */
   --sm-editor-link-color: #ff5a00;
 }
-/* 用户代理对 <a> 的默认色会盖过继承的 color，需与预览/MJML 全局链接色对齐 */
-.sm-canvas a,
-.sm-canvas a:link,
-.sm-canvas a:visited,
-.sm-canvas a:hover,
-.sm-canvas a:active {
-  color: var(--sm-editor-link-color) !important;
+/*
+ * 无 inline color 时使用文档级链接色；局部 style 优先于全局（不用 !important，避免盖过 foreColor）。
+ * 属性选择器排除 background-color 等误匹配（仅匹配 style 中的 color: 声明）。
+ */
+.sm-canvas a:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]),
+.sm-canvas a:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]):link,
+.sm-canvas a:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]):visited,
+.sm-canvas a:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]):hover,
+.sm-canvas a:not([style^="color:"]):not([style*=";color:"]):not([style*="; color:"]):active {
+  color: var(--sm-editor-link-color);
 }
 
 .sm-canvas .sm-text-content :where(p) {
