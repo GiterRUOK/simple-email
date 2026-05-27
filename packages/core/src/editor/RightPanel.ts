@@ -525,10 +525,31 @@ export class RightPanel {
       }
       case 'select': {
         const isFw = field.key === 'fontWeight' || field.key === 'labelFontWeight';
-        const displayVal = isFw ? normalizeFontWeightStep(String(value ?? '')) : String(value ?? '');
-        const opts = isFw ? FONT_WEIGHT_STEP_OPTIONS : (field.options ?? []);
+        const opts = field.options?.length
+          ? field.options
+          : isFw
+            ? FONT_WEIGHT_STEP_OPTIONS
+            : [];
+        if (isFw && field.inheritGlobal) {
+          const stored =
+            raw !== undefined && raw !== null ? String(raw).trim() : '';
+          return this._fontWeightInheritField(
+            field.label,
+            stored,
+            normalizeFontWeightStep(this.opts.store.doc.styles.fontWeight),
+            (v) => onChange(v),
+            fp,
+            opts,
+            field.help,
+          );
+        }
+        const displayVal = isFw
+          ? normalizeFontWeightStep(String(value ?? ''))
+          : String(value ?? '');
         if (isFw || field.selectVariant === 'segmented') {
-          return this._segmentedSelectField(field.label, displayVal, opts, onChange, fp);
+          const el = this._segmentedSelectField(field.label, displayVal, opts, onChange, fp);
+          if (field.help) el.append(h('div', { class: 'sm-field__help' }, [field.help]));
+          return el;
         }
         return this._selectField(field.label, displayVal, opts, onChange, fp);
       }
@@ -554,13 +575,16 @@ export class RightPanel {
             field.help,
           );
         }
-        if (field.key === 'fontSize' && this._preferSliderControls()) {
+        if (field.key === 'fontSize' && field.inheritGlobal) {
+          const rawFs =
+            raw !== undefined && raw !== null ? String(raw).trim() : '';
           return this._fontSizeSliderField(
             field.label,
-            String(value ?? ''),
-            (v) => onChange(v),
+            rawFs,
+            (v) => onChange(v.trim()),
             fp,
             field.help,
+            this.opts.store.doc.styles.fontSize,
           );
         }
         const row = this._textField(
@@ -1198,9 +1222,10 @@ export class RightPanel {
     options: { label: string; value: string }[],
     onChange: (v: string) => void,
     focusToken?: string,
+    wrap = false,
   ) {
     const group = h('div', {
-      class: 'sm-segmented sm-segmented--fill',
+      class: `sm-segmented sm-segmented--fill${wrap ? ' sm-segmented--wrap' : ''}`,
       role: 'group',
       'aria-label': label,
     });
@@ -1404,6 +1429,188 @@ export class RightPanel {
     ]);
   }
 
+  /** 「继承全局」开关行：开=跟随邮件全局，关=块级固定值 */
+  private _globalInheritSwitch(
+    inheritOn: boolean,
+    globalDisplay: string,
+    onToggle: (inherit: boolean) => void,
+    focusToken?: string,
+  ): { el: HTMLElement; setInherit: (on: boolean, display?: string) => void } {
+    const input = h('input', {
+      type: 'checkbox',
+      class: 'sm-inherit-switch__input',
+      role: 'switch',
+      ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
+      ...(inheritOn ? { checked: true } : {}),
+    }) as HTMLInputElement;
+    const valueEl = h('span', {
+      class: 'sm-inherit-switch__value',
+      hidden: !inheritOn,
+    }, [globalDisplay]);
+    const el = h('div', { class: 'sm-inherit-switch' }, [
+      h('label', { class: 'sm-inherit-switch__label' }, [
+        input,
+        h('span', { class: 'sm-inherit-switch__text' }, ['继承全局']),
+      ]),
+      valueEl,
+    ]);
+    input.addEventListener('change', () => onToggle(input.checked));
+    const setInherit = (on: boolean, display?: string) => {
+      input.checked = on;
+      if (display !== undefined) valueEl.textContent = display;
+      valueEl.hidden = !on;
+    };
+    return { el, setInherit };
+  }
+
+  private _fontWeightInheritField(
+    label: string,
+    stored: string,
+    globalWeight: string,
+    onChange: (v: string) => void,
+    focusToken: string,
+    options: { label: string; value: string }[],
+    help?: string,
+  ): HTMLElement {
+    let inheriting = !stored;
+    const group = h('div', {
+      class: 'sm-segmented sm-segmented--fill',
+      role: 'group',
+      'aria-label': label,
+    });
+
+    const syncGroup = () => {
+      group.classList.toggle('sm-segmented--disabled', inheriting);
+      const display = inheriting ? '' : normalizeFontWeightStep(stored || globalWeight);
+      clear(group);
+      for (const o of options) {
+        const active = !inheriting && o.value === display;
+        group.append(
+          h(
+            'button',
+            {
+              type: 'button',
+              class: `sm-segmented__item${active ? ' sm-segmented__item--active' : ''}`,
+              'aria-pressed': active ? 'true' : 'false',
+              title: o.label,
+              ...(focusToken ? { 'data-sm-focus': `${focusToken}:${o.value}` } : {}),
+              onclick: () => {
+                inheriting = false;
+                stored = o.value;
+                inheritSwitch.setInherit(false);
+                syncGroup();
+                onChange(o.value);
+              },
+            },
+            [o.label],
+          ),
+        );
+      }
+    };
+
+    const inheritSwitch = this._globalInheritSwitch(
+      inheriting,
+      globalWeight,
+      (on) => {
+        if (on) {
+          inheriting = true;
+          stored = '';
+          inheritSwitch.setInherit(true, globalWeight);
+          syncGroup();
+          onChange('');
+          return;
+        }
+        inheriting = false;
+        stored = globalWeight;
+        inheritSwitch.setInherit(false);
+        syncGroup();
+        onChange(globalWeight);
+      },
+      `${focusToken}:inherit`,
+    );
+
+    syncGroup();
+
+    const wrap = h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, [label]),
+      inheritSwitch.el,
+      group,
+    ]);
+    if (help) wrap.append(h('div', { class: 'sm-field__help' }, [help]));
+    return wrap;
+  }
+
+  private _fontSizeInheritTextField(
+    label: string,
+    stored: string,
+    onChange: (v: string) => void,
+    focusToken: string,
+    globalFontSize: string,
+    help?: string,
+  ): HTMLElement {
+    const globalPx = this._snapFontSizeToPx(globalFontSize);
+    let inheriting = !stored.trim();
+    const input = h('input', {
+      class: 'sm-input',
+      type: 'text',
+      ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
+    }) as HTMLInputElement;
+
+    const syncInput = () => {
+      input.disabled = inheriting;
+      input.value = inheriting ? '' : stored;
+      input.placeholder = inheriting ? '' : '如 16px';
+      input.classList.toggle('sm-input--inherit-disabled', inheriting);
+    };
+
+    const inheritSwitch = this._globalInheritSwitch(
+      inheriting,
+      `${globalPx}px`,
+      (on) => {
+        if (on) {
+          inheriting = true;
+          stored = '';
+          inheritSwitch.setInherit(true, `${globalPx}px`);
+          syncInput();
+          onChange('');
+          return;
+        }
+        inheriting = false;
+        stored = `${globalPx}px`;
+        inheritSwitch.setInherit(false);
+        syncInput();
+        onChange(stored);
+      },
+      `${focusToken}:inherit`,
+    );
+
+    syncInput();
+
+    input.addEventListener('input', () => {
+      if (inheriting) return;
+      stored = input.value;
+      onChange(stored);
+    });
+
+    input.addEventListener('blur', () => {
+      if (inheriting) return;
+      const t = input.value.trim();
+      if (!t) {
+        stored = `${globalPx}px`;
+        input.value = stored;
+        onChange(stored);
+      }
+    });
+
+    const wrap = h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, [label]),
+      inheritSwitch.el,
+      input,
+    ]);
+    if (help) wrap.append(h('div', { class: 'sm-field__help' }, [help]));
+    return wrap;
+  }
+
   private _snapFontSizeToPx(value: string): number {
     const t = (value ?? '').trim();
     const m = t.match(/^(\d+(\.\d+)?)/);
@@ -1417,63 +1624,118 @@ export class RightPanel {
     onChange: (v: string) => void,
     focusToken: string,
     help?: string,
+    globalFontSize?: string,
   ) {
+    const inheritGlobal = globalFontSize !== undefined;
     if (!this._preferSliderControls()) {
+      if (inheritGlobal) {
+        return this._fontSizeInheritTextField(
+          label,
+          value,
+          onChange,
+          focusToken,
+          globalFontSize,
+          help,
+        );
+      }
       return this._textField(label, value ?? '', onChange, '', focusToken);
     }
+
     const min = 10;
     const max = 48;
     const step = 1;
     const snap = (n: number) => Math.min(max, Math.max(min, Math.round(n)));
-    const px = snap(this._snapFontSizeToPx(value ?? ''));
+    const globalPx = snap(this._snapFontSizeToPx(globalFontSize ?? value ?? '16px'));
+    let stored = value.trim();
+    let inheriting = inheritGlobal && !stored;
 
+    const sliderRow = h('div', { class: 'sm-field__slider-row' });
     const range = h('input', {
       type: 'range',
       min,
       max,
       step,
-      value: String(px),
     }) as HTMLInputElement;
-
     const num = h('input', {
       class: 'sm-input',
       type: 'number',
       min,
       max,
       step,
-      value: String(px),
       'data-sm-focus': focusToken,
     }) as HTMLInputElement;
+    sliderRow.append(range, num);
+
+    const syncSlider = () => {
+      sliderRow.classList.toggle('sm-field__slider-row--inherit', inheriting);
+      num.disabled = inheriting;
+      if (inheriting) {
+        range.value = String(globalPx);
+        num.value = '';
+      } else {
+        const s = snap(this._snapFontSizeToPx(stored || `${globalPx}px`));
+        range.value = String(s);
+        num.value = String(s);
+      }
+    };
+
+    let inheritSwitch: ReturnType<RightPanel['_globalInheritSwitch']> | null = null;
+    if (inheritGlobal) {
+      inheritSwitch = this._globalInheritSwitch(
+        inheriting,
+        `${globalPx}px`,
+        (on) => {
+          if (on) {
+            inheriting = true;
+            stored = '';
+            inheritSwitch!.setInherit(true, `${globalPx}px`);
+            syncSlider();
+            onChange('');
+            return;
+          }
+          inheriting = false;
+          stored = `${globalPx}px`;
+          inheritSwitch!.setInherit(false);
+          syncSlider();
+          onChange(stored);
+        },
+        `${focusToken}:inherit`,
+      );
+    }
+
+    syncSlider();
+
+    const leaveInherit = () => {
+      if (!inheriting) return;
+      inheriting = false;
+      inheritSwitch?.setInherit(false);
+      syncSlider();
+    };
 
     range.addEventListener('input', () => {
+      leaveInherit();
       const s = snap(Number(range.value));
       num.value = String(s);
-      onChange(`${s}px`);
+      stored = `${s}px`;
+      onChange(stored);
     });
 
     num.addEventListener('input', () => {
-      const t = num.value.trim();
-      if (t === '') return;
-      const rawN = Number(t);
+      if (inheriting) return;
+      const rawN = Number(num.value);
       if (Number.isNaN(rawN)) return;
       range.value = String(snap(rawN));
     });
 
     num.addEventListener('blur', () => {
+      if (inheriting) return;
       const t = num.value.trim();
       const fb = snap(Number(range.value));
-      if (t === '') {
-        const r = fb;
-        num.value = String(r);
-        range.value = String(r);
-        onChange(`${r}px`);
-        return;
-      }
-      const rawN = Number(t);
-      const s = snap(Number.isNaN(rawN) ? fb : rawN);
+      const s = snap(t === '' || Number.isNaN(Number(t)) ? fb : Number(t));
+      stored = `${s}px`;
       num.value = String(s);
       range.value = String(s);
-      onChange(`${s}px`);
+      onChange(stored);
     });
 
     num.addEventListener('keydown', (e) => {
@@ -1482,7 +1744,8 @@ export class RightPanel {
 
     const wrap = h('div', { class: 'sm-field' }, [
       h('label', { class: 'sm-field__label' }, [label]),
-      h('div', { class: 'sm-field__slider-row' }, [range, num]),
+      ...(inheritSwitch ? [inheritSwitch.el] : []),
+      sliderRow,
     ]);
     if (help) wrap.append(h('div', { class: 'sm-field__help' }, [help]));
     return wrap;

@@ -29,9 +29,9 @@ export const textBlock = defineBlock<TextProps>({
       '<p style="margin:0;">在此处输入文本。<strong>双击</strong>进入编辑模式，<em>选中文字</em>会出现工具条；支持变量 {{user.name}}</p>',
     align: 'left',
     color: '',
-    fontSize: '16px',
+    fontSize: '',
     fontFamily: '',
-    fontWeight: '400',
+    fontWeight: '',
     lineHeight: '',
     paddingTop: 8,
     paddingRight: 0,
@@ -51,13 +51,14 @@ export const textBlock = defineBlock<TextProps>({
       ],
     },
     { key: 'color', label: '颜色', type: 'color', placeholder: '继承全局' },
-    { key: 'fontSize', label: '字号', type: 'text', placeholder: '14px' },
+    { key: 'fontSize', label: '字号', type: 'text', inheritGlobal: true },
     { key: 'fontFamily', label: '字体', type: 'text', placeholder: '继承全局' },
     {
       key: 'fontWeight',
       label: '字重',
       type: 'select',
       selectVariant: 'segmented',
+      inheritGlobal: true,
       options: [...FONT_WEIGHT_STEP_OPTIONS],
     },
     {
@@ -98,23 +99,26 @@ export const textBlock = defineBlock<TextProps>({
   toMjml: (p) => {
     const padding = `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;
     const ff = p.fontFamily ? ` font-family="${escapeAttr(p.fontFamily)}"` : '';
-    const fwN = normalizeFontWeightStep(p.fontWeight);
-    const fw = fwN !== '400' ? ` font-weight="${escapeAttr(fwN)}"` : '';
+    const fwRaw = String(p.fontWeight ?? '').trim();
+    const fw = fwRaw ? ` font-weight="${escapeAttr(normalizeFontWeightStep(fwRaw))}"` : '';
     const lh = String(p.lineHeight ?? '').trim();
     const lhAttr = lh ? ` line-height="${escapeAttr(lh)}"` : '';
     const colorRaw = String(p.color ?? '').trim();
     const colorAttr = colorRaw ? ` color="${escapeAttr(colorRaw)}"` : '';
-    return `<mj-text align="${p.align}"${colorAttr} font-size="${escapeAttr(
-      p.fontSize,
-    )}"${lhAttr}${ff}${fw} padding="${padding}">${p.content}</mj-text>`;
+    const fsRaw = String(p.fontSize ?? '').trim();
+    const fsAttr = fsRaw ? ` font-size="${escapeAttr(fsRaw)}"` : '';
+    return `<mj-text align="${p.align}"${colorAttr}${fsAttr}${lhAttr}${ff}${fw} padding="${padding}">${p.content}</mj-text>`;
   },
   renderPreview: (p) => {
     const ff = p.fontFamily ? `font-family:${p.fontFamily};` : '';
-    const fwN = normalizeFontWeightStep(p.fontWeight);
+    const fwRaw = String(p.fontWeight ?? '').trim();
+    const fwCss = fwRaw ? `font-weight:${normalizeFontWeightStep(fwRaw)};` : '';
     const lhRaw = String(p.lineHeight ?? '').trim();
     const lh = lhRaw ? `line-height:${lhRaw};` : 'line-height:normal;';
     const colorRaw = String(p.color ?? '').trim();
     const colorCss = colorRaw ? `color:${colorRaw};` : '';
-    return `<div class="sm-text-content" style="text-align:${p.align};${colorCss}font-size:${p.fontSize};font-weight:${fwN};${lh}${ff}padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;">${p.content}</div>`;
+    const fsRaw = String(p.fontSize ?? '').trim();
+    const fsCss = fsRaw ? `font-size:${fsRaw};` : '';
+    return `<div class="sm-text-content" style="text-align:${p.align};${colorCss}${fsCss}${fwCss}${lh}${ff}padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;">${p.content}</div>`;
   },
 });

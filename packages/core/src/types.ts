@@ -136,6 +136,8 @@ export interface BlockSchemaField {
   step?: number;
   placeholder?: string;
   help?: string;
+  /** 为 true 时右栏显示「继承全局」开关：开=留空跟随邮件全局，关=写入当前全局值为块级固定值 */
+  inheritGlobal?: boolean;
 }
 
 export interface BlockDefinition<P extends object = Record<string, unknown>> {
