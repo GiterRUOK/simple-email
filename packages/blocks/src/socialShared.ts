@@ -77,6 +77,58 @@ export function socialMeta(network: string): { color: string; preview: string } 
   return NETWORK_META[network] ?? { color: '#6b7280', preview: '·' };
 }
 
+/** MJML 内置社交图标 CDN（与 mjml-browser 4.x 一致） */
+export const MJML_SOCIAL_ICON_BASE =
+  'https://www.mailjet.com/images/theme/v1/icons/ico-social/';
+
+/** MJML `mj-social-element` name → 图标文件名 */
+const MJML_SOCIAL_ICON_FILES: Record<string, string> = {
+  facebook: 'facebook.png',
+  twitter: 'twitter.png',
+  x: 'twitter-x.png',
+  google: 'google-plus.png',
+  pinterest: 'pinterest.png',
+  linkedin: 'linkedin.png',
+  instagram: 'instagram.png',
+  web: 'web.png',
+  snapchat: 'snapchat.png',
+  youtube: 'youtube.png',
+  tumblr: 'tumblr.png',
+  github: 'github.png',
+  xing: 'xing.png',
+  vimeo: 'vimeo.png',
+  medium: 'medium.png',
+  soundcloud: 'soundcloud.png',
+  dribbble: 'dribbble.png',
+};
+
+/** 画布预览用默认图标 URL（与 MJML `name` 映射一致；无内置图时返回 null） */
+export function mjSocialDefaultIconSrc(network: string): string | null {
+  const file = MJML_SOCIAL_ICON_FILES[mjSocialElementName(network)];
+  return file ? `${MJML_SOCIAL_ICON_BASE}${file}` : null;
+}
+
+/** 画布 / renderPreview 社交图标 HTML（优先自定义 URL，其次 MJML 内置图，最后文字占位） */
+export function renderSocialIconPreviewHtml(opts: {
+  network: string;
+  iconSize: number;
+  iconBorderRadius: number;
+  iconSrc?: string;
+  backgroundColor?: string;
+}): string {
+  const { network, iconSize, iconBorderRadius, iconSrc, backgroundColor } = opts;
+  const radiusCss = socialIconBorderRadiusCss(iconSize, iconBorderRadius);
+  const meta = socialMeta(network);
+  const bg = backgroundColor?.trim() || meta.color;
+  const src = iconSrc?.trim() || mjSocialDefaultIconSrc(network);
+  if (src) {
+    return `<span style="display:inline-flex;width:${iconSize}px;height:${iconSize}px;border-radius:${radiusCss};background:${bg};overflow:hidden;align-items:center;justify-content:center;flex-shrink:0;line-height:0;"><img src="${escAttr(src)}" alt="" width="${iconSize}" height="${iconSize}" style="display:block;width:${iconSize}px;height:${iconSize}px;border-radius:${radiusCss};" /></span>`;
+  }
+  return `<span style="display:inline-flex;width:${iconSize}px;height:${iconSize}px;border-radius:${radiusCss};background:${bg};color:#fff;align-items:center;justify-content:center;font-size:${Math.round(
+    iconSize / 2,
+  )}px;font-weight:600;flex-shrink:0;overflow:hidden;">${meta.preview}</span>`;
+}
+
 export function paddingQuad(p: {
   paddingTop: number;
   paddingRight: number;

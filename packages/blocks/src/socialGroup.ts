@@ -5,10 +5,9 @@ import {
   flexJustifyFromAlign,
   mjSocialElementsLines,
   paddingQuad,
-  socialIconBorderRadiusCss,
   socialIconBorderRadiusMjml,
+  renderSocialIconPreviewHtml,
   socialIconSpacingPx,
-  socialMeta,
   SOCIAL_NETWORK_OPTIONS,
   type SocialLinkItem,
 } from './socialShared';
@@ -133,21 +132,19 @@ ${inner}
     const fs = Math.max(8, Math.min(48, fsRaw));
     const fw = normalizeFontWeightStep(p.labelFontWeight);
     const textColor = p.labelColor?.trim() || '#333333';
-    const radiusCss = socialIconBorderRadiusCss(p.iconSize, p.iconBorderRadius ?? 999);
     const gap = socialIconSpacingPx(p.iconSpacing, 10);
     const jc = flexJustifyFromAlign(p.align);
     const items = p.elements
       .filter((l) => l.href?.trim())
       .map((l) => {
-        const meta = socialMeta(l.network);
-        const bg = l.backgroundColor?.trim() || meta.color;
         const label = l.label?.trim() ?? '';
-        const iconSrc = l.iconSrc?.trim();
-        const iconHtml = iconSrc
-          ? `<img src="${escAttr(iconSrc)}" alt="" style="width:${p.iconSize}px;height:${p.iconSize}px;object-fit:cover;border-radius:${radiusCss};flex-shrink:0;" />`
-          : `<span style="display:inline-flex;width:${p.iconSize}px;height:${p.iconSize}px;border-radius:${radiusCss};background:${bg};color:#fff;align-items:center;justify-content:center;font-size:${Math.round(
-              p.iconSize / 2,
-            )}px;font-weight:600;flex-shrink:0;overflow:hidden;">${meta.preview}</span>`;
+        const iconHtml = renderSocialIconPreviewHtml({
+          network: l.network,
+          iconSize: p.iconSize,
+          iconBorderRadius: p.iconBorderRadius ?? 999,
+          iconSrc: l.iconSrc,
+          backgroundColor: l.backgroundColor,
+        });
         const textHtml = label
           ? `<span style="font-size:${fs}px !important;font-weight:${fw};color:${escAttr(
               textColor,
