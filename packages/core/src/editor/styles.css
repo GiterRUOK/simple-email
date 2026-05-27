@@ -1120,6 +1120,10 @@
   border-radius: 6px;
   background: none;
 }
+.sm-color-row input[type='color'].sm-color-row__pick--inherit {
+  opacity: 0.55;
+  border-style: dashed;
+}
 
 .sm-empty-form {
   padding: 24px 16px;

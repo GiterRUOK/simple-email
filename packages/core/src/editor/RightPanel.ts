@@ -19,6 +19,7 @@ import type {
   SectionLayout,
 } from '../types';
 import { defaultSocialIconBackground } from '../socialDefaults';
+import { normalizeAccentHex } from '../utils/accentColor';
 import { clear, h } from '../utils/dom';
 import { metaWidthInputString, parseMetaWidthFromUserInput, parseSectionWidthFromUserInput, sectionWidthInputString } from '../utils/contentWidth';
 import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
@@ -410,6 +411,7 @@ export class RightPanel {
             if (s) s.attrs.backgroundColor = v || undefined;
           }),
         `section:${section.id}:attrs.bg`,
+        '留空=透明',
       ),
       this._layoutWidthField(
         '区域宽度',
@@ -509,8 +511,18 @@ export class RightPanel {
           field.step ?? 1,
           fp,
         );
-      case 'color':
-        return this._colorField(field.label, String(value ?? ''), onChange, fp);
+      case 'color': {
+        const rawColor = (block.props as Record<string, unknown>)[field.key];
+        const stored =
+          rawColor !== undefined && rawColor !== null ? String(rawColor).trim() : '';
+        return this._colorField(
+          field.label,
+          stored,
+          (v) => onChange(v.trim()),
+          fp,
+          field.placeholder ?? '',
+        );
+      }
       case 'select': {
         const isFw = field.key === 'fontWeight' || field.key === 'labelFontWeight';
         const displayVal = isFw ? normalizeFontWeightStep(String(value ?? '')) : String(value ?? '');
@@ -534,30 +546,22 @@ export class RightPanel {
       case 'url':
       case 'text': {
         if (field.key === 'width' && this._preferSliderControls()) {
-          const el = this._layoutWidthField(
+          return this._layoutWidthField(
             field.label,
             String(value ?? ''),
             (v) => onChange(v),
             fp,
             field.help,
           );
-          if (field.placeholder && !field.help) {
-            el.append(h('div', { class: 'sm-field__help' }, [field.placeholder]));
-          }
-          return el;
         }
         if (field.key === 'fontSize' && this._preferSliderControls()) {
-          const el = this._fontSizeSliderField(
+          return this._fontSizeSliderField(
             field.label,
             String(value ?? ''),
             (v) => onChange(v),
             fp,
             field.help,
           );
-          if (field.placeholder && !field.help) {
-            el.append(h('div', { class: 'sm-field__help' }, [field.placeholder]));
-          }
-          return el;
         }
         const row = this._textField(
           field.label,
@@ -1076,27 +1080,90 @@ export class RightPanel {
     value: string,
     onChange: (v: string) => void,
     focusPrefix?: string,
+    placeholder = '#ffffff',
   ) {
     const pickToken = focusPrefix ? `${focusPrefix}:pick` : undefined;
     const textToken = focusPrefix ? `${focusPrefix}:text` : undefined;
+    const pick = h('input', {
+      type: 'color',
+      ...(pickToken ? { 'data-sm-focus': pickToken } : {}),
+    }) as HTMLInputElement;
+    const text = h('input', {
+      class: 'sm-input',
+      type: 'text',
+      placeholder,
+      ...(textToken ? { 'data-sm-focus': textToken } : {}),
+    }) as HTMLInputElement;
+
+    let lastValid = value.trim();
+
+    const applyPickInherit = () => {
+      pick.value = '#808080';
+      pick.classList.add('sm-color-row__pick--inherit');
+      pick.title = placeholder || '未设置';
+    };
+
+    const applyStored = (stored: string) => {
+      const trimmed = stored.trim();
+      text.value = trimmed;
+      const hex = normalizeAccentHex(trimmed);
+      if (hex) {
+        pick.value = hex;
+        pick.classList.remove('sm-color-row__pick--inherit');
+        pick.title = '';
+      } else {
+        applyPickInherit();
+      }
+    };
+
+    applyStored(value);
+
+    pick.addEventListener('input', () => {
+      const hex = pick.value;
+      text.value = hex;
+      pick.classList.remove('sm-color-row__pick--inherit');
+      pick.title = '';
+      lastValid = hex;
+      onChange(hex);
+    });
+
+    text.addEventListener('input', () => {
+      const raw = text.value;
+      const hex = normalizeAccentHex(raw);
+      if (hex) {
+        pick.value = hex;
+        pick.classList.remove('sm-color-row__pick--inherit');
+        pick.title = '';
+        lastValid = hex;
+      } else if (!raw.trim()) {
+        applyPickInherit();
+        lastValid = '';
+      }
+      onChange(raw);
+    });
+
+    text.addEventListener('blur', () => {
+      const raw = text.value.trim();
+      if (!raw) {
+        applyStored('');
+        lastValid = '';
+        onChange('');
+        return;
+      }
+      const hex = normalizeAccentHex(raw);
+      if (hex) {
+        applyStored(hex);
+        lastValid = hex;
+        if (hex !== raw) onChange(hex);
+        return;
+      }
+      applyStored(lastValid);
+      onChange(lastValid);
+    });
+
     return h('div', { class: 'sm-field' }, [
       h('label', { class: 'sm-field__label' }, [label]),
-      h('div', { class: 'sm-color-row' }, [
-        h('input', {
-          type: 'color',
-          value: value || '#ffffff',
-          ...(pickToken ? { 'data-sm-focus': pickToken } : {}),
-          oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
-        }),
-        h('input', {
-          class: 'sm-input',
-          type: 'text',
-          value,
-          placeholder: '#ffffff',
-          ...(textToken ? { 'data-sm-focus': textToken } : {}),
-          oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
-        }),
-      ]),
+      h('div', { class: 'sm-color-row' }, [pick, text]),
     ]);
   }
   private _selectField(

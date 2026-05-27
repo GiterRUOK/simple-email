@@ -28,7 +28,7 @@ export const textBlock = defineBlock<TextProps>({
     content:
       '<p style="margin:0;">在此处输入文本。<strong>双击</strong>进入编辑模式，<em>选中文字</em>会出现工具条；支持变量 {{user.name}}</p>',
     align: 'left',
-    color: '#433f3f',
+    color: '',
     fontSize: '16px',
     fontFamily: '',
     fontWeight: '400',
@@ -41,7 +41,7 @@ export const textBlock = defineBlock<TextProps>({
   schema: [
     {
       key: 'align',
-      label: '默认对齐',
+      label: '对齐',
       type: 'select',
       selectVariant: 'segmented',
       options: [
@@ -50,8 +50,8 @@ export const textBlock = defineBlock<TextProps>({
         { label: '右', value: 'right' },
       ],
     },
-    { key: 'color', label: '默认颜色', type: 'color' },
-    { key: 'fontSize', label: '默认字号', type: 'text', placeholder: '14px' },
+    { key: 'color', label: '颜色', type: 'color', placeholder: '继承全局' },
+    { key: 'fontSize', label: '字号', type: 'text', placeholder: '14px' },
     { key: 'fontFamily', label: '字体', type: 'text', placeholder: '继承全局' },
     {
       key: 'fontWeight',
@@ -102,7 +102,9 @@ export const textBlock = defineBlock<TextProps>({
     const fw = fwN !== '400' ? ` font-weight="${escapeAttr(fwN)}"` : '';
     const lh = String(p.lineHeight ?? '').trim();
     const lhAttr = lh ? ` line-height="${escapeAttr(lh)}"` : '';
-    return `<mj-text align="${p.align}" color="${escapeAttr(p.color)}" font-size="${escapeAttr(
+    const colorRaw = String(p.color ?? '').trim();
+    const colorAttr = colorRaw ? ` color="${escapeAttr(colorRaw)}"` : '';
+    return `<mj-text align="${p.align}"${colorAttr} font-size="${escapeAttr(
       p.fontSize,
     )}"${lhAttr}${ff}${fw} padding="${padding}">${p.content}</mj-text>`;
   },
@@ -111,6 +113,8 @@ export const textBlock = defineBlock<TextProps>({
     const fwN = normalizeFontWeightStep(p.fontWeight);
     const lhRaw = String(p.lineHeight ?? '').trim();
     const lh = lhRaw ? `line-height:${lhRaw};` : 'line-height:normal;';
-    return `<div class="sm-text-content" style="text-align:${p.align};color:${p.color};font-size:${p.fontSize};font-weight:${fwN};${lh}${ff}padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;">${p.content}</div>`;
+    const colorRaw = String(p.color ?? '').trim();
+    const colorCss = colorRaw ? `color:${colorRaw};` : '';
+    return `<div class="sm-text-content" style="text-align:${p.align};${colorCss}font-size:${p.fontSize};font-weight:${fwN};${lh}${ff}padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;">${p.content}</div>`;
   },
 });
