@@ -24,6 +24,8 @@ Doc → Section → Column → Block       // 仅四层，不允许 Block 再含
 - **品牌色**：可选 `accentColor` / `setAccentColor`，覆盖强调色与选区色；可选顶栏拾色器
 - **仅搭正文**：`ui.hideMailMeta` 隐藏主题 / Preheader 与顶栏「邮件设置」，保留版式宽度与全局样式
 - **画布清空 / 重置**：顶栏「清空画布」「重置内容」；`presetDoc` 与 `initialDoc` 分离，编辑已保存邮件时重置仍回到业务预置模板
+- **变量系统**：`setVariables` 注入占位符列表；顶栏 `{{ }}` 弹层支持插 key / 插元素 / 复制；`kind: 'link' | 'image'` 区分链接片段与图片块
+- **点空白取消选中**：可选 `clearSelectionOnCanvasMargin`，点击画布灰色衬底或白底留白时提交内联编辑并清空选中
 - 包体可控：核心 + MJML + CodeMirror + 富文本，gzip ≈ 586KB
 
 ## 仓库结构
@@ -80,6 +82,11 @@ const editor = new MailEditor({
   // 自动包一个一列 Section。设为 false 则强制只能拖入现有列内。
   // 唯一块被删或拖走后，会去掉因此变空的 Section，无需再删一次壳子。
   autoWrapSection: true,
+  /**
+   * 为 true 时：点击中栏灰色衬底、画布白底上未落到 Section/块的空白时，
+   * 提交内联编辑并清空选中，右栏回到文档级面板。默认 false。
+   */
+  // clearSelectionOnCanvasMargin: true,
   onChange: (doc) => console.log(doc),
   /**
    * 可选：见 README「图片资源 imageAssets」（uploadImage、内置 imageGallery、自管 pickImageFromGallery）。
@@ -162,6 +169,111 @@ editor.getTheme();
 | `hideTopbarFullscreen?: boolean` | 隐藏顶栏全屏按钮。 |
 | `hideTopbarClearCanvas?: boolean` | 隐藏顶栏「清空画布」。 |
 | `hideTopbarResetContent?: boolean` | 隐藏顶栏「重置内容」。 |
+
+### 构造选项（画布行为）
+
+| 字段 | 说明 |
+|------|------|
+| `autoWrapSection?: boolean` | 为 `true`（默认）时，把 Block 拖到 Section 之间空白处会自动包一列 Section；`false` 则只能拖入现有列内。 |
+| `clearSelectionOnCanvasMargin?: boolean` | 为 `true` 时，点击中栏灰色衬底、画布白底留白（未点到 Section/Block）、空文档提示区等，会提交内联编辑并 `setSelection(null)`，右栏回到文档级面板。默认 `false`。嵌入宿主页且希望「点空白取消 focus」时开启。 |
+
+### 变量系统
+
+占位符用于导出 HTML / MJML 后由后端或发送服务替换。设计态通过 `Variable` 列表维护可选项。
+
+#### 数据模型
+
+```ts
+interface Variable {
+  key: string;           // Mustache 变量名，如 couponLink（不含 {{}}）
+  label: string;         // 弹层 / 下拉展示名
+  sample?: string;       // 预览、export({ withSampleVariables: true }) 时的示例值
+  kind?: 'text' | 'link' | 'image';  // 默认 text
+}
+```
+
+| `kind` | 含义 | 「插入元素」行为 |
+|--------|------|----------------|
+| `text`（默认） | 纯文本占位 | 与插 key 相同，写入 `{{key}}` |
+| `link` | 链接类 | 插入 `<a href="{{key}}">{{key}}</a>`（href 与展示文本均为 token，不用 label） |
+| `image` | 图片类 | 插入 image 块，`src` 为 `{{key}}` |
+
+#### 注入与持久化
+
+```ts
+editor.setVariables([
+  { key: 'username', label: '用户名', sample: '张三' },
+  { key: 'couponLink', label: '优惠券链接', kind: 'link', sample: '#' },
+  { key: 'couponImage', label: '优惠券图片', kind: 'image' },
+]);
+
+editor.getVariables(); // 返回当前可用列表
+```
+
+- 推荐宿主在构造后 **`setVariables`** 注入业务变量，而不是只写在 `initialDoc.variables` 里。
+- 宿主调用 **`setValue` / `resetToPreset`** 恢复文档 JSON 后，已通过 `setVariables` 注入的列表**仍会写回** `doc.variables`，避免弹层显示「暂无可用变量」。
+
+#### 插入 API
+
+| 方法 | 说明 |
+|------|------|
+| `insertVariableKey(v)` | 插入 `{{key}}` 纯文本 |
+| `insertVariableElement(v)` | `link` → 链接 HTML；`image` → 图片块；其余同 key |
+| `insertVariable(v)` | 同 `insertVariableKey`（兼容旧名） |
+
+插入位置优先级：
+
+1. 当前**内联编辑**（双击文本块）→ 写入 contenteditable 光标处（打开顶栏变量弹层前会自动 `saveSelection`）
+2. 编辑器内**聚焦的 input/textarea**（右栏属性等）
+3. 当前**选中的 Block** → 追加到其主文本字段末尾
+4. 以上皆无 → 在画布末尾新建 text 块
+
+#### 顶栏弹层交互
+
+顶栏 **`{{ }} 插入变量`** 打开列表，每行：
+
+| 操作 | 行为 |
+|------|------|
+| **点击行** | 插入 `{{key}}` |
+| **插入元素**（仅 `link` / `image`） | 调用 `insertVariableElement` |
+| **复制** | 复制 token 到剪贴板并关闭弹层 |
+
+#### 宿主侧工具函数
+
+若主题、预览文案等字段在编辑器**外部**维护，可从 `@simple-mail/core` 导入：
+
+```ts
+import {
+  buildBodyVariableKeyInsert,
+  buildBodyVariableElementInsert,
+  buildLinkVariableHtml,
+  normalizeVariable,
+  tokenToVariableKey,
+  variablePlaceholder,
+} from '@simple-mail/core';
+
+// 纯 key
+buildBodyVariableKeyInsert({ key: 'username', label: '用户名' });
+// -> { content: '{{username}}', asHtml: false }
+
+// 链接 / 图片片段（供 Monaco、Grapes 等宿主自管插入）
+buildBodyVariableElementInsert(
+  { key: 'couponLink', label: '优惠券链接', kind: 'link' },
+  { linkColor: '#ff5a00' },
+);
+// link -> { content: '<a href="{{couponLink}}">...</a>', asHtml: true }
+```
+
+`buildBodyVariableInsert` 仍可用，内部按 kind 分发到 key / element，**新代码请用上述两个函数**。
+
+#### 嵌入宿主时的入口分工（建议）
+
+| 字段 | 建议入口 |
+|------|----------|
+| 发件主题、Preheader 等表单字段 | **宿主页**下拉 / 输入框旁「插入变量」 |
+| 正文（已嵌入 `MailEditor`） | **编辑器顶栏** `{{ }}`（靠近光标，打开弹层前会保存选区） |
+
+避免同一屏内正文出现两个变量入口；若宿主页仍保留正文入口，需自行在打开下拉前保存编辑器选区。
 
 ### 图片资源 `imageAssets`
 
@@ -259,8 +371,15 @@ onMounted(() => {
     container: el.value!,
     blocks: stable,
     initialDoc: props.modelValue,
+    presetDoc: props.presetDoc,
+    ui: { hideMailMeta: true, hideTopbarTitle: true },
+    clearSelectionOnCanvasMargin: true,
     onChange: (doc) => emit('update:modelValue', doc),
   });
+  editor.setVariables([
+    { key: 'username', label: '用户名' },
+    { key: 'couponLink', label: '优惠券链接', kind: 'link' },
+  ]);
 });
 onBeforeUnmount(() => editor?.destroy());
 </script>
@@ -361,7 +480,10 @@ expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
 | 撤销 / 重做 | ⌘Z / ⌘⇧Z（顶栏按钮也行） |
 | 清空画布 | 顶栏「清空画布」；移除全部 Section/Block，保留全局样式与变量（可撤销） |
 | 重置内容 | 顶栏「重置内容」；恢复为 `presetDoc`（或构造时的 `initialDoc`） |
-| 插入变量 | 顶栏 `{{ }}`：编辑中插到光标处；否则插到聚焦输入框 |
+| 插入变量 key | 顶栏 `{{ }}` → **点击行**；或 `editor.insertVariableKey(v)` |
+| 插入变量元素 | 顶栏 `{{ }}` → **插入元素**（仅 `link` / `image`）；或 `editor.insertVariableElement(v)` |
+| 复制变量 token | 顶栏 `{{ }}` → **复制** |
+| 点空白取消选中 | 需 `clearSelectionOnCanvasMargin: true`；点击画布灰色衬底或白底留白 |
 | 切换源码 / 设计 | 顶栏切换 |
 | 导出 HTML | 顶栏右上 |
 | 文档级设置（主题 / Preheader / 宽度 / 全局样式） | 未选中画布时右栏展示；`ui.hideMailMeta` 时无主题与 Preheader，且无顶栏「邮件设置」按钮 |
@@ -387,7 +509,7 @@ expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
 interface EmailDoc {
   version: '1';
   meta: { subject: string; preheader?: string; width: number | string };
-  variables: { key: string; label: string; sample?: string }[];
+  variables: { key: string; label: string; sample?: string; kind?: 'text' | 'link' | 'image' }[];
   styles: { backgroundColor; contentBackgroundColor; fontFamily; fontSize; color; linkColor; lineHeight };
   sections: Section[];   // 顺序即视觉顺序
 }
