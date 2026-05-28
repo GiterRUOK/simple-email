@@ -11,6 +11,19 @@
  */
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import {
+  convertListTag,
+  detectListFormats,
+  findListItem,
+  findListRoot,
+  getCaretTextOffset,
+  insertCaretMarker,
+  mergeListItemOnBackspace,
+  mergeNextListItemOnDelete,
+  restoreCaretAfterListMutation,
+  splitListItemOnEnter,
+  unwrapList,
+} from '../utils/inlineListEditing';
+import {
   richTextExecCommand,
   richTextQueryCommandState,
   richTextQueryCommandValue,
@@ -132,8 +145,32 @@ export class InlineEditor {
     }
     // 列表：Chrome 等在 styleWithCSS=true 下 insertOrderedList / insertUnorderedList 常失灵，需退回 HTML 列表标签
     const isListCmd = command === 'insertOrderedList' || command === 'insertUnorderedList';
-    richTextExecCommand('styleWithCSS', false, isListCmd ? 'false' : 'true');
-    richTextExecCommand(command, false, value);
+    if (isListCmd && sel?.rangeCount) {
+      const range = sel.getRangeAt(0);
+      const li = findListItem(sel.anchorNode, this.el);
+      const list = li ? findListRoot(li) : null;
+      const savedOffset = getCaretTextOffset(this.el, range);
+      const marker = range.collapsed ? insertCaretMarker(range) : null;
+      if (list) {
+        const wantUl = command === 'insertUnorderedList';
+        const inUl = list.tagName === 'UL';
+        if (wantUl === inUl) {
+          unwrapList(list);
+        } else {
+          convertListTag(list, wantUl ? 'ul' : 'ol');
+        }
+        restoreCaretAfterListMutation(this.el, marker, savedOffset);
+        this.saveSelection();
+        this._emitSelection();
+        return;
+      }
+      richTextExecCommand('styleWithCSS', false, 'false');
+      richTextExecCommand(command, false, value);
+      restoreCaretAfterListMutation(this.el, marker, savedOffset);
+    } else {
+      richTextExecCommand('styleWithCSS', false, isListCmd ? 'false' : 'true');
+      richTextExecCommand(command, false, value);
+    }
     if (command === 'hiliteColor') {
       this.pendingHiliteColor = value ?? null;
       this.pendingHiliteAnchor = hiliteAnchor;
@@ -302,9 +339,56 @@ export class InlineEditor {
           this.commit();
           return;
         }
-        // 多行下，回车默认会插入 <div> / <br>。强制 <br>，避免出现各种奇怪嵌套。
+        if (mode === 'rich') {
+          if (e.shiftKey) {
+            e.preventDefault();
+            richTextExecCommand('insertLineBreak');
+            this.saveSelection();
+            this._emitSelection();
+            return;
+          }
+          const sel = window.getSelection();
+          if (sel?.rangeCount) {
+            const range = sel.getRangeAt(0);
+            const li = findListItem(range.startContainer, el);
+            if (li && el.contains(li)) {
+              e.preventDefault();
+              splitListItemOnEnter(li, range);
+              this.saveSelection();
+              this._emitSelection();
+              return;
+            }
+          }
+        }
+        // 非列表：回车默认会插入 <div>，强制 <br> 避免出现各种奇怪嵌套
         e.preventDefault();
         richTextExecCommand('insertLineBreak');
+        return;
+      }
+      if (e.key === 'Backspace' && mode === 'rich' && multiline) {
+        if (e.isComposing || imeComposing) return;
+        const sel = window.getSelection();
+        if (!sel?.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        const li = findListItem(range.startContainer, el);
+        if (li && el.contains(li) && mergeListItemOnBackspace(li, range)) {
+          e.preventDefault();
+          this.saveSelection();
+          this._emitSelection();
+        }
+        return;
+      }
+      if (e.key === 'Delete' && mode === 'rich' && multiline) {
+        if (e.isComposing || imeComposing) return;
+        const sel = window.getSelection();
+        if (!sel?.rangeCount) return;
+        const range = sel.getRangeAt(0);
+        const li = findListItem(range.startContainer, el);
+        if (li && el.contains(li) && mergeNextListItemOnDelete(li, range)) {
+          e.preventDefault();
+          this.saveSelection();
+          this._emitSelection();
+        }
       }
     };
     const onBlur = (e: FocusEvent) => {
@@ -458,6 +542,8 @@ export class InlineEditor {
     }
     if (inline.backColor) this._clearPendingHilite();
 
+    const listFormats = detectListFormats(sel.anchorNode, this.el);
+
     const state: SelectionState = {
       hasSelection: true,
       rect,
@@ -466,8 +552,9 @@ export class InlineEditor {
         italic: richTextQueryCommandState('italic'),
         underline: richTextQueryCommandState('underline'),
         strikethrough: richTextQueryCommandState('strikeThrough'),
-        unorderedList: richTextQueryCommandState('insertUnorderedList'),
-        orderedList: richTextQueryCommandState('insertOrderedList'),
+        unorderedList:
+          listFormats.unorderedList || richTextQueryCommandState('insertUnorderedList'),
+        orderedList: listFormats.orderedList || richTextQueryCommandState('insertOrderedList'),
         align,
         link,
         foreColor,
@@ -713,6 +800,11 @@ export function sanitizeRichHtml(html: string): string {
     const all = (root as ParentNode).querySelectorAll('*');
     all.forEach((el) => {
       const tag = el.tagName.toLowerCase();
+      if (tag === 'span' && el.getAttribute('data-sm-caret') === '1') {
+        while (el.firstChild) el.parentNode?.insertBefore(el.firstChild, el);
+        el.remove();
+        return;
+      }
       // <font color="..." size="..." face="..."> → 转成 span style
       if (tag === 'font') {
         const span = document.createElement('span');

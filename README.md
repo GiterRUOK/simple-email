@@ -474,6 +474,11 @@ expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
 | **编辑 Block 内容** | **双击 Block**（文本/按钮）；或选中后点 ✎ 图标 |
 | 编辑中提交 | 点击外部 / 单行 Enter / 按工具条按钮后失焦 |
 | 编辑中取消 | Esc |
+| 列表项内换行 | Shift+Enter（段内软换行） |
+| 新列表项 | 列表内 Enter |
+| 退出列表 | 空列表项 Enter；或再次点击已激活的列表按钮 |
+| 合并 / 退出列表项 | 列表项行首 Backspace |
+| 合并下一列表项 | 列表项行末 Delete（Fn+退格） |
 | 拖拽排序 | 仅在 hover 出现的 ⋮⋮ 图标上按住拖动 |
 | 删除 | 选中后按 Delete/Backspace；或工具条 🗑 |
 | 复制 | 工具条 ⎘ 图标 |

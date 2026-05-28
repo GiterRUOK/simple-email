@@ -1292,6 +1292,24 @@
   pointer-events: none;
 }
 
+.sm-inline-editing :where(ul, ol) {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+  list-style-position: outside;
+}
+
+.sm-inline-editing ul {
+  list-style-type: disc;
+}
+
+.sm-inline-editing ol {
+  list-style-type: decimal;
+}
+
+.sm-inline-editing :where(li) {
+  margin: 0.25em 0;
+}
+
 .sm-floating-toolbar {
   position: absolute;
   z-index: 200;
