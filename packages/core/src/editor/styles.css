@@ -1469,29 +1469,70 @@
 .sm-popover {
   position: absolute;
   z-index: 100;
-  min-width: 220px;
-  max-height: 280px;
-  overflow: auto;
+  min-width: 260px;
   background: var(--sm-surface);
   border: 1px solid var(--sm-border);
   border-radius: var(--sm-radius-sm);
   box-shadow: var(--sm-shadow-md);
 }
+
+.sm-popover--variables {
+  max-height: min(480px, 65vh);
+  overflow: auto;
+}
+
+.sm-popover__row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--sm-border);
+}
+.sm-popover__row:last-child {
+  border-bottom: 0;
+}
+
 .sm-popover__item {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 8px 12px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
   cursor: pointer;
   border: 0;
-  width: 100%;
   text-align: left;
   background: transparent;
   font: inherit;
 }
-.sm-popover__item:hover { background: var(--sm-primary-soft); }
-.sm-popover__key { font-family: monospace; color: var(--sm-primary); }
-.sm-popover__label { font-size: 11px; color: var(--sm-text-muted); }
+.sm-popover__item:hover { background: var(--sm-surface-hover); }
+.sm-popover__label { font-size: 13px; color: var(--sm-text); }
+.sm-popover__key {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: var(--sm-text-muted);
+}
+
+.sm-popover__actions {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  margin-right: 8px;
+}
+
+.sm-popover__action {
+  padding: 4px 10px;
+  border: 1px solid var(--sm-border);
+  border-radius: var(--sm-radius-sm);
+  background: var(--sm-surface);
+  color: var(--sm-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sm-popover__action:hover {
+  background: var(--sm-surface-hover);
+  color: var(--sm-text);
+}
 
 /* Modal -------------------------------------------------------------------- */
 /* 弹层常挂在 document.body，无 .sm-root 祖先时 CSS 变量不存在；凡 var(...) 须带浅色兜底，避免卡片「透明」与页面叠在一起 */

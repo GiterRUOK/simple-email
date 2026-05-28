@@ -180,6 +180,14 @@ export class InlineEditor {
     this.saveSelection();
   }
 
+  /** 在当前光标处插入 HTML 片段（供链接类变量使用）。 */
+  insertHtml(html: string) {
+    this._ensureFocus();
+    this._restoreSelection();
+    richTextExecCommand('insertHTML', false, html);
+    this.saveSelection();
+  }
+
   /** Toolbar 关闭某个面板/控件后调用，把选区还给编辑区，方便用户继续输入。 */
   refocus() {
     this._ensureFocus();
@@ -307,6 +315,7 @@ export class InlineEditor {
         if (active && (active === el || el.contains(active))) return;
         if (isColorPickerOpen()) return;
         if (active?.closest?.('.sm-floating-toolbar, .sm-color-picker, .sm-color-picker-layer')) return;
+        if (active?.closest?.('.sm-topbar, .sm-popover')) return;
         // 从左栏拖入 / 画布内 Sortable 排序：mousedown 会先 blur，若在此时提交会触发画布重渲染并拆掉 drop 目标
         if (active?.closest?.('.sm-panel--left')) return;
         if (active?.closest?.('.sm-block__handle, .sm-section__handle')) return;
@@ -315,6 +324,7 @@ export class InlineEditor {
         if (related?.closest?.('.sm-block-card')) return;
         if (related?.closest?.('.sm-block__handle, .sm-section__handle')) return;
         if (related?.closest?.('.sm-color-picker, .sm-color-picker-layer')) return;
+        if (related?.closest?.('.sm-topbar, .sm-popover')) return;
         if (document.querySelector('.sm-root .sm-drag, .sm-root .sm-chosen')) return;
         this.commit();
       }, 0);

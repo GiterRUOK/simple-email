@@ -1,6 +1,6 @@
 import { Registry, defineBlock } from '../registry/registry';
 import { renderDoc } from '../renderer';
-import { Store, pruneSectionIfEmpty } from '../store/store';
+import { Store, createSection, pruneSectionIfEmpty } from '../store/store';
 import type {
   BlockDefinition,
   EditorUiOptions,
@@ -9,7 +9,13 @@ import type {
   Selection,
   Variable,
 } from '../types';
+import {
+  buildLinkVariableHtml,
+  normalizeVariable,
+  variablePlaceholder,
+} from '../variables';
 import { clear, h } from '../utils/dom';
+import { appendInlineToRichHtml } from '../utils/richHtmlInsert';
 import { Canvas } from './Canvas';
 import { ExportModal } from './ExportModal';
 import { LeftPanel } from './LeftPanel';
@@ -105,6 +111,8 @@ export class MailEditor {
   private showLayoutBorders = false;
   /** 「重置内容」时恢复的文档快照（与当前画布内容无关） */
   private presetContentDoc: EmailDoc;
+  /** 宿主通过 setVariables 注入的列表；setValue 恢复文档后仍会写回，避免被 doc JSON 里的空数组覆盖 */
+  private configuredVariables: Variable[] = [];
   private systemThemeMq: MediaQueryList | null = null;
   private readonly _onSystemThemeMqChange = () => {
     if (this.accentColorOverride) this._applyAccentVars();
@@ -203,6 +211,7 @@ export class MailEditor {
   setValue(doc: EmailDoc) {
     this._blurRightPanelIfFocused();
     this.store.replace(doc);
+    this._applyConfiguredVariables();
   }
 
   getValue(): EmailDoc {
@@ -226,6 +235,7 @@ export class MailEditor {
   resetToPreset(): void {
     this._blurRightPanelIfFocused();
     this.store.replace(structuredClone(this.presetContentDoc));
+    this._applyConfiguredVariables();
     this.store.setSelection(null);
   }
 
@@ -235,13 +245,55 @@ export class MailEditor {
   }
 
   setVariables(vars: Variable[]) {
-    this.store.update((d) => {
-      d.variables = vars;
-    });
+    this.configuredVariables = vars.map(normalizeVariable);
+    this._applyConfiguredVariables();
   }
 
   getVariables(): Variable[] {
+    if (this.configuredVariables.length) return this.configuredVariables;
     return this.store.doc.variables;
+  }
+
+  private _applyConfiguredVariables() {
+    if (!this.configuredVariables.length) return;
+    const snapshot = this.configuredVariables.map((v) => ({ ...v }));
+    this.store.update((d) => {
+      d.variables = snapshot;
+    });
+  }
+
+  /**
+   * 插入变量 key（`{{key}}`）。
+   * @returns 是否成功插入
+   */
+  insertVariableKey(v: Variable): boolean {
+    const normalized = normalizeVariable(v);
+    return this._insertAtFocus(variablePlaceholder(normalized.key), false);
+  }
+
+  /**
+   * 插入链接 / 图片变量对应元素（`<a>` / image 块等）。
+   * 非 link/image 时退化为 insertVariableKey。
+   */
+  insertVariableElement(v: Variable): boolean {
+    const normalized = normalizeVariable(v);
+    if (normalized.kind === 'image') {
+      return this._insertImageVariable(normalized);
+    }
+    if (normalized.kind === 'link') {
+      const token = variablePlaceholder(normalized.key);
+      const html = buildLinkVariableHtml(
+        token,
+        this.store.doc.styles.linkColor || '#ff5a00',
+      );
+      return this._insertAtFocus(html, true);
+    }
+    return this.insertVariableKey(normalized);
+  }
+
+  /** 同 {@link insertVariableKey} */
+  insertVariable(v: Variable): boolean {
+    return this.insertVariableKey(v);
   }
 
   /** 当前界面主题（`system` 不解析为 light/dark）。 */
@@ -493,9 +545,11 @@ export class MailEditor {
   }
 
   private _showVariablePopover(anchor: HTMLElement) {
-    const vars = this.store.doc.variables;
+    this.canvas.currentInlineEditor?.saveSelection();
+
+    const vars = this.getVariables();
     if (!vars.length) {
-      alert('当前未配置变量。请先调用 editor.setVariables([...])');
+      this._showToast('暂无可用变量');
       return;
     }
     const existing = this.root.querySelector('.sm-popover');
@@ -504,25 +558,72 @@ export class MailEditor {
       return;
     }
 
-    const pop = h('div', { class: 'sm-popover' });
+    const pop = h('div', { class: 'sm-popover sm-popover--variables' });
+    let onDocClick: ((ev: MouseEvent) => void) | null = null;
+    const dismissPopover = () => {
+      pop.remove();
+      if (onDocClick) document.removeEventListener('click', onDocClick, true);
+    };
+
     for (const v of vars) {
-      pop.append(
+      const token = variablePlaceholder(v.key);
+      const row = h('div', { class: 'sm-popover__row' });
+      const actions = h('div', { class: 'sm-popover__actions' });
+      if (v.kind === 'link' || v.kind === 'image') {
+        actions.append(
+          h(
+            'button',
+            {
+              class: 'sm-popover__action',
+              type: 'button',
+              onclick: (e: Event) => {
+                e.stopPropagation();
+                this.insertVariableElement(v);
+                dismissPopover();
+              },
+            },
+            ['插入元素'],
+          ),
+        );
+      }
+      actions.append(
+        h(
+          'button',
+          {
+            class: 'sm-popover__action sm-popover__action--copy',
+            type: 'button',
+            title: `复制 ${token}`,
+            onclick: (e: Event) => {
+              e.stopPropagation();
+              void copyVariableToken(token).then((ok) => {
+                if (!ok) return;
+                dismissPopover();
+                this._showToast('已复制变量');
+              });
+            },
+          },
+          ['复制'],
+        ),
+      );
+      row.append(
         h(
           'button',
           {
             class: 'sm-popover__item',
             type: 'button',
             onclick: () => {
-              this._insertVariable(v);
-              pop.remove();
+              this.insertVariableKey(v);
+              dismissPopover();
             },
           },
           [
-            h('span', { class: 'sm-popover__key' }, [`{{${v.key}}}`]),
             h('span', { class: 'sm-popover__label' }, [v.label]),
+            h('span', { class: 'sm-popover__key' }, [token]),
           ],
         ),
+        actions,
       );
+      pop.append(row);
     }
 
     const rect = anchor.getBoundingClientRect();
@@ -531,27 +632,62 @@ export class MailEditor {
     pop.style.left = `${rect.left - rootRect.left}px`;
     this.root.append(pop);
 
-    const onDocClick = (ev: MouseEvent) => {
+    onDocClick = (ev: MouseEvent) => {
       if (!pop.contains(ev.target as Node) && ev.target !== anchor) {
-        pop.remove();
-        document.removeEventListener('click', onDocClick, true);
+        dismissPopover();
       }
     };
-    setTimeout(() => document.addEventListener('click', onDocClick, true), 0);
+    setTimeout(() => {
+      if (onDocClick) document.addEventListener('click', onDocClick, true);
+    }, 0);
   }
 
-  private _insertVariable(v: Variable) {
-    const sel = this.store.selection;
-    const placeholder = `{{${v.key}}}`;
+  private _showToast(text: string) {
+    const t = h('div', { class: 'sm-toast' }, [text]);
+    this.root.append(t);
+    requestAnimationFrame(() => t.classList.add('is-visible'));
+    setTimeout(() => {
+      t.classList.remove('is-visible');
+      setTimeout(() => t.remove(), 200);
+    }, 1400);
+  }
 
-    // 最高优：正在画布内联编辑的富文本光标处
+  private _insertImageVariable(v: Variable): boolean {
+    const token = variablePlaceholder(v.key);
+    const block = this.registry.createBlock('image');
+    const props = block.props as { src: string; alt: string };
+    props.src = token;
+    props.alt = v.label?.trim() || v.key;
+    const sel = this.store.selection;
+    this.store.update((d) => {
+      if (sel?.kind === 'block') {
+        const sec = d.sections.find((s) => s.id === sel.sectionId);
+        const col = sec?.columns[sel.columnIndex];
+        if (col) {
+          const idx = col.blocks.findIndex((b) => b.id === sel.blockId);
+          col.blocks.splice(idx >= 0 ? idx + 1 : col.blocks.length, 0, block);
+          return;
+        }
+      }
+      let section = d.sections[d.sections.length - 1];
+      if (!section) {
+        section = createSection('1');
+        d.sections.push(section);
+      }
+      section.columns[0]?.blocks.push(block);
+    });
+    return true;
+  }
+
+  /** 在焦点处插入文本或 HTML；失败时返回 false */
+  private _insertAtFocus(content: string, asHtml: boolean): boolean {
     const inline = this.canvas.currentInlineEditor;
     if (inline) {
-      inline.insertText(placeholder);
-      return;
+      if (asHtml) inline.insertHtml(content);
+      else inline.insertText(content);
+      return true;
     }
 
-    // 次之：当前聚焦的 input/textarea（属性面板）
     const active = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
     if (
       active &&
@@ -560,14 +696,14 @@ export class MailEditor {
     ) {
       const start = active.selectionStart ?? active.value.length;
       const end = active.selectionEnd ?? active.value.length;
-      active.value = active.value.slice(0, start) + placeholder + active.value.slice(end);
-      const ev = new Event('input', { bubbles: true });
-      active.dispatchEvent(ev);
-      return;
+      active.value = active.value.slice(0, start) + content + active.value.slice(end);
+      active.dispatchEvent(new Event('input', { bubbles: true }));
+      return true;
     }
 
-    // 最次：选中 Block 时追加到该 block 的 inlineEditable 字段或第一个文本字段
+    const sel = this.store.selection;
     if (sel?.kind === 'block') {
+      let updated = false;
       this.store.update((d) => {
         for (const s of d.sections) {
           for (const c of s.columns) {
@@ -578,16 +714,40 @@ export class MailEditor {
               def?.inlineEditable?.propKey ??
               def?.schema.find((f) => f.type === 'text' || f.type === 'textarea')?.key;
             if (key) {
-              const cur = String((b.props as any)[key] ?? '');
-              (b.props as any)[key] = cur + placeholder;
+              const cur = String((b.props as Record<string, unknown>)[key] ?? '');
+              const richInline = def?.inlineEditable && def.inlineEditable.mode !== 'plain';
+              (b.props as Record<string, unknown>)[key] = richInline
+                ? appendInlineToRichHtml(cur, content)
+                : cur + content;
+              updated = true;
             }
           }
         }
       });
-      return;
+      if (updated) return true;
     }
 
-    alert('请先双击进入文本编辑、或聚焦一个输入框后再插入变量');
+    const block = this.registry.createBlock('text');
+    const wrapped = appendInlineToRichHtml('', content);
+    (block.props as { content: string }).content = wrapped;
+    this.store.update((d) => {
+      let section = d.sections[d.sections.length - 1];
+      if (!section) {
+        section = createSection('1');
+        d.sections.push(section);
+      }
+      if (sel?.kind === 'block') {
+        const sec = d.sections.find((s) => s.id === sel.sectionId);
+        const col = sec?.columns[sel.columnIndex];
+        if (col) {
+          const idx = col.blocks.findIndex((b) => b.id === sel.blockId);
+          col.blocks.splice(idx >= 0 ? idx + 1 : col.blocks.length, 0, block);
+          return;
+        }
+      }
+      section.columns[0]?.blocks.push(block);
+    });
+    return true;
   }
 
   private _showExport() {
@@ -635,6 +795,29 @@ export class MailEditor {
     this.showLayoutBorders = !this.showLayoutBorders;
     this.root.classList.toggle('sm-show-layout-borders', this.showLayoutBorders);
     this.topbar.setLayoutBordersActive(this.showLayoutBorders);
+  }
+}
+
+async function copyVariableToken(token: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(token);
+    return true;
+  } catch {
+    // fallback
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = token;
+    ta.setAttribute('readonly', 'true');
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch {
+    return false;
   }
 }
 

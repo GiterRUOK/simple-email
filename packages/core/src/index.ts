@@ -2,6 +2,17 @@ export { MailEditor } from './editor/Editor';
 export { defineBlock, Registry } from './registry/registry';
 export { mjRawCellTypographyFromStyles, mjRawEmailTableWrap } from './utils/lockedMjml';
 export { renderDoc, replaceVariables } from './renderer';
+export {
+  buildBodyVariableElementInsert,
+  buildBodyVariableInsert,
+  buildBodyVariableKeyInsert,
+  buildLinkVariableHtml,
+  defaultVariableSample,
+  normalizeVariable,
+  tokenToVariableKey,
+  variablePlaceholder,
+} from './variables';
+export type { BodyVariableInsert, VariableKind } from './variables';
 export { docToMjml } from './renderer/mjml';
 export {
   Store,

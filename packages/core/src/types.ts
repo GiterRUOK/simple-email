@@ -42,6 +42,8 @@ export interface Variable {
   label: string;
   /** 预览数据，仅设计态预览使用 */
   sample?: string;
+  /** 插入语义：纯文本占位 / 链接片段 / 图片块 */
+  kind?: 'text' | 'link' | 'image';
 }
 
 export type SectionLayout = '1' | '1-1' | '1-2' | '2-1' | '1-1-1';

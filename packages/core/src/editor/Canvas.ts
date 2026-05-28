@@ -112,6 +112,15 @@ export class Canvas {
     this.inlineEditor?.commit();
   }
 
+  /** 强制重绘（内联编辑中会延迟到 commit 后） */
+  refresh() {
+    if (this.editingBlockId) {
+      this.pendingRender = true;
+      return;
+    }
+    this._render();
+  }
+
   destroy() {
     this.linkNavSuppression.abort();
     this._exitEditing(false);
