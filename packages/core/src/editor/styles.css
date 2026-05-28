@@ -540,6 +540,20 @@
   list-style-type: decimal;
 }
 
+.sm-canvas .sm-text-content.is-empty:not(.sm-inline-editing) {
+  position: relative;
+  /* 与编辑态单行 <br> 行高对齐；不用 min-height 避免与 padding 叠出额外高度 */
+  min-height: 1lh;
+  min-height: 1em;
+}
+
+.sm-canvas .sm-text-content.is-empty:not(.sm-inline-editing)::before {
+  content: attr(data-placeholder);
+  color: var(--sm-placeholder);
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Section 外层：Sortable 拖拽壳，与列内 Sortable 分离避免嵌套冲突 */
 .sm-section-host {
   position: relative;
@@ -1273,7 +1287,6 @@
   border-radius: 2px;
   background-color: color-mix(in srgb, var(--sm-primary-soft) 55%, transparent);
   cursor: text;
-  min-height: 1em;
   caret-color: var(--sm-primary);
   transition:
     outline-color 0.12s ease,
@@ -1285,11 +1298,6 @@
   outline-offset: 2px;
   box-shadow: 0 0 0 4px var(--sm-primary-soft);
   background-color: color-mix(in srgb, var(--sm-primary-soft) 35%, transparent);
-}
-.sm-inline-editing:empty::before {
-  content: attr(data-placeholder);
-  color: var(--sm-placeholder);
-  pointer-events: none;
 }
 
 .sm-inline-editing :where(ul, ol) {

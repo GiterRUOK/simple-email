@@ -1,4 +1,4 @@
-import { defineBlock, FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '@simple-mail/core';
+import { defineBlock, FONT_WEIGHT_STEP_OPTIONS, isRichHtmlEffectivelyEmpty, normalizeFontWeightStep } from '@simple-mail/core';
 import { icons } from './icons';
 
 interface TextProps {
@@ -18,6 +18,8 @@ interface TextProps {
 
 const escapeAttr = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const TEXT_PLACEHOLDER = '输入文本…';
 
 export const textBlock = defineBlock<TextProps>({
   type: 'text',
@@ -94,7 +96,7 @@ export const textBlock = defineBlock<TextProps>({
     mode: 'rich',
     multiline: true,
     propKey: 'content',
-    placeholder: '输入文本…',
+    placeholder: TEXT_PLACEHOLDER,
   },
   toMjml: (p) => {
     const padding = `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;
@@ -119,6 +121,9 @@ export const textBlock = defineBlock<TextProps>({
     const colorCss = colorRaw ? `color:${colorRaw};` : '';
     const fsRaw = String(p.fontSize ?? '').trim();
     const fsCss = fsRaw ? `font-size:${fsRaw};` : '';
-    return `<div class="sm-text-content" style="text-align:${p.align};${colorCss}${fsCss}${fwCss}${lh}${ff}padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;">${p.content}</div>`;
+    const empty = isRichHtmlEffectivelyEmpty(p.content);
+    const emptyClass = empty ? ' is-empty' : '';
+    const placeholderAttr = empty ? ` data-placeholder="${TEXT_PLACEHOLDER}"` : '';
+    return `<div class="sm-text-content${emptyClass}"${placeholderAttr} style="text-align:${p.align};${colorCss}${fsCss}${fwCss}${lh}${ff}padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;">${p.content}</div>`;
   },
 });

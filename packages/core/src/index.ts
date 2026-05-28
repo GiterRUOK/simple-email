@@ -1,5 +1,7 @@
 export { MailEditor } from './editor/Editor';
 export { defineBlock, Registry } from './registry/registry';
+export { appendInlineToRichHtml } from './utils/richHtmlInsert';
+export { isRichHtmlEffectivelyEmpty, normalizeRichHtmlForCommit } from './utils/richHtmlEmpty';
 export { mjRawCellTypographyFromStyles, mjRawEmailTableWrap } from './utils/lockedMjml';
 export { renderDoc, replaceVariables } from './renderer';
 export {

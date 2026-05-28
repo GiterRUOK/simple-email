@@ -100,6 +100,8 @@ const editor = new MailEditor({
   },
   /** 体验：右栏数字 / 内边距 / 字号滑块等（字重恒为五档平铺） */
   ui: { preferSliderControls: true },
+  /** 点击画布灰色衬底或白底留白时取消选中 */
+  clearSelectionOnCanvasMargin: true,
   /** 顶栏主题色拾色器；未设 accentColor 时使用样式表随 light/dark/system 的默认紫/靛 */
   showAccentColorPicker: true,
 });

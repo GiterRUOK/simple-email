@@ -28,6 +28,12 @@ import {
   richTextQueryCommandState,
   richTextQueryCommandValue,
 } from '../utils/richTextCommand';
+import {
+  isRichHtmlEffectivelyEmpty,
+  isRichHtmlEditorSeedOnly,
+  hasRichHtmlLineBreak,
+  getRichHtmlPlainText,
+} from '../utils/richHtmlEmpty';
 import { isColorPickerOpen } from './ColorPickerPopover';
 
 export interface InlineEditorOptions {
@@ -81,6 +87,11 @@ export class InlineEditor {
   /** hiliteColor 在输入前不写 DOM；记录「待输入背景色 + 锚点」以便 bar 即时同步，移开光标后清除 */
   private pendingHiliteColor: string | null = null;
   private pendingHiliteAnchor: string | null = null;
+  /** 进入编辑时空内容；用于忽略未改动就失焦时的占位 <br> */
+  private initiallyEmpty = false;
+  private edited = false;
+  /** 是否曾有过文本（含空格）；用于区分「仅换行」与「输入后清空残留的 <br>」 */
+  private hadTextInSession = false;
 
   constructor(opts: InlineEditorOptions) {
     this.opts = opts;
@@ -93,12 +104,31 @@ export class InlineEditor {
   commit() {
     if (this.committed) return;
     this.committed = true;
-    const value =
-      this.opts.mode === 'plain'
-        ? (this.el.textContent ?? '').replace(/\s+\n/g, '\n').trim()
-        : this.opts.mode === 'html'
-          ? this.el.innerHTML
-          : sanitizeRichHtml(this.el.innerHTML);
+    let value: string;
+    if (this.opts.mode === 'plain') {
+      value = (this.el.textContent ?? '').replace(/\u200b/g, '');
+    } else if (this.opts.mode === 'html') {
+      value = this.el.innerHTML;
+    } else {
+      const sanitized = sanitizeRichHtml(this.el.innerHTML);
+      const text = (this.el.textContent ?? '').replace(/\u200b/g, '');
+      if (text.length > 0) {
+        value = sanitized;
+      } else if (
+        this.initiallyEmpty &&
+        !this.edited &&
+        isRichHtmlEditorSeedOnly(sanitized)
+      ) {
+        value = '';
+      } else if (hasRichHtmlLineBreak(sanitized) && !this.hadTextInSession) {
+        // 从未有过文本，仅换行（含单个 <br>）视为有效
+        value = sanitized;
+      } else {
+        // 曾有过文本后清空，或无文本无换行
+        value = '';
+      }
+    }
+
     this.opts.onCommit(value);
     this.destroy(false);
   }
@@ -136,6 +166,7 @@ export class InlineEditor {
 
   /** 直接对当前选区执行命令（供 Toolbar 调用）。 */
   exec(command: string, value?: string) {
+    this.edited = true;
     this._ensureFocus();
     this._restoreSelection();
     const sel = window.getSelection();
@@ -185,6 +216,7 @@ export class InlineEditor {
    * （仅用 createLink 在链接内需改 URL 时浏览器行为不一致。）
    */
   setLink(url: string) {
+    this.edited = true;
     this._ensureFocus();
     this._restoreSelection();
     const trimmed = url.trim();
@@ -211,6 +243,7 @@ export class InlineEditor {
 
   /** 在当前光标处插入纯文本（供"插入变量"使用）。 */
   insertText(text: string) {
+    this.edited = true;
     this._ensureFocus();
     this._restoreSelection();
     richTextExecCommand('insertText', false, text);
@@ -219,6 +252,7 @@ export class InlineEditor {
 
   /** 在当前光标处插入 HTML 片段（供链接类变量使用）。 */
   insertHtml(html: string) {
+    this.edited = true;
     this._ensureFocus();
     this._restoreSelection();
     richTextExecCommand('insertHTML', false, html);
@@ -241,6 +275,7 @@ export class InlineEditor {
    * 有选区包裹内容；折叠光标插入 typing span，后续输入沿用。
    */
   applyFontWeight(weight: string) {
+    this.edited = true;
     this._ensureFocus();
     this._restoreSelection();
     const sel = window.getSelection();
@@ -293,14 +328,26 @@ export class InlineEditor {
   /* -------------------------------- 内部 ---------------------------------- */
 
   private _mount() {
-    const { el, mode, multiline, placeholder } = this.opts;
+    const { el, mode, multiline } = this.opts;
     el.setAttribute('contenteditable', 'true');
     el.classList.add('sm-inline-editing');
-    if (placeholder) el.setAttribute('data-placeholder', placeholder);
+    el.classList.remove('is-empty');
 
-    if (this.opts.initialValue) {
-      el.innerHTML =
-        mode === 'plain' ? escapeHtml(this.opts.initialValue) : this.opts.initialValue;
+    const initial = this.opts.initialValue ?? '';
+    const initiallyEmpty =
+      mode === 'plain' ? !initial.trim() : isRichHtmlEffectivelyEmpty(initial);
+    this.initiallyEmpty = initiallyEmpty;
+    this.edited = false;
+    this.hadTextInSession =
+      mode === 'plain'
+        ? initial.replace(/\u200b/g, '').length > 0
+        : getRichHtmlPlainText(initial).length > 0;
+
+    if (initiallyEmpty) {
+      // 空 rich 块需一个 <br> 锚点，浏览器才能稳定接收输入/换行；不在编辑态显示 placeholder
+      el.innerHTML = mode === 'plain' ? '' : '<br>';
+    } else {
+      el.innerHTML = mode === 'plain' ? escapeHtml(initial) : initial;
     }
 
     // 初始聚焦并把光标移到末尾，便于"双击 → 直接输入"
@@ -413,18 +460,35 @@ export class InlineEditor {
         this.commit();
       }, 0);
     };
+    const markEdited = () => {
+      this.edited = true;
+    };
+
+    const syncTextPresence = () => {
+      const t = (el.textContent ?? '').replace(/\u200b/g, '');
+      if (t.length > 0) this.hadTextInSession = true;
+    };
+
     const onPaste = (e: ClipboardEvent) => {
       if (mode !== 'plain') return;
       e.preventDefault();
+      markEdited();
       const text = e.clipboardData?.getData('text/plain') ?? '';
       const safe = multiline ? text : text.replace(/\r?\n/g, ' ');
       richTextExecCommand('insertText', false, safe);
     };
+
     const onSelChange = () => {
       if (!this.alive) return;
       this._syncPendingHiliteAnchor();
       this.saveSelection();
       this._emitSelection();
+    };
+
+    const onInput = () => {
+      markEdited();
+      syncTextPresence();
+      onSelChange();
     };
 
     const linkInsideEditing = (t: EventTarget | null): HTMLAnchorElement | null => {
@@ -449,7 +513,7 @@ export class InlineEditor {
     el.addEventListener('blur', onBlur);
     el.addEventListener('paste', onPaste);
     document.addEventListener('selectionchange', onSelChange);
-    el.addEventListener('input', onSelChange);
+    el.addEventListener('input', onInput);
     el.addEventListener('mouseup', onSelChange);
     if (mode === 'rich' || mode === 'html') {
       el.addEventListener('click', stopLinkActivate, true);
@@ -463,7 +527,7 @@ export class InlineEditor {
       () => el.removeEventListener('blur', onBlur),
       () => el.removeEventListener('paste', onPaste),
       () => document.removeEventListener('selectionchange', onSelChange),
-      () => el.removeEventListener('input', onSelChange),
+      () => el.removeEventListener('input', onInput),
       () => el.removeEventListener('mouseup', onSelChange),
       ...(mode === 'rich' || mode === 'html'
         ? [
