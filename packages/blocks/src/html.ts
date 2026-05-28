@@ -1,4 +1,9 @@
-import { defineBlock, mjRawCellTypographyFromStyles, mjRawEmailTableWrap } from '@simple-mail/core';
+import {
+  defineBlock,
+  htmlContainsMjmlTags,
+  mjRawCellTypographyFromStyles,
+  mjRawEmailTableWrap,
+} from '@simple-mail/core';
 import { icons } from './icons';
 
 interface HtmlBlockProps {
@@ -26,7 +31,7 @@ export const htmlBlock = defineBlock<HtmlBlockProps>({
       key: 'html',
       label: 'HTML',
       type: 'textarea',
-      help: '插入 MJML 的 mj-raw。邮件客户端常会过滤脚本与不支持的标签。',
+      help: '只写 HTML（如 <a>、<table>），不要写 <mj-text> 等 MJML 标签；MJML 标签在 mj-raw 内不会被编译。简单链接建议用「文本」块。',
     },
     { key: 'paddingTop', label: '内边距', type: 'spacing' },
   ],
@@ -43,6 +48,9 @@ export const htmlBlock = defineBlock<HtmlBlockProps>({
   },
   renderPreview: (p) => {
     const pad = `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;
-    return `<div class="sm-html-content" style="padding:${pad};min-height:1em;">${p.html}</div>`;
+    const warn = htmlContainsMjmlTags(p.html)
+      ? '<div class="sm-html-mjml-warn">检测到 MJML 标签，此处应只写 HTML，预览可能显示异常。</div>'
+      : '';
+    return `<div class="sm-html-content" style="padding:${pad};min-height:1em;">${warn}${p.html}</div>`;
   },
 });

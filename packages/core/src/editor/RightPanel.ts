@@ -2,6 +2,7 @@ import { EditorView, basicSetup } from 'codemirror';
 import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
 import type { Registry } from '../registry/registry';
+import { htmlContainsMjmlTags } from '../utils/lockedMjml';
 import {
   findBlockLocation,
   findSection,
@@ -501,6 +502,19 @@ export class RightPanel {
 
     switch (field.type) {
       case 'textarea':
+        if (block.type === 'html' && field.key === 'html') {
+          return this._textareaField(
+            field.label,
+            String(value ?? ''),
+            onChange,
+            field.help,
+            fp,
+            (v) =>
+              htmlContainsMjmlTags(v)
+                ? '检测到 MJML 标签（如 <mj-text>）。此处应只写 HTML，否则预览会显示源码。简单链接请用「文本」块。'
+                : null,
+          );
+        }
         return this._textareaField(field.label, String(value ?? ''), onChange, field.help, fp);
       case 'number':
         return this._numberField(
@@ -956,19 +970,37 @@ export class RightPanel {
     onChange: (v: string) => void,
     help?: string,
     focusToken?: string,
+    warn?: (v: string) => string | null,
   ) {
+    const warnEl = h('div', { class: 'sm-field__warn', style: 'display:none' });
     const ta = h('textarea', {
       class: 'sm-textarea',
       ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
-      oninput: (e: Event) => onChange((e.target as HTMLTextAreaElement).value),
+      oninput: (e: Event) => {
+        const v = (e.target as HTMLTextAreaElement).value;
+        onChange(v);
+        if (warn) {
+          const msg = warn(v);
+          warnEl.textContent = msg ?? '';
+          warnEl.style.display = msg ? '' : 'none';
+        }
+      },
     });
     ta.value = value;
+    if (warn) {
+      const msg = warn(value);
+      if (msg) {
+        warnEl.textContent = msg;
+        warnEl.style.display = '';
+      }
+    }
     return h(
       'div',
       { class: 'sm-field' },
       [
         h('label', { class: 'sm-field__label' }, [label]),
         ta,
+        warnEl,
         help ? h('div', { class: 'sm-field__help' }, [help]) : null,
       ],
     );

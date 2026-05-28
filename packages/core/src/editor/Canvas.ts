@@ -11,7 +11,10 @@ import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } f
 import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import { clear, escapeHtml, h } from '../utils/dom';
-import { htmlFragmentForLockedHtmlBlockCanvas } from '../utils/lockedMjml';
+import {
+  defaultPaddingForLockedBlock,
+  resolveLockedMjmlCanvasContent,
+} from '../utils/lockedMjml';
 import { layoutHumanLabel } from '../utils/sectionLayout';
 import { BlockCodeModal } from './BlockCodeModal';
 import { InlineEditor, type SelectionState } from './InlineEditor';
@@ -389,23 +392,24 @@ export class Canvas {
     const def = this.opts.registry.get(block.type);
     let inner = '';
     if (block.lockedMjml) {
-      if (block.type === 'html') {
-        const p = block.props as {
+      const isHtmlLike = block.type === 'html' || def?.inlineEditable?.mode === 'html';
+      const padding = defaultPaddingForLockedBlock(
+        block.type,
+        block.lockedMjml,
+        block.props as {
           paddingTop?: number;
           paddingRight?: number;
           paddingBottom?: number;
           paddingLeft?: number;
-        };
-        const frag = htmlFragmentForLockedHtmlBlockCanvas(block.lockedMjml, {
-          top: Number(p.paddingTop ?? 8),
-          right: Number(p.paddingRight ?? 0),
-          bottom: Number(p.paddingBottom ?? 8),
-          left: Number(p.paddingLeft ?? 0),
-        });
-        inner = `<div class="sm-html-content">${frag}</div>`;
+        },
+      );
+      const resolved = resolveLockedMjmlCanvasContent(block.lockedMjml, padding);
+      if (resolved.mode === 'preview') {
+        const wrapClass = isHtmlLike ? 'sm-html-content' : 'sm-locked-preview';
+        inner = `<div class="${wrapClass}">${resolved.html}</div>`;
       } else {
         inner = `<div style="padding:8px;color:#92400e;background:#fffbeb;border:1px dashed #f59e0b;font-family:monospace;font-size:11px;white-space:pre-wrap;">${escapeHtml(
-          block.lockedMjml,
+          resolved.source,
         )}</div>`;
       }
     } else if (def?.renderPreview) {
@@ -520,7 +524,13 @@ export class Canvas {
       });
     });
 
-    if (def?.inlineEditable && !block.lockedMjml) {
+    if (block.lockedMjml) {
+      el.addEventListener('dblclick', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.blockCodeModal.open(block.id, displayName);
+      });
+    } else if (def?.inlineEditable) {
       el.addEventListener('dblclick', (e) => {
         e.stopPropagation();
         this._enterEditing(block);

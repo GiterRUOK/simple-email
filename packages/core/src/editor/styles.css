@@ -986,6 +986,27 @@
   font-size: 11px;
   color: var(--sm-text-muted);
 }
+.sm-field__warn {
+  font-size: 11px;
+  color: #b45309;
+  line-height: 1.4;
+}
+
+.sm-html-mjml-warn {
+  margin: 0 0 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px dashed #f59e0b;
+  border-radius: 4px;
+}
+
+.sm-locked-preview a {
+  color: var(--sm-link, #ff5a00);
+  text-decoration: underline;
+}
 
 .sm-image-field__row {
   display: flex;

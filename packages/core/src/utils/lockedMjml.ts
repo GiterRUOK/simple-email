@@ -93,19 +93,104 @@ export function normalizeHtmlBlockLockedMjmlForCompile(
   return mjRawEmailTableWrap(paddingCss, inner, typo);
 }
 
-/** HTML 块锁定：画布上优先渲染可读效果，而非转义后的 MJML 源码字符串。 */
+/** HTML 块内容是否误含 MJML 标签（应只写 HTML，MJML 标签在 mj-raw 内不会被编译）。 */
+export function htmlContainsMjmlTags(html: string): boolean {
+  return /<mj-[a-z]/i.test(String(html ?? ''));
+}
+
+/** 从 presentation table 中提取首个 td 的内层 HTML。 */
+function innerFromPresentationTable(html: string): string | null {
+  const tdMatch = html.match(/<td\b[^>]*>([\s\S]*?)<\/td>/i);
+  return tdMatch ? tdMatch[1].trim() : null;
+}
+
+/**
+ * 从锁定 MJML 片段提取可在画布内渲染的 HTML；无法识别时返回 null（回退源码视图）。
+ */
+export function extractPreviewHtmlFromLockedMjml(lockedMjml: string): string | null {
+  const raw = String(lockedMjml ?? '').trim();
+  if (!raw) return '';
+
+  const mjText = raw.match(/^<mj-text\b[^>]*>([\s\S]*)<\/mj-text\s*>$/i);
+  if (mjText) return mjText[1].trim();
+
+  const mjButton = raw.match(/^<mj-button\b[^>]*>([\s\S]*)<\/mj-button\s*>$/i);
+  if (mjButton) {
+    const label = mjButton[1].trim();
+    if (!label) return '';
+    return `<span style="display:inline-block;padding:12px 24px;background:#ff5a00;color:#fff;border-radius:4px;font-size:14px;">${label}</span>`;
+  }
+
+  const mjRaw = raw.match(/^<mj-raw\b[^>]*>([\s\S]*)<\/mj-raw\s*>$/i);
+  if (mjRaw) {
+    let body = mjRaw[1].trim();
+    if (/^\s*<table\b/i.test(body)) {
+      const tdInner = innerFromPresentationTable(body);
+      if (tdInner != null) return tdInner;
+    }
+    return body;
+  }
+
+  if (!/^<mj-/i.test(raw)) return raw;
+
+  return null;
+}
+
+export interface BlockPaddingBox {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+/** 锁定块画布预览用的默认内边距（与文本块一致：水平 0，由 section 承担版心 gutter）。 */
+export function defaultPaddingForLockedBlock(
+  _blockType: string,
+  _lockedMjml: string,
+  props: {
+    paddingTop?: number;
+    paddingRight?: number;
+    paddingBottom?: number;
+    paddingLeft?: number;
+  },
+): BlockPaddingBox {
+  return {
+    top: Number(props.paddingTop ?? 8),
+    right: Number(props.paddingRight ?? 0),
+    bottom: Number(props.paddingBottom ?? 8),
+    left: Number(props.paddingLeft ?? 0),
+  };
+}
+
+/** 锁定块在画布上的渲染结果：preview 为 WYSIWYG HTML，source 为无法解析时的源码回退。 */
+export function resolveLockedMjmlCanvasContent(
+  lockedMjml: string,
+  padding: BlockPaddingBox,
+): { mode: 'preview'; html: string } | { mode: 'source'; source: string } {
+  const previewInner = extractPreviewHtmlFromLockedMjml(lockedMjml);
+  const pad = `${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`;
+
+  if (previewInner !== null) {
+    if (!previewInner) {
+      return {
+        mode: 'preview',
+        html: `<div style="padding:${pad};color:#9ca3af;font-size:13px;">（无内容）</div>`,
+      };
+    }
+    return {
+      mode: 'preview',
+      html: `<div style="padding:${pad};min-height:1em;">${previewInner}</div>`,
+    };
+  }
+
+  return { mode: 'source', source: lockedMjml };
+}
+
+/** @deprecated 使用 resolveLockedMjmlCanvasContent */
 export function htmlFragmentForLockedHtmlBlockCanvas(
   lockedMjml: string,
-  padding: { top: number; right: number; bottom: number; left: number },
+  padding: BlockPaddingBox,
 ): string {
-  const raw = lockedMjml.trim();
-  const mjMatch = raw.match(/^<mj-raw\b[^>]*>([\s\S]*)<\/mj-raw\s*>$/i);
-  const pad = `${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`;
-  if (mjMatch) {
-    const body = mjMatch[1].trim();
-    return body || `<div style="padding:${pad};color:#9ca3af;font-size:13px;">（无内容）</div>`;
-  }
-  const bare = raw;
-  if (!bare) return `<div style="padding:${pad};color:#9ca3af;font-size:13px;">（无内容）</div>`;
-  return `<div style="padding:${pad}">${bare}</div>`;
+  const resolved = resolveLockedMjmlCanvasContent(lockedMjml, padding);
+  return resolved.mode === 'preview' ? resolved.html : resolved.source;
 }
