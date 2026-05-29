@@ -37,6 +37,17 @@
   --sm-gallery-cell-bg: #ebecef;
   --sm-gallery-thumb-bg: #dde1e8;
   --sm-gallery-cell-hover-border: #d6d9df;
+  /* 富文本浮动条：浅色主题用固定深条，压在白纸画布上对比清晰 */
+  --sm-float-bar-bg: #1f2328;
+  --sm-float-bar-fg: #ffffff;
+  --sm-float-bar-border: transparent;
+  --sm-float-bar-shadow: 0 6px 24px rgba(16, 24, 40, 0.18);
+  --sm-float-bar-control-bg: rgba(255, 255, 255, 0.08);
+  --sm-float-bar-hover-bg: rgba(255, 255, 255, 0.12);
+  --sm-float-bar-sep: rgba(255, 255, 255, 0.12);
+  --sm-float-bar-input-border: rgba(255, 255, 255, 0.18);
+  --sm-float-bar-placeholder: rgba(255, 255, 255, 0.5);
+  --sm-float-bar-select-option-fg: #1f2328;
   /* 三栏与画布边距（窄屏见文末 @media） */
   --sm-layout-col-left: 240px;
   --sm-layout-col-right: 300px;
@@ -93,6 +104,19 @@
   --sm-gallery-cell-bg: #252c36;
   --sm-gallery-thumb-bg: #343d4a;
   --sm-gallery-cell-hover-border: #484f58;
+  /* 暗黑：抬高亮度 + 描边，避免与画布区底色 (#111820) 糊成一片 */
+  --sm-float-bar-bg: #3d444d;
+  --sm-float-bar-fg: #e6edf3;
+  --sm-float-bar-border: #6e7681;
+  --sm-float-bar-shadow:
+    0 0 0 1px rgba(230, 237, 243, 0.1),
+    0 8px 32px rgba(0, 0, 0, 0.55);
+  --sm-float-bar-control-bg: rgba(255, 255, 255, 0.1);
+  --sm-float-bar-hover-bg: rgba(255, 255, 255, 0.14);
+  --sm-float-bar-sep: rgba(255, 255, 255, 0.16);
+  --sm-float-bar-input-border: rgba(255, 255, 255, 0.22);
+  --sm-float-bar-placeholder: rgba(230, 237, 243, 0.55);
+  --sm-float-bar-select-option-fg: #1f2328;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -121,6 +145,18 @@
     --sm-gallery-cell-bg: #252c36;
     --sm-gallery-thumb-bg: #343d4a;
     --sm-gallery-cell-hover-border: #484f58;
+    --sm-float-bar-bg: #3d444d;
+    --sm-float-bar-fg: #e6edf3;
+    --sm-float-bar-border: #6e7681;
+    --sm-float-bar-shadow:
+      0 0 0 1px rgba(230, 237, 243, 0.1),
+      0 8px 32px rgba(0, 0, 0, 0.55);
+    --sm-float-bar-control-bg: rgba(255, 255, 255, 0.1);
+    --sm-float-bar-hover-bg: rgba(255, 255, 255, 0.14);
+    --sm-float-bar-sep: rgba(255, 255, 255, 0.16);
+    --sm-float-bar-input-border: rgba(255, 255, 255, 0.22);
+    --sm-float-bar-placeholder: rgba(230, 237, 243, 0.55);
+    --sm-float-bar-select-option-fg: #1f2328;
   }
 }
 
@@ -1346,10 +1382,11 @@
   align-items: center;
   gap: 2px;
   padding: 4px 6px;
-  background: #1f2328;
-  color: #fff;
+  background: var(--sm-float-bar-bg);
+  color: var(--sm-float-bar-fg);
+  border: 1px solid var(--sm-float-bar-border);
   border-radius: 8px;
-  box-shadow: 0 6px 24px rgba(16, 24, 40, 0.18);
+  box-shadow: var(--sm-float-bar-shadow);
   pointer-events: auto;
   user-select: none;
   white-space: nowrap;
@@ -1366,7 +1403,7 @@
 .sm-floating-toolbar__sep {
   width: 1px;
   align-self: stretch;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--sm-float-bar-sep);
   margin: 4px 4px;
 }
 
@@ -1380,26 +1417,27 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: #fff;
+  color: inherit;
   font: inherit;
   cursor: pointer;
 }
-.sm-floating-toolbar__btn:hover { background: rgba(255, 255, 255, 0.12); }
+.sm-floating-toolbar__btn:hover { background: var(--sm-float-bar-hover-bg); }
 .sm-floating-toolbar__btn.is-active {
   background: var(--sm-primary);
+  color: var(--sm-on-primary);
 }
 
 .sm-floating-toolbar__select {
   height: 26px;
   border: 0;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #fff;
+  background: var(--sm-float-bar-control-bg);
+  color: inherit;
   padding: 0 6px;
   font: inherit;
   max-width: 130px;
 }
-.sm-floating-toolbar__select option { color: #1f2328; }
+.sm-floating-toolbar__select option { color: var(--sm-float-bar-select-option-fg); }
 
 .sm-floating-toolbar__color {
   width: 26px;
@@ -1407,7 +1445,7 @@
   padding: 0;
   border: 0;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--sm-float-bar-control-bg);
   cursor: pointer;
 }
 
@@ -1422,11 +1460,13 @@
 .sm-floating-toolbar__link-panel .sm-input {
   flex: 1;
   height: 26px;
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-  color: #fff;
+  background: var(--sm-float-bar-control-bg);
+  border-color: var(--sm-float-bar-input-border);
+  color: inherit;
 }
-.sm-floating-toolbar__link-panel .sm-input::placeholder { color: rgba(255,255,255,0.5); }
+.sm-floating-toolbar__link-panel .sm-input::placeholder {
+  color: var(--sm-float-bar-placeholder);
+}
 .sm-floating-toolbar__link-panel .sm-btn { height: 26px; }
 
 /* 自定义色板（右栏 / 富文本色卡） ---------------------------------------- */
