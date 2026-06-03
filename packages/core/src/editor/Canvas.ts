@@ -543,8 +543,7 @@ export class Canvas {
   private _renderAddBar(): HTMLElement {
     const layouts: { layout: SectionLayout; label: string }[] = [
       { layout: '1', label: '一列' },
-      { layout: '1-1', label: '两列' },
-      { layout: '1-1-1', label: '三列' },
+      { layout: '1-1', label: '多列' },
     ];
     const bar = h('div', { class: 'sm-add-section-bar' }, [h('span', {}, ['+ 添加 Section：'])]);
     for (const l of layouts) {

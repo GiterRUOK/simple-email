@@ -20,13 +20,18 @@ interface LayoutCard {
   layout: SectionLayout;
   name: string;
   icon: string;
+  title?: string;
 }
 
 const LAYOUT_CARDS: LayoutCard[] = [
   { layout: '1', name: '一列', icon: layoutSvg([1]) },
-  /** 默认 1:1；1:2 / 2:1 在选中 Section 后于右栏「列比例」切换 */
-  { layout: '1-1', name: '两列', icon: layoutSvg([1, 1]) },
-  { layout: '1-1-1', name: '三列', icon: layoutSvg([1, 1, 1]) },
+  /** 默认 1:1；1:2 / 2:1 / 1:1:1 在选中 Section 后于右栏「列布局」切换 */
+  {
+    layout: '1-1',
+    name: '多列',
+    icon: layoutSvg([1, 1]),
+    title: '多列（右栏可调 2/3 列比例）',
+  },
 ];
 
 /**
@@ -80,7 +85,7 @@ export class LeftPanel {
             class: 'sm-block-card',
             'data-source-group': 'sections',
             'data-layout': c.layout,
-            title: c.name,
+            title: c.title ?? c.name,
           },
           [
             h('span', { class: 'sm-block-card__icon', html: c.icon }),

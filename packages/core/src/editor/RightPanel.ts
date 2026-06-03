@@ -6,7 +6,7 @@ import { htmlContainsMjmlTags } from '../utils/lockedMjml';
 import {
   findBlockLocation,
   findSection,
-  isTwoColumnLayout,
+  isMultiColumnLayout,
   setSectionLayout,
   type Store,
   type DocChangedDetail,
@@ -391,9 +391,9 @@ export class RightPanel {
     const a = section.attrs;
     return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, [
       h('div', { class: 'sm-panel__title' }, ['Section 设置']),
-      ...(isTwoColumnLayout(section.layout)
+      ...(isMultiColumnLayout(section.layout)
         ? [
-            this._twoColumnRatioField(
+            this._multiColumnLayoutField(
               section.layout,
               (layout) =>
                 this.opts.store.update((d) => {
@@ -1956,18 +1956,19 @@ export class RightPanel {
     return this._segmentedSelectField('字重', cur, FONT_WEIGHT_STEP_OPTIONS, onChange, focusToken);
   }
 
-  private _twoColumnRatioField(
+  private _multiColumnLayoutField(
     layout: SectionLayout,
     onChange: (layout: SectionLayout) => void,
     focusToken: string,
   ) {
     return this._segmentedSelectField(
-      '列比例',
+      '列布局',
       layout,
       [
         { label: '1:1', value: '1-1' },
         { label: '1:2', value: '1-2' },
         { label: '2:1', value: '2-1' },
+        { label: '1:1:1', value: '1-1-1' },
       ],
       (v) => onChange(v as SectionLayout),
       focusToken,

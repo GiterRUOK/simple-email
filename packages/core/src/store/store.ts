@@ -147,15 +147,26 @@ export function pruneEmptySections(draft: EmailDoc) {
   );
 }
 
-/** 两列 Section 的列宽比例（左栏拖入默认 `1-1`，右栏可改为 `1-2` / `2-1`） */
+/** 多列 Section 的列布局（左栏拖入默认 `1-1`，右栏可切换列数/比例） */
+export const MULTI_COLUMN_LAYOUTS = ['1-1', '1-2', '2-1', '1-1-1'] as const;
+export type MultiColumnLayout = (typeof MULTI_COLUMN_LAYOUTS)[number];
+
+/** @deprecated 使用 MULTI_COLUMN_LAYOUTS */
 export const TWO_COLUMN_LAYOUTS = ['1-1', '1-2', '2-1'] as const;
 export type TwoColumnLayout = (typeof TWO_COLUMN_LAYOUTS)[number];
 
+export function isMultiColumnLayout(layout: SectionLayout): layout is MultiColumnLayout {
+  return (
+    layout === '1-1' || layout === '1-2' || layout === '2-1' || layout === '1-1-1'
+  );
+}
+
+/** @deprecated 使用 isMultiColumnLayout */
 export function isTwoColumnLayout(layout: SectionLayout): layout is TwoColumnLayout {
   return layout === '1-1' || layout === '1-2' || layout === '2-1';
 }
 
-/** 仅更新 layout 字段；两列间切换时列数不变，列内块按列下标保留 */
+/** 更新 layout；列数变化时增删列，被删列内块并入最后一列 */
 export function setSectionLayout(section: Section, layout: SectionLayout): void {
   const nextCols = layout.split('-').length;
   const curCols = section.columns.length;

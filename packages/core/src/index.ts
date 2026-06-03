@@ -30,10 +30,12 @@ export {
   pruneEmptySections,
   pruneSectionIfEmpty,
   isTwoColumnLayout,
+  isMultiColumnLayout,
   setSectionLayout,
   TWO_COLUMN_LAYOUTS,
+  MULTI_COLUMN_LAYOUTS,
 } from './store/store';
-export type { TwoColumnLayout } from './store/store';
+export type { TwoColumnLayout, MultiColumnLayout } from './store/store';
 export type { MjRawCellTypography } from './utils/lockedMjml';
 export {
   FONT_WEIGHT_STEP_OPTIONS,
