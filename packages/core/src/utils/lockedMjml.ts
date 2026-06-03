@@ -98,10 +98,59 @@ export function htmlContainsMjmlTags(html: string): boolean {
   return /<mj-[a-z]/i.test(String(html ?? ''));
 }
 
-/** 从 presentation table 中提取首个 td 的内层 HTML。 */
+/** 从 `<tag...>` 之后起，提取到与之配对的 `</tag>` 之前的完整内容（支持同名标签嵌套）。 */
+function extractHtmlUntilMatchingCloseTag(
+  html: string,
+  contentStart: number,
+  tagName: string,
+): string | null {
+  const openRe = new RegExp(`<${tagName}\\b`, 'gi');
+  const closeRe = new RegExp(`</${tagName}\\s*>`, 'gi');
+  let depth = 1;
+  let i = contentStart;
+
+  while (i < html.length) {
+    openRe.lastIndex = i;
+    closeRe.lastIndex = i;
+    const nextOpen = openRe.exec(html);
+    const nextClose = closeRe.exec(html);
+    if (!nextClose) return null;
+
+    if (nextOpen && nextOpen.index < nextClose.index) {
+      depth++;
+      i = nextOpen.index + nextOpen[0].length;
+      continue;
+    }
+
+    depth--;
+    if (depth === 0) return html.slice(contentStart, nextClose.index);
+    i = nextClose.index + nextClose[0].length;
+  }
+
+  return null;
+}
+
+/** 提取最外层 `<table>...</table>` 内的 HTML（不含 table 标签本身）。 */
+function extractOutermostTableInner(html: string): string | null {
+  const open = html.match(/^(\s*)<table\b[^>]*>/i);
+  if (!open) return null;
+  const contentStart = open[0].length;
+  return extractHtmlUntilMatchingCloseTag(html, contentStart, 'table');
+}
+
+/** 从 presentation table 中提取最外层包裹 td 的完整内层 HTML（支持嵌套 table/td）。 */
 function innerFromPresentationTable(html: string): string | null {
-  const tdMatch = html.match(/<td\b[^>]*>([\s\S]*?)<\/td>/i);
-  return tdMatch ? tdMatch[1].trim() : null;
+  const trimmed = html.trim();
+  if (!/^\s*<table\b/i.test(trimmed)) return null;
+
+  const tableInner = extractOutermostTableInner(trimmed);
+  if (tableInner == null) return null;
+
+  const tdOpen = tableInner.match(/<td\b[^>]*>/i);
+  if (!tdOpen || tdOpen.index === undefined) return null;
+
+  const contentStart = tdOpen.index + tdOpen[0].length;
+  return extractHtmlUntilMatchingCloseTag(tableInner, contentStart, 'td');
 }
 
 /**
