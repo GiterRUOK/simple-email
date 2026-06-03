@@ -830,7 +830,7 @@ export class MailEditor {
     const modal = new ExportModal({
       store: this.store,
       registry: this.registry,
-      withSampleVariables: true,
+      withSampleVariables: false,
     });
     modal.open(this.root);
   }

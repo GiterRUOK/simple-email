@@ -24,7 +24,7 @@ export interface PreviewModalOptions {
 
 /**
  * 预览弹框：用 iframe 渲染真实 mjml 编译产物。
- * 通过 srcdoc 写入 HTML，避免跨域；用变量 sample 值替换占位符，所见即所得。
+ * 通过 srcdoc 写入 HTML，避免跨域；默认保留 {{var}} 占位符，与画布编辑态一致。
  * 三个设备宽度切换：800 / 640 / 375，按邮件常见宽度档位。
  */
 export class PreviewModal {
@@ -102,7 +102,7 @@ export class PreviewModal {
 
   private _render() {
     const result = renderDoc(this.opts.store.doc, this.opts.registry, {
-      withSampleVariables: true,
+      withSampleVariables: false,
     });
     // 用 srcdoc 而非 src=blob:，避免 about:srcdoc 偶发的相对资源问题
     this.iframe.srcdoc = result.html;

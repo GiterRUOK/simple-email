@@ -13,7 +13,8 @@ export interface RenderOptions {
   /** 渲染引擎，目前仅 'mjml'；'table' 预留作将来直输 table HTML。 */
   engine?: RenderEngine;
   /**
-   * 是否把 {{var}} 替换为示例值。设计态画布预览传 true，导出原始 HTML 传 false。
+   * 是否把 {{var}} 替换为变量的 sample 值。
+   * 设计态预览默认不替换，保持占位符；仅当变量显式配置了 sample 且调用方传 true 时才替换。
    */
   withSampleVariables?: boolean;
 }

@@ -13,12 +13,11 @@ export function variablePlaceholder(key: string): string {
   return `{{${key}}}`;
 }
 
-/** 无后端 sample 时按 kind / label 生成预览用示例值（仅预览弹窗等场景） */
+/** 无显式 sample 时保留 Mustache 占位符；仅当宿主传入 sample 才用于可选的示例替换。 */
 export function defaultVariableSample(v: Pick<Variable, 'key' | 'label' | 'kind' | 'sample'>): string {
   if (v.sample != null && String(v.sample).trim() !== '') return String(v.sample);
-  if (v.kind === 'image') return 'https://via.placeholder.com/120x80/e8e8e8/666666?text=Image';
-  if (v.kind === 'link') return '#';
-  return v.label?.trim() || v.key;
+  const key = v.key?.trim() || tokenToVariableKey(String(v.key));
+  return variablePlaceholder(key);
 }
 
 /** 规范化 Variable（补 kind、sample） */

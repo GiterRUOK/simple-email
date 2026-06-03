@@ -78,7 +78,7 @@ export class ExportModal {
 
   private _compile() {
     const result = renderDoc(this.opts.store.doc, this.opts.registry, {
-      withSampleVariables: this.opts.withSampleVariables ?? true,
+      withSampleVariables: this.opts.withSampleVariables ?? false,
     });
     this.current = result.html;
     this._setText(result.html);
