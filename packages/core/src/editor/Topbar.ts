@@ -56,6 +56,7 @@ export class Topbar {
   private accentInput?: HTMLInputElement;
   private fullscreenBtn?: HTMLButtonElement;
   private layoutBordersBtn?: HTMLButtonElement;
+  private insertVariableBtn?: HTMLButtonElement;
 
   constructor(opts: TopbarOptions) {
     this.opts = opts;
@@ -116,6 +117,14 @@ export class Topbar {
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
     btn.title = active ? '隐藏 Section / Block 边框' : '显示 Section / Block 边框';
     btn.setAttribute('aria-label', active ? '隐藏 Section / Block 边框' : '显示 Section / Block 边框');
+  }
+
+  /** 变量列表在右栏打开（设计态）或浮层打开（源码态）时高亮顶栏按钮 */
+  setInsertVariableActive(active: boolean) {
+    const btn = this.insertVariableBtn;
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    btn.classList.toggle('sm-topbar__insert-var--active', active);
   }
 
   private _render() {
@@ -258,13 +267,16 @@ export class Topbar {
     }
     if (this.opts.showInsertVariableButton !== false) {
       trailingGroup.push(
-        actionBtn({
+        (this.insertVariableBtn = actionBtn({
+          class: 'sm-topbar__insert-var',
           title: '插入变量',
           icon: iconVariable(),
           label: '插入变量',
           onclick: (e: Event) => this.opts.onInsertVariable(e.currentTarget as HTMLElement),
-        }),
+        })),
       );
+    } else {
+      this.insertVariableBtn = undefined;
     }
     trailingGroup.push(previewBtn, exportBtn);
 

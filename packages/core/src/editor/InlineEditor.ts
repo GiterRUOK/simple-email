@@ -447,7 +447,7 @@ export class InlineEditor {
         if (active && (active === el || el.contains(active))) return;
         if (isColorPickerOpen()) return;
         if (active?.closest?.('.sm-floating-toolbar, .sm-color-picker, .sm-color-picker-layer')) return;
-        if (active?.closest?.('.sm-topbar, .sm-popover')) return;
+        if (active?.closest?.('.sm-topbar, .sm-popover, .sm-panel--variable-picker')) return;
         // 从左栏拖入 / 画布内 Sortable 排序：mousedown 会先 blur，若在此时提交会触发画布重渲染并拆掉 drop 目标
         if (active?.closest?.('.sm-panel--left')) return;
         if (active?.closest?.('.sm-block__handle, .sm-section__handle')) return;
@@ -456,7 +456,7 @@ export class InlineEditor {
         if (related?.closest?.('.sm-block-card')) return;
         if (related?.closest?.('.sm-block__handle, .sm-section__handle')) return;
         if (related?.closest?.('.sm-color-picker, .sm-color-picker-layer')) return;
-        if (related?.closest?.('.sm-topbar, .sm-popover')) return;
+        if (related?.closest?.('.sm-topbar, .sm-popover, .sm-panel--variable-picker')) return;
         if (document.querySelector('.sm-root .sm-drag, .sm-root .sm-chosen')) return;
         this.commit();
       }, 0);

@@ -132,6 +132,11 @@ export class MailEditor {
   /** design 态 Esc：块 → 父级 Section → 文档级面板（邮件设置或版式/全局样式，取决于 `ui.hideMailMeta`） */
   private _mailEscHandler = (e: KeyboardEvent) => {
     if (e.key !== 'Escape') return;
+    if (this.rightPanel.isVariablePickerOpen()) {
+      e.preventDefault();
+      this._closeVariablePicker();
+      return;
+    }
     if (this.mode !== 'design') return;
     if (!this.store.selection) return;
     if (document.querySelector('.sm-modal__mask.is-open')) return;
@@ -439,7 +444,7 @@ export class MailEditor {
       showMailSettingsButton: this.opts.ui?.hideTopbarMailSettings !== true,
       showTitle: this.opts.ui?.hideTopbarTitle !== true,
       showInsertVariableButton: this.opts.ui?.hideTopbarInsertVariable !== true,
-      onInsertVariable: (anchor) => this._showVariablePopover(anchor),
+      onInsertVariable: (anchor) => this._toggleVariablePanel(anchor),
       onPreview: () => this._showPreview(),
       onExport: () => this._showExport(),
       showFullscreenButton: this.opts.ui?.hideTopbarFullscreen !== true,
@@ -498,12 +503,15 @@ export class MailEditor {
 
   /** 提交内联编辑并清空选中，右栏回到文档级面板 */
   private _focusMailSettings() {
+    this._closeVariablePicker();
     this.canvas.commitInlineEdit();
     this.store.setSelection(null);
   }
 
   private _setMode(m: EditorMode) {
     if (this.mode === m) return;
+    this._closeVariablePicker();
+    this._dismissVariablePopover();
     if (m !== 'design') this.canvas.commitInlineEdit();
     this.mode = m;
     this.topbar.setMode(m);
@@ -563,7 +571,13 @@ export class MailEditor {
     }, 60) as unknown as number;
   }
 
-  private _showVariablePopover(anchor: HTMLElement) {
+  private _closeVariablePicker() {
+    if (!this.rightPanel.isVariablePickerOpen()) return;
+    this.rightPanel.closeVariablePicker();
+    this.topbar.setInsertVariableActive(false);
+  }
+
+  private _toggleVariablePanel(anchor: HTMLElement) {
     this.canvas.currentInlineEditor?.saveSelection();
 
     const vars = this.getVariables();
@@ -571,9 +585,48 @@ export class MailEditor {
       this._showToast('暂无可用变量');
       return;
     }
+
+    if (this.mode === 'design') {
+      if (this.rightPanel.isVariablePickerOpen()) {
+        this._closeVariablePicker();
+        return;
+      }
+      this._dismissVariablePopover();
+      this._blurRightPanelIfFocused();
+      this.rightPanel.openVariablePicker(vars, {
+        onPickKey: (v) => {
+          this.insertVariableKey(v);
+          this._closeVariablePicker();
+        },
+        onPickElement: (v) => {
+          this.insertVariableElement(v);
+          this._closeVariablePicker();
+        },
+        onCopy: (token) => {
+          void copyVariableToken(token).then((ok) => {
+            if (!ok) return;
+            this._showToast('已复制变量');
+          });
+        },
+        onClose: () => this._closeVariablePicker(),
+      });
+      this.topbar.setInsertVariableActive(true);
+      return;
+    }
+
+    this._toggleVariablePopover(anchor, vars);
+  }
+
+  private _dismissVariablePopover() {
+    this.overlayLayer.querySelector('.sm-popover')?.remove();
+  }
+
+  /** 源码模式无右栏时仍用浮层选择变量 */
+  private _toggleVariablePopover(anchor: HTMLElement, vars: Variable[]) {
     const existing = this.overlayLayer.querySelector('.sm-popover');
     if (existing) {
       existing.remove();
+      this.topbar.setInsertVariableActive(false);
       return;
     }
 
@@ -582,6 +635,7 @@ export class MailEditor {
     const dismissPopover = () => {
       pop.remove();
       if (onDocClick) document.removeEventListener('click', onDocClick, true);
+      this.topbar.setInsertVariableActive(false);
     };
 
     for (const v of vars) {
@@ -656,6 +710,7 @@ export class MailEditor {
     setTimeout(() => {
       if (onDocClick) document.addEventListener('click', onDocClick, true);
     }, 0);
+    this.topbar.setInsertVariableActive(true);
   }
 
   private _showToast(text: string) {

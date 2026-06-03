@@ -31,6 +31,9 @@
   --sm-modal-footer-bg: #fafbfc;
   --sm-placeholder: #9aa0a6;
   --sm-outline-muted: #c7cad1;
+  /* 展示边框：Section 100% · Block 70%；hover 用 --sm-primary */
+  --sm-outline-layout-section: var(--sm-outline-muted);
+  --sm-outline-layout-block: color-mix(in srgb, var(--sm-outline-muted) 70%, transparent);
   --sm-empty-column-border: #d6d8dd;
   --sm-empty-column-stripe: rgba(0, 0, 0, 0.02);
   --sm-on-primary: #ffffff;
@@ -98,6 +101,8 @@
   --sm-modal-footer-bg: #1c2128;
   --sm-placeholder: #8b949e;
   --sm-outline-muted: #484f58;
+  --sm-outline-layout-section: var(--sm-outline-muted);
+  --sm-outline-layout-block: color-mix(in srgb, var(--sm-outline-muted) 70%, transparent);
   --sm-empty-column-border: #3d444d;
   --sm-empty-column-stripe: rgba(255, 255, 255, 0.04);
   --sm-on-primary: #ffffff;
@@ -139,6 +144,8 @@
     --sm-modal-footer-bg: #1c2128;
     --sm-placeholder: #8b949e;
     --sm-outline-muted: #484f58;
+    --sm-outline-layout-section: var(--sm-outline-muted);
+    --sm-outline-layout-block: color-mix(in srgb, var(--sm-outline-muted) 70%, transparent);
     --sm-empty-column-border: #3d444d;
     --sm-empty-column-stripe: rgba(255, 255, 255, 0.04);
     --sm-on-primary: #ffffff;
@@ -513,6 +520,36 @@
   overflow: auto;
 }
 
+/* 右栏变量列表（设计态顶栏「插入变量」） */
+.sm-panel--variable-picker .sm-panel__body {
+  padding: 0;
+}
+.sm-var-picker__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+.sm-var-picker__title {
+  padding: 0;
+  flex: 1;
+  min-width: 0;
+}
+.sm-var-picker__close {
+  flex-shrink: 0;
+  font-size: 12px;
+}
+.sm-var-picker {
+  display: flex;
+  flex-direction: column;
+}
+.sm-topbar__insert-var[aria-pressed="true"],
+.sm-topbar__insert-var.sm-topbar__insert-var--active {
+  background: var(--sm-primary-soft);
+  color: var(--sm-primary);
+}
+
 .sm-panel__title {
   font-size: 12px;
   font-weight: 600;
@@ -698,17 +735,31 @@
 .sm-section {
   position: relative;
   outline: 1px dashed transparent;
-  outline-offset: -1px;
-  transition: outline-color 0.12s;
+  outline-offset: 0;
+  transition: outline-color 0.12s, outline-offset 0.12s;
 }
-.sm-root.sm-show-layout-borders .sm-section {
-  outline-color: var(--sm-outline-muted);
+/* 展示边框：Section 更深；内层 Block 交互时弱化外层，避免框中框 */
+.sm-root.sm-show-layout-borders .sm-section-host:not(.is-selected) .sm-section {
+  outline-color: var(--sm-outline-layout-section);
 }
-.sm-section-host:hover .sm-section {
-  outline-color: var(--sm-outline-muted);
+.sm-root.sm-show-layout-borders
+  .sm-section-host:not(.is-selected):not(:hover)
+  .sm-section {
+  outline-offset: -2px;
+}
+.sm-root.sm-show-layout-borders
+  .sm-section-host:not(.is-selected):has(.sm-block:hover, .sm-block.is-selected, .sm-block.is-editing)
+  .sm-section {
+  outline-color: transparent;
+}
+.sm-section-host:hover:not(.is-selected):not(:has(.sm-block:hover, .sm-block.is-selected, .sm-block.is-editing))
+  .sm-section {
+  outline-color: var(--sm-primary);
+  /* outline-offset: -2px; */
 }
 .sm-section-host.is-selected .sm-section {
   outline: 2px solid var(--sm-primary);
+  outline-offset: 0;
 }
 .sm-section__toolbar {
   position: absolute;
@@ -824,7 +875,7 @@
   flex: 1 1 auto;
   min-height: 0;
   padding: 0;
-  border: 1px dashed transparent;
+  /* border: 1px dashed transparent; */
   position: relative;
 }
 .sm-column.is-empty {
@@ -851,14 +902,23 @@
 .sm-block {
   position: relative;
   outline: 1px dashed transparent;
-  /* 不用负 offset，避免行首 caret 被描边盖住 */
+  /* 默认 0：hover / 选中描边贴边外扩，避免被相邻块盖住 */
   outline-offset: 0;
+  transition: outline-color 0.12s, outline-offset 0.12s;
 }
-.sm-root.sm-show-layout-borders .sm-block:not(.is-selected):not(.is-editing) {
-  outline-color: var(--sm-outline-muted);
+/* 仅「展示边框」且未交互时内缩，避免虚线与内容描边重叠 */
+.sm-root.sm-show-layout-borders .sm-block:not(.is-selected):not(.is-editing):not(:hover) {
+  outline-offset: -2px;
 }
-.sm-block:hover:not(.is-selected):not(.is-editing) {
-  outline-color: var(--sm-outline-muted);
+/* 展示边框：Block 更浅的辅助线（非 hover） */
+.sm-root.sm-show-layout-borders
+  .sm-block:not(.is-selected):not(.is-editing):not(:hover) {
+  outline-color: var(--sm-outline-layout-block);
+}
+.sm-block:hover:not(.is-selected):not(.is-editing),
+.sm-root.sm-show-layout-borders .sm-block:hover:not(.is-selected):not(.is-editing) {
+  outline-color: var(--sm-primary);
+  outline-offset: 0;
 }
 .sm-block.is-selected:not(.is-editing) {
   outline: 2px solid var(--sm-primary);
@@ -871,9 +931,13 @@
   /* 列内 Block 按 DOM 顺序绘制；下方块（如 padding-top:0 的分割线）会盖住 offset 描边 */
   z-index: 3;
 }
-/* hover / 选中态同样抬升，避免 2px 实线描边被相邻块遮挡（编辑态 z-index 更高，见 .is-editing） */
-.sm-block:hover:not(.is-editing),
+/* 选中 / hover：抬升，避免描边被相邻块遮挡（Section hover 为 -2px；编辑态见 .is-editing） */
+.sm-block:hover:not(.is-selected):not(.is-editing),
+.sm-root.sm-show-layout-borders .sm-block:hover:not(.is-selected):not(.is-editing) {
+  z-index: 2;
+}
 .sm-block.is-selected:not(.is-editing) {
+  outline-offset: 0;
   z-index: 2;
 }
 .sm-block__content { position: relative; }
@@ -1745,6 +1809,8 @@
    */
   --sm-border: #e6e8ec;
   --sm-outline-muted: #c7cad1;
+  --sm-outline-layout-section: var(--sm-outline-muted);
+  --sm-outline-layout-block: color-mix(in srgb, var(--sm-outline-muted) 70%, transparent);
   --sm-surface: #ffffff;
   --sm-surface-hover: #f5f6f8;
   --sm-text: #1f2328;

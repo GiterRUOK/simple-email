@@ -18,6 +18,7 @@ import type {
   EmailDoc,
   Section,
   SectionLayout,
+  Variable,
 } from '../types';
 import { defaultSocialIconBackground } from '../socialDefaults';
 import { bindColorPickerInput } from './ColorPickerPopover';
@@ -28,6 +29,11 @@ import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/font
 import type { ImageAssetsHandlers, ImageFieldContext } from './imageAssets';
 import { FocusBreadcrumb } from './FocusBreadcrumb';
 import { openImageGalleryModal } from './ImageGalleryModal';
+import {
+  buildVariablePickerBody,
+  buildVariablePickerHead,
+  type VariablePickerHandlers,
+} from './VariablePickerPanel';
 
 /** 与社交组 block 中每行元素结构一致（core 不依赖 blocks） */
 type SocialLinkRow = {
@@ -88,6 +94,8 @@ export class RightPanel {
   private focusCrumb: FocusBreadcrumb;
   private currentTab: RightTab = 'props';
   private codeView: EditorView | null = null;
+  private variablePickerOpen = false;
+  private variablePickerHandlers: VariablePickerHandlers | null = null;
 
   private _preferSliderControls(): boolean {
     return this.opts.ui?.preferSliderControls === true;
@@ -113,6 +121,7 @@ export class RightPanel {
     this._syncHeadVisibility();
     this._render();
     opts.store.subscribe((detail?: DocChangedDetail) => {
+      if (this.variablePickerOpen) return;
       if (detail?.source === 'history') {
         this._renderPreservingFieldFocus();
         return;
@@ -126,16 +135,52 @@ export class RightPanel {
       this._render();
     });
     opts.store.subscribeSelection(() => {
+      if (this.variablePickerOpen) return;
       this.currentTab = 'props';
       this._syncHeadVisibility();
       this._render();
     });
   }
 
+  /** 在右栏展示变量列表（顶替属性面板，不遮挡画布） */
+  openVariablePicker(vars: Variable[], handlers: VariablePickerHandlers) {
+    this.variablePickerOpen = true;
+    this.variablePickerHandlers = handlers;
+    this._renderVariablePicker(vars);
+  }
+
+  closeVariablePicker() {
+    if (!this.variablePickerOpen) return;
+    this.variablePickerOpen = false;
+    this.variablePickerHandlers = null;
+    this.el.classList.remove('sm-panel--variable-picker');
+    clear(this.headEl);
+    this.headEl.append(this.focusCrumb.el);
+    this._syncHeadVisibility();
+    this._render();
+  }
+
+  isVariablePickerOpen(): boolean {
+    return this.variablePickerOpen;
+  }
+
   /** 文档级（无选中）时不展示面包屑，避免与「邮件设置」标题重复 */
   private _syncHeadVisibility() {
+    if (this.variablePickerOpen) return;
     const show = !!this.opts.store.selection;
     this.headEl.hidden = !show;
+  }
+
+  private _renderVariablePicker(vars: Variable[]) {
+    const handlers = this.variablePickerHandlers;
+    if (!handlers) return;
+    this._destroyCodeView();
+    clear(this.headEl);
+    clear(this.contentEl);
+    this.el.classList.add('sm-panel--variable-picker');
+    this.headEl.hidden = false;
+    this.headEl.append(buildVariablePickerHead(() => handlers.onClose()));
+    this.contentEl.append(buildVariablePickerBody(vars, handlers));
   }
 
   /** 焦点在右栏可编辑控件上时不要整栏重渲染（避免输入/CodeMirror 失焦） */
@@ -150,6 +195,7 @@ export class RightPanel {
 
   /** undo/redo 后整栏重绘，但尽量回到同一输入框与光标位置 */
   private _renderPreservingFieldFocus() {
+    if (this.variablePickerOpen) return;
     const ae = document.activeElement as HTMLElement | null;
     let token: string | null = null;
     let selStart = 0;
@@ -182,6 +228,7 @@ export class RightPanel {
   }
 
   private _render() {
+    if (this.variablePickerOpen) return;
     this._destroyCodeView();
     clear(this.contentEl);
 
