@@ -438,6 +438,7 @@ export class MailEditor {
       onMailSettings: () => this._focusMailSettings(),
       showMailSettingsButton: this.opts.ui?.hideTopbarMailSettings !== true,
       showTitle: this.opts.ui?.hideTopbarTitle !== true,
+      showInsertVariableButton: this.opts.ui?.hideTopbarInsertVariable !== true,
       onInsertVariable: (anchor) => this._showVariablePopover(anchor),
       onPreview: () => this._showPreview(),
       onExport: () => this._showExport(),

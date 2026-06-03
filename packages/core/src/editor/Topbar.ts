@@ -42,6 +42,8 @@ export interface TopbarOptions {
   /** 为 false 时不展示「重置内容」 */
   showResetContentButton?: boolean;
   onResetContent?: () => void;
+  /** 为 false 时不展示「插入变量」 */
+  showInsertVariableButton?: boolean;
 }
 
 export class Topbar {
@@ -226,13 +228,6 @@ export class Topbar {
     const contentActionsGroup =
       contentActionKids.length > 0 && h('div', { class: 'sm-topbar__group' }, contentActionKids);
 
-    const insertVar = actionBtn({
-      title: '插入变量',
-      icon: iconVariable(),
-      label: '插入变量',
-      onclick: (e: Event) => this.opts.onInsertVariable(e.currentTarget as HTMLElement),
-    });
-
     const previewBtn = actionBtn({
       title: '预览',
       icon: iconEye(),
@@ -261,7 +256,17 @@ export class Topbar {
         }),
       );
     }
-    trailingGroup.push(insertVar, previewBtn, exportBtn);
+    if (this.opts.showInsertVariableButton !== false) {
+      trailingGroup.push(
+        actionBtn({
+          title: '插入变量',
+          icon: iconVariable(),
+          label: '插入变量',
+          onclick: (e: Event) => this.opts.onInsertVariable(e.currentTarget as HTMLElement),
+        }),
+      );
+    }
+    trailingGroup.push(previewBtn, exportBtn);
 
     const canvasToolKids: HTMLElement[] = [];
 

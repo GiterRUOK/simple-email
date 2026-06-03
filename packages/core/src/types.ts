@@ -233,6 +233,8 @@ export interface EditorUiOptions {
   hideTopbarClearCanvas?: boolean;
   /** 为 true 时隐藏顶栏「重置内容」按钮。 */
   hideTopbarResetContent?: boolean;
+  /** 为 true 时隐藏顶栏「插入变量」按钮（由宿主在编辑器外提供时可用）。 */
+  hideTopbarInsertVariable?: boolean;
   /**
    * 为 true 时顶栏默认可切换为仅图标（文案收入 `title` / `aria-label`），适合窄屏或嵌入宿主。
    * 默认 false；嵌入场景可在宿主侧设为 true。
