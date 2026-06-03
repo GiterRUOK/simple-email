@@ -1,7 +1,8 @@
 import { Registry, defineBlock } from '../registry/registry';
 import { renderDoc } from '../renderer';
-import { Store, createSection, pruneSectionIfEmpty } from '../store/store';
+import { Store, createSection, findBlockLocation, pruneSectionIfEmpty } from '../store/store';
 import type {
+  Block,
   BlockDefinition,
   EditorUiOptions,
   EmailDoc,
@@ -282,6 +283,7 @@ export class MailEditor {
     }
     if (normalized.kind === 'link') {
       const token = variablePlaceholder(normalized.key);
+      if (this._tryApplyLinkVariableToken(token)) return true;
       const html = buildLinkVariableHtml(
         token,
         this.store.doc.styles.linkColor || '#ff5a00',
@@ -664,21 +666,87 @@ export class MailEditor {
     props.alt = v.label?.trim() || v.key;
     const sel = this.store.selection;
     this.store.update((d) => {
-      if (sel?.kind === 'block') {
-        const sec = d.sections.find((s) => s.id === sel.sectionId);
-        const col = sec?.columns[sel.columnIndex];
-        if (col) {
-          const idx = col.blocks.findIndex((b) => b.id === sel.blockId);
-          col.blocks.splice(idx >= 0 ? idx + 1 : col.blocks.length, 0, block);
-          return;
+      this._insertBlockRelativeToSelection(d, sel, block);
+    });
+    return true;
+  }
+
+  /**
+   * 按当前选中插入块：block → 其后；section → 该 section 首列末尾；无选中 → 文档最后一节首列末尾。
+   */
+  private _insertBlockRelativeToSelection(
+    d: EmailDoc,
+    sel: Selection | null,
+    block: Block,
+  ): void {
+    if (sel?.kind === 'block') {
+      const sec = d.sections.find((s) => s.id === sel.sectionId);
+      const col = sec?.columns[sel.columnIndex];
+      if (col) {
+        const idx = col.blocks.findIndex((b) => b.id === sel.blockId);
+        col.blocks.splice(idx >= 0 ? idx + 1 : col.blocks.length, 0, block);
+        return;
+      }
+    }
+    if (sel?.kind === 'section') {
+      const sec = d.sections.find((s) => s.id === sel.sectionId);
+      sec?.columns[0]?.blocks.push(block);
+      return;
+    }
+    let section = d.sections[d.sections.length - 1];
+    if (!section) {
+      section = createSection('1');
+      d.sections.push(section);
+    }
+    section.columns[0]?.blocks.push(block);
+  }
+
+  /** 链接变量：写入图片/按钮等块的 `href`（MJML 可点击），而非 alt 或右栏纯文本。 */
+  private _tryApplyLinkVariableToken(token: string): boolean {
+    const active = document.activeElement as HTMLInputElement | HTMLTextAreaElement | null;
+    if (
+      active &&
+      (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
+      this.root.contains(active)
+    ) {
+      const focusToken = active.getAttribute('data-sm-focus');
+      if (focusToken?.startsWith('block:')) {
+        const parts = focusToken.split(':');
+        const blockId = parts[1];
+        const propKey = parts[2];
+        if (blockId && propKey && this._setBlockUrlProp(blockId, propKey, token)) {
+          active.value = token;
+          active.dispatchEvent(new Event('input', { bubbles: true }));
+          return true;
         }
       }
-      let section = d.sections[d.sections.length - 1];
-      if (!section) {
-        section = createSection('1');
-        d.sections.push(section);
-      }
-      section.columns[0]?.blocks.push(block);
+    }
+
+    const sel = this.store.selection;
+    if (sel?.kind !== 'block') return false;
+    const loc = findBlockLocation(this.store.doc, sel.blockId);
+    if (!loc) return false;
+    const urlKey = this._schemaUrlPropKey(this.registry.get(loc.block.type));
+    if (!urlKey) return false;
+    this.store.update((d) => {
+      const l = findBlockLocation(d, sel.blockId);
+      if (l) (l.block.props as Record<string, unknown>)[urlKey] = token;
+    });
+    return true;
+  }
+
+  private _schemaUrlPropKey(def: BlockDefinition | undefined): string | undefined {
+    return def?.schema.find((f) => f.type === 'url')?.key;
+  }
+
+  private _setBlockUrlProp(blockId: string, propKey: string, token: string): boolean {
+    const loc = findBlockLocation(this.store.doc, blockId);
+    if (!loc) return false;
+    const field = this.registry.get(loc.block.type)?.schema.find((f) => f.key === propKey);
+    if (field?.type !== 'url') return false;
+    this.store.update((d) => {
+      const l = findBlockLocation(d, blockId);
+      if (l) (l.block.props as Record<string, unknown>)[propKey] = token;
     });
     return true;
   }
@@ -698,11 +766,30 @@ export class MailEditor {
       (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA') &&
       this.root.contains(active)
     ) {
-      const start = active.selectionStart ?? active.value.length;
-      const end = active.selectionEnd ?? active.value.length;
-      active.value = active.value.slice(0, start) + content + active.value.slice(end);
-      active.dispatchEvent(new Event('input', { bubbles: true }));
-      return true;
+      if (asHtml) {
+        const focusToken = active.getAttribute('data-sm-focus');
+        if (focusToken?.startsWith('block:')) {
+          const parts = focusToken.split(':');
+          const blockId = parts[1];
+          const propKey = parts[2];
+          if (blockId && propKey) {
+            const m = content.match(/\{\{[^}]+\}\}/);
+            const token = m?.[0] ?? content;
+            if (this._setBlockUrlProp(blockId, propKey, token)) {
+              active.value = token;
+              active.dispatchEvent(new Event('input', { bubbles: true }));
+              return true;
+            }
+          }
+        }
+        /* 链接 HTML 不写入 alt 等右栏文本框，落到下方新建文本块 */
+      } else {
+        const start = active.selectionStart ?? active.value.length;
+        const end = active.selectionEnd ?? active.value.length;
+        active.value = active.value.slice(0, start) + content + active.value.slice(end);
+        active.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      }
     }
 
     const sel = this.store.selection;
@@ -714,17 +801,14 @@ export class MailEditor {
             const b = c.blocks.find((x) => x.id === sel.blockId);
             if (!b) continue;
             const def = this.registry.get(b.type);
-            const key =
-              def?.inlineEditable?.propKey ??
-              def?.schema.find((f) => f.type === 'text' || f.type === 'textarea')?.key;
-            if (key) {
-              const cur = String((b.props as Record<string, unknown>)[key] ?? '');
-              const richInline = def?.inlineEditable && def.inlineEditable.mode !== 'plain';
-              (b.props as Record<string, unknown>)[key] = richInline
-                ? appendInlineToRichHtml(cur, content)
-                : cur + content;
-              updated = true;
-            }
+            const key = def?.inlineEditable?.propKey;
+            if (!key) continue;
+            const cur = String((b.props as Record<string, unknown>)[key] ?? '');
+            const richInline = def.inlineEditable!.mode !== 'plain';
+            (b.props as Record<string, unknown>)[key] = richInline
+              ? appendInlineToRichHtml(cur, content)
+              : cur + content;
+            updated = true;
           }
         }
       });
@@ -735,21 +819,7 @@ export class MailEditor {
     const wrapped = appendInlineToRichHtml('', content);
     (block.props as { content: string }).content = wrapped;
     this.store.update((d) => {
-      let section = d.sections[d.sections.length - 1];
-      if (!section) {
-        section = createSection('1');
-        d.sections.push(section);
-      }
-      if (sel?.kind === 'block') {
-        const sec = d.sections.find((s) => s.id === sel.sectionId);
-        const col = sec?.columns[sel.columnIndex];
-        if (col) {
-          const idx = col.blocks.findIndex((b) => b.id === sel.blockId);
-          col.blocks.splice(idx >= 0 ? idx + 1 : col.blocks.length, 0, block);
-          return;
-        }
-      }
-      section.columns[0]?.blocks.push(block);
+      this._insertBlockRelativeToSelection(d, sel, block);
     });
     return true;
   }
