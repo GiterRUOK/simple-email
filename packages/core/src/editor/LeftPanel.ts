@@ -5,16 +5,16 @@ import { clear, h } from '../utils/dom';
 
 export interface LeftPanelOptions {
   registry: Registry;
-  /** 左栏分组标题；未传 category 时使用内置默认文案 */
-  categoryLabels?: Partial<Record<BlockDefinition['category'], string>>;
+  /** 合并后的组件分组标题 */
+  blockGroupTitle?: string;
+  /** custom 类块默认 tooltip 后缀（无 paletteTooltip 时） */
+  customPaletteTooltipSuffix?: string;
   /** 不显示在左栏的 block type（仍可在 Registry 中 createBlock） */
   hiddenPaletteBlockTypes?: string[];
 }
 
-const DEFAULT_CATEGORY_LABELS: Record<BlockDefinition['category'], string> = {
-  content: '内容',
-  custom: '自定义',
-};
+const DEFAULT_BLOCK_GROUP_TITLE = '组件';
+const DEFAULT_CUSTOM_TOOLTIP_SUFFIX = 'Navimow 定制组件，拖入列内使用';
 
 interface LayoutCard {
   layout: SectionLayout;
@@ -37,7 +37,7 @@ const LAYOUT_CARDS: LayoutCard[] = [
 /**
  * 左栏分两类：
  *  - 布局（layout）：决定 Section 结构，拖入到画布顶层（group: 'sections'）
- *  - 内容/自定义：作为 Block，拖入到 Column 中（group: 'blocks'）
+ *  - 组件：内置与 custom 合并为一组，作为 Block 拖入 Column（group: 'blocks'）
  *
  * 通过 SortableJS 的 group + clone + sort:false 实现。
  * 这两个组分开，画布顶层只接 'sections'，列内只接 'blocks'，
@@ -62,15 +62,22 @@ export class LeftPanel {
     const hiddenPalette = new Set(this.opts.hiddenPaletteBlockTypes ?? []);
     const filterPalette = (defs: BlockDefinition[]) =>
       defs.filter((d) => !hiddenPalette.has(d.type));
-    const content = filterPalette(this.opts.registry.byCategory('content'));
-    const custom = filterPalette(this.opts.registry.byCategory('custom'));
+    const paletteBlocks = [
+      ...filterPalette(this.opts.registry.byCategory('content')),
+      ...filterPalette(this.opts.registry.byCategory('custom')),
+    ];
 
     const wrap = h('div', { class: 'sm-blocks' });
 
     wrap.append(this._renderLayoutGroup());
-    const labels = { ...DEFAULT_CATEGORY_LABELS, ...this.opts.categoryLabels };
-    if (content.length) wrap.append(this._renderBlockGroup(labels.content, content));
-    if (custom.length) wrap.append(this._renderBlockGroup(labels.custom, custom));
+    if (paletteBlocks.length) {
+      wrap.append(
+        this._renderBlockGroup(
+          this.opts.blockGroupTitle ?? DEFAULT_BLOCK_GROUP_TITLE,
+          paletteBlocks,
+        ),
+      );
+    }
 
     this.el.append(wrap);
   }
@@ -108,9 +115,28 @@ export class LeftPanel {
     ]);
   }
 
+  private _blockCardTitle(def: BlockDefinition): string {
+    if (def.paletteTooltip?.trim()) return def.paletteTooltip.trim();
+    if (def.category === 'custom') {
+      const suffix =
+        this.opts.customPaletteTooltipSuffix ?? DEFAULT_CUSTOM_TOOLTIP_SUFFIX;
+      return `${def.name} — ${suffix}`;
+    }
+    return def.name;
+  }
+
   private _renderBlockGroup(title: string, defs: BlockDefinition[]): HTMLElement {
     const grid = h('div', { class: 'sm-blocks__grid' });
     for (const def of defs) {
+      const isCustom = def.category === 'custom';
+      const children: HTMLElement[] = [];
+      if (isCustom) {
+        children.push(h('span', { class: 'sm-block-card__dot', 'aria-hidden': 'true' }));
+      }
+      children.push(
+        h('span', { class: 'sm-block-card__icon', html: def.icon }),
+        h('span', { class: 'sm-block-card__name' }, [def.name]),
+      );
       grid.append(
         h(
           'div',
@@ -118,12 +144,9 @@ export class LeftPanel {
             class: 'sm-block-card',
             'data-source-group': 'blocks',
             'data-block-type': def.type,
-            title: def.name,
+            title: this._blockCardTitle(def),
           },
-          [
-            h('span', { class: 'sm-block-card__icon', html: def.icon }),
-            h('span', { class: 'sm-block-card__name' }, [def.name]),
-          ],
+          children,
         ),
       );
     }

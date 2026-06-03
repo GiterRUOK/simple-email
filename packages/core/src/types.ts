@@ -147,8 +147,10 @@ export interface BlockDefinition<P extends object = Record<string, unknown>> {
   type: string;
   /** 显示名（左栏） */
   name: string;
-  /** 分类，用于左栏分组 */
+  /** 分类，用于左栏分组与定制块角标 */
   category: 'content' | 'custom';
+  /** 左栏卡片悬停提示；未设时 custom 类块使用 UI 默认后缀 */
+  paletteTooltip?: string;
   /** 16x16 SVG 字符串 */
   icon: string;
   /** 默认 props（拖入时使用） */
@@ -232,9 +234,14 @@ export interface EditorUiOptions {
   /** 为 true 时隐藏顶栏「重置内容」按钮。 */
   hideTopbarResetContent?: boolean;
   /**
-   * 左栏块分组标题。未设置的 category 仍用内置默认（`content` →「内容」，`custom` →「自定义」）。
+   * @deprecated 左栏已合并为单组，请用 `paletteBlockGroupTitle`。
+   * 仍兼容：仅 `content` 键会作为合并后分组标题的回退。
    */
   blockCategoryLabels?: Partial<Record<BlockDefinition['category'], string>>;
+  /** 左栏合并后的组件分组标题，默认「组件」。 */
+  paletteBlockGroupTitle?: string;
+  /** custom 类块无 `paletteTooltip` 时拼入 title 的说明后缀。 */
+  customPaletteTooltipSuffix?: string;
   /**
    * 仍注册、渲染、可被 palette 展开引用，但不显示在左栏的 block type（如组合块内部用的 divider）。
    */

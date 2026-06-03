@@ -451,6 +451,7 @@
 }
 
 .sm-block-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -470,6 +471,17 @@
   box-shadow: var(--sm-shadow);
 }
 .sm-block-card:active { cursor: grabbing; }
+.sm-block-card__dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 2px;
+  height: 2px;
+  background: var(--sm-text-muted);
+  border-radius: 50%;
+  box-sizing: border-box;
+  pointer-events: none;
+}
 .sm-block-card__icon {
   width: 24px;
   height: 24px;

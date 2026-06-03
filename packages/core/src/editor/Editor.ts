@@ -444,10 +444,13 @@ export class MailEditor {
     });
 
     this.toolbar = new RichTextToolbar({ positionRoot: this.root });
+    const ui = this.opts.ui;
     this.leftPanel = new LeftPanel({
       registry: this.registry,
-      categoryLabels: this.opts.ui?.blockCategoryLabels,
-      hiddenPaletteBlockTypes: this.opts.ui?.hiddenPaletteBlockTypes,
+      blockGroupTitle:
+        ui?.paletteBlockGroupTitle ?? ui?.blockCategoryLabels?.content,
+      customPaletteTooltipSuffix: ui?.customPaletteTooltipSuffix,
+      hiddenPaletteBlockTypes: ui?.hiddenPaletteBlockTypes,
     });
     const autoWrap = this.opts.autoWrapSection !== false;
     this.root.classList.toggle('sm-allow-auto-wrap', autoWrap);
