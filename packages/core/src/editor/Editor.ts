@@ -442,7 +442,11 @@ export class MailEditor {
     });
 
     this.toolbar = new RichTextToolbar({ positionRoot: this.root });
-    this.leftPanel = new LeftPanel({ registry: this.registry });
+    this.leftPanel = new LeftPanel({
+      registry: this.registry,
+      categoryLabels: this.opts.ui?.blockCategoryLabels,
+      hiddenPaletteBlockTypes: this.opts.ui?.hiddenPaletteBlockTypes,
+    });
     const autoWrap = this.opts.autoWrapSection !== false;
     this.root.classList.toggle('sm-allow-auto-wrap', autoWrap);
     this.canvas = new Canvas({

@@ -5,7 +5,16 @@ import { clear, h } from '../utils/dom';
 
 export interface LeftPanelOptions {
   registry: Registry;
+  /** 左栏分组标题；未传 category 时使用内置默认文案 */
+  categoryLabels?: Partial<Record<BlockDefinition['category'], string>>;
+  /** 不显示在左栏的 block type（仍可在 Registry 中 createBlock） */
+  hiddenPaletteBlockTypes?: string[];
 }
+
+const DEFAULT_CATEGORY_LABELS: Record<BlockDefinition['category'], string> = {
+  content: '内容',
+  custom: '自定义',
+};
 
 interface LayoutCard {
   layout: SectionLayout;
@@ -45,14 +54,18 @@ export class LeftPanel {
 
   private _render() {
     clear(this.el);
-    const content = this.opts.registry.byCategory('content');
-    const custom = this.opts.registry.byCategory('custom');
+    const hiddenPalette = new Set(this.opts.hiddenPaletteBlockTypes ?? []);
+    const filterPalette = (defs: BlockDefinition[]) =>
+      defs.filter((d) => !hiddenPalette.has(d.type));
+    const content = filterPalette(this.opts.registry.byCategory('content'));
+    const custom = filterPalette(this.opts.registry.byCategory('custom'));
 
     const wrap = h('div', { class: 'sm-blocks' });
 
     wrap.append(this._renderLayoutGroup());
-    if (content.length) wrap.append(this._renderBlockGroup('内容', content));
-    if (custom.length) wrap.append(this._renderBlockGroup('自定义', custom));
+    const labels = { ...DEFAULT_CATEGORY_LABELS, ...this.opts.categoryLabels };
+    if (content.length) wrap.append(this._renderBlockGroup(labels.content, content));
+    if (custom.length) wrap.append(this._renderBlockGroup(labels.custom, custom));
 
     this.el.append(wrap);
   }

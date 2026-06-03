@@ -231,6 +231,14 @@ export interface EditorUiOptions {
   hideTopbarClearCanvas?: boolean;
   /** 为 true 时隐藏顶栏「重置内容」按钮。 */
   hideTopbarResetContent?: boolean;
+  /**
+   * 左栏块分组标题。未设置的 category 仍用内置默认（`content` →「内容」，`custom` →「自定义」）。
+   */
+  blockCategoryLabels?: Partial<Record<BlockDefinition['category'], string>>;
+  /**
+   * 仍注册、渲染、可被 palette 展开引用，但不显示在左栏的 block type（如组合块内部用的 divider）。
+   */
+  hiddenPaletteBlockTypes?: string[];
 }
 
 export interface EditorEvents {
