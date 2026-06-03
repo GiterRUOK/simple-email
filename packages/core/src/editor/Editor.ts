@@ -105,6 +105,8 @@ export class MailEditor {
   private sourceView!: SourceView;
   private toolbar!: RichTextToolbar;
   private body: HTMLElement;
+  /** 浮层（变量列表、toast），避免挂到 grid 的 .sm-root 上被挤成窄条 */
+  private overlayLayer!: HTMLElement;
   private changeTimer: number | null = null;
   /** 显式品牌色时覆盖 CSS 变量；未设置则由 styles 按 light/dark 使用默认紫/靛 */
   private accentColorOverride: string | undefined;
@@ -114,14 +116,17 @@ export class MailEditor {
   private presetContentDoc: EmailDoc;
   /** 宿主通过 setVariables 注入的列表；setValue 恢复文档后仍会写回，避免被 doc JSON 里的空数组覆盖 */
   private configuredVariables: Variable[] = [];
+  private topbarLayoutObserver: ResizeObserver | null = null;
+  private topbarLayoutRaf = 0;
   private systemThemeMq: MediaQueryList | null = null;
   private readonly _onSystemThemeMqChange = () => {
     if (this.accentColorOverride) this._applyAccentVars();
   };
 
   private readonly _onFullscreenChange = () => {
-    const el = smGetFullscreenElement();
-    this.topbar?.setFullscreenActive(el === this.root);
+    const fs = smGetFullscreenElement() === this.root;
+    this.topbar?.setFullscreenActive(fs);
+    this._syncTopbarLayout();
   };
 
   /** design 态 Esc：块 → 父级 Section → 文档级面板（邮件设置或版式/全局样式，取决于 `ui.hideMailMeta`） */
@@ -199,6 +204,7 @@ export class MailEditor {
     this._buildUI();
     this._bindKeyboard();
     this._bindFullscreen();
+    this._bindTopbarLayoutWatch();
 
     this._applyAccentVars();
     this._refreshAccentMqBinding();
@@ -357,6 +363,7 @@ export class MailEditor {
 
   destroy() {
     this._unbindFullscreen();
+    this._unbindTopbarLayoutWatch();
     this._unbindSystemThemeMqForAccent();
     if (this.changeTimer) window.clearTimeout(this.changeTimer);
     if (smGetFullscreenElement() === this.root) void smExitFullscreen();
@@ -441,6 +448,7 @@ export class MailEditor {
       onClearCanvas: () => this.clearCanvas(),
       showResetContentButton: this.opts.ui?.hideTopbarResetContent !== true,
       onResetContent: () => this.resetToPreset(),
+      compact: !topbarPrefersLabels(this.opts.ui, this._topbarLayoutContext()),
     });
 
     this.toolbar = new RichTextToolbar({ positionRoot: this.root });
@@ -477,7 +485,8 @@ export class MailEditor {
     this.sourceView = new SourceView({ store: this.store, registry: this.registry });
 
     this.body.append(this.leftPanel.el, this.canvas.el, this.rightPanel.el);
-    this.root.append(this.topbar.el, this.body);
+    this.overlayLayer = h('div', { class: 'sm-overlay-layer' });
+    this.root.append(this.topbar.el, this.body, this.overlayLayer);
   }
 
   /** 撤销/替换文档前先失焦右栏，否则 RightPanel 会因「保留焦点」跳过重绘而仍显示旧值 */
@@ -561,7 +570,7 @@ export class MailEditor {
       this._showToast('暂无可用变量');
       return;
     }
-    const existing = this.root.querySelector('.sm-popover');
+    const existing = this.overlayLayer.querySelector('.sm-popover');
     if (existing) {
       existing.remove();
       return;
@@ -635,11 +644,8 @@ export class MailEditor {
       pop.append(row);
     }
 
-    const rect = anchor.getBoundingClientRect();
-    const rootRect = this.root.getBoundingClientRect();
-    pop.style.top = `${rect.bottom - rootRect.top + 4}px`;
-    pop.style.left = `${rect.left - rootRect.left}px`;
-    this.root.append(pop);
+    this.overlayLayer.append(pop);
+    positionAnchoredLayer(pop, anchor, this.root);
 
     onDocClick = (ev: MouseEvent) => {
       if (!pop.contains(ev.target as Node) && ev.target !== anchor) {
@@ -653,7 +659,7 @@ export class MailEditor {
 
   private _showToast(text: string) {
     const t = h('div', { class: 'sm-toast' }, [text]);
-    this.root.append(t);
+    this.overlayLayer.append(t);
     requestAnimationFrame(() => t.classList.add('is-visible'));
     setTimeout(() => {
       t.classList.remove('is-visible');
@@ -847,6 +853,50 @@ export class MailEditor {
     modal.open(this.root);
   }
 
+  private _topbarLayoutContext(): TopbarLayoutContext {
+    return {
+      fullscreenOnRoot: smGetFullscreenElement() === this.root,
+      rootWidth: this.root.clientWidth,
+    };
+  }
+
+  private _syncTopbarLayout() {
+    const bar = this.topbar;
+    if (!bar) return;
+    const ctx = this._topbarLayoutContext();
+    if (!topbarPrefersLabels(this.opts.ui, ctx)) {
+      bar.setCompact(true);
+      return;
+    }
+    bar.setCompact(false);
+    requestAnimationFrame(() => {
+      const el = bar.el;
+      if (el.scrollWidth > el.clientWidth + 2) bar.setCompact(true);
+    });
+  }
+
+  private _bindTopbarLayoutWatch() {
+    if (this.opts.ui?.topbarCompact !== true) return;
+    this._syncTopbarLayout();
+    this.topbarLayoutObserver = new ResizeObserver(() => {
+      if (this.topbarLayoutRaf) cancelAnimationFrame(this.topbarLayoutRaf);
+      this.topbarLayoutRaf = requestAnimationFrame(() => {
+        this.topbarLayoutRaf = 0;
+        this._syncTopbarLayout();
+      });
+    });
+    this.topbarLayoutObserver.observe(this.root);
+  }
+
+  private _unbindTopbarLayoutWatch() {
+    this.topbarLayoutObserver?.disconnect();
+    this.topbarLayoutObserver = null;
+    if (this.topbarLayoutRaf) {
+      cancelAnimationFrame(this.topbarLayoutRaf);
+      this.topbarLayoutRaf = 0;
+    }
+  }
+
   private _bindFullscreen() {
     if (this.opts.ui?.hideTopbarFullscreen === true) return;
     document.addEventListener('fullscreenchange', this._onFullscreenChange);
@@ -873,6 +923,44 @@ export class MailEditor {
     this.root.classList.toggle('sm-show-layout-borders', this.showLayoutBorders);
     this.topbar.setLayoutBordersActive(this.showLayoutBorders);
   }
+}
+
+/** 在 .sm-root 坐标系下定位浮层，靠右的锚点右对齐，并限制在根节点内 */
+function positionAnchoredLayer(layer: HTMLElement, anchor: HTMLElement, root: HTMLElement) {
+  const rect = anchor.getBoundingClientRect();
+  const rootRect = root.getBoundingClientRect();
+  const gap = 4;
+  const margin = 8;
+  layer.style.top = `${rect.bottom - rootRect.top + gap}px`;
+  const w = layer.offsetWidth;
+  let left = rect.left - rootRect.left;
+  const anchorMid = rect.left + rect.width * 0.5;
+  const rootMid = rootRect.left + rootRect.width * 0.5;
+  if (anchorMid >= rootMid) {
+    left = rect.right - rootRect.left - w;
+  }
+  left = Math.max(margin, Math.min(left, rootRect.width - w - margin));
+  layer.style.left = `${left}px`;
+}
+
+export const DEFAULT_TOPBAR_COMPACT_MIN_WIDTH = 1200;
+
+export interface TopbarLayoutContext {
+  fullscreenOnRoot: boolean;
+  rootWidth: number;
+}
+
+/** 顶栏是否应展示按钮文案（紧凑模式下的策略；非 compact 配置恒为 true） */
+export function topbarPrefersLabels(
+  ui: EditorUiOptions | undefined,
+  ctx: TopbarLayoutContext,
+): boolean {
+  if (ui?.topbarCompact !== true) return true;
+  const labels = ui.topbarLabels ?? 'auto';
+  if (labels === 'always') return true;
+  if (labels === 'never') return false;
+  const minW = ui.topbarCompactMinWidth ?? DEFAULT_TOPBAR_COMPACT_MIN_WIDTH;
+  return ctx.fullscreenOnRoot || ctx.rootWidth >= minW;
 }
 
 async function copyVariableToken(token: string): Promise<boolean> {

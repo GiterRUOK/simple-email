@@ -57,7 +57,7 @@
 
   position: relative;
   display: grid;
-  grid-template-rows: 48px 1fr;
+  grid-template-rows: 52px 1fr;
   height: 100%;
   min-height: 480px;
   font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
@@ -167,15 +167,20 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   padding: 0 12px;
   background: var(--sm-panel-bg);
   border-bottom: 1px solid var(--sm-border);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
 }
 
 .sm-topbar__group {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .sm-topbar__title {
@@ -184,7 +189,8 @@
 }
 
 .sm-topbar__spacer {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 12px;
 }
 
 .sm-focus-crumb {
@@ -266,8 +272,8 @@
   border-radius: 2px;
 }
 .sm-topbar__theme-btn {
-  min-width: 28px;
-  padding: 0 6px;
+  min-width: 32px;
+  padding: 0 7px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -275,13 +281,15 @@
 .sm-topbar__theme-btn svg {
   display: block;
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
 }
 
 .sm-topbar__icon-btn {
   flex-shrink: 0;
-  min-width: 28px;
-  width: 28px;
-  height: 28px;
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   justify-content: center;
   gap: 0;
@@ -289,19 +297,91 @@
 .sm-topbar__icon-btn svg {
   display: block;
   flex-shrink: 0;
+  width: 18px;
+  height: 18px;
 }
+
+.sm-topbar__action-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.sm-topbar__action-btn svg {
+  display: block;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+.sm-topbar__btn-label {
+  line-height: 1;
+}
+.sm-topbar__mode-seg {
+  flex-shrink: 0;
+}
+.sm-topbar__mode-btn {
+  gap: 5px;
+  min-width: 40px;
+  padding-left: 11px;
+  padding-right: 11px;
+  flex-shrink: 0;
+}
+.sm-topbar:not(.sm-topbar--compact) .sm-topbar__mode-btn .sm-topbar__btn-label {
+  max-width: 4.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sm-topbar__mode-btn svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.sm-topbar--compact {
+  gap: 6px;
+  padding: 0 8px;
+}
+.sm-topbar--compact .sm-topbar__group {
+  gap: 4px;
+}
+.sm-topbar--compact .sm-topbar__btn-label {
+  display: none;
+}
+.sm-topbar--compact .sm-topbar__action-btn {
+  min-width: 32px;
+  width: 32px;
+  padding: 0;
+  justify-content: center;
+  gap: 0;
+}
+.sm-topbar--compact .sm-topbar__mode-btn {
+  min-width: 40px;
+  padding: 0 11px;
+  justify-content: center;
+  gap: 0;
+}
+.sm-topbar--compact .sm-topbar__mode-btn svg {
+  margin: 0;
+  width: 18px;
+  height: 18px;
+}
+.sm-topbar--compact .sm-topbar__icon-btn {
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+}
+
 .sm-topbar__toggle-btn[aria-pressed="true"] {
   background: var(--sm-primary-soft);
   color: var(--sm-primary);
 }
-.sm-topbar__toggle-btn .sm-layout-borders-check {
-  opacity: 0;
-  transition: opacity 0.12s ease;
+.sm-topbar__toggle-btn:not([aria-pressed="true"]) {
+  color: var(--sm-text-muted);
 }
-.sm-topbar__toggle-btn[aria-pressed="true"] .sm-layout-borders-check {
-  opacity: 1;
+.sm-topbar__toggle-btn:not([aria-pressed="true"]):hover {
+  color: var(--sm-text);
 }
 
+.sm-topbar .sm-btn {
+  height: 32px;
+}
 .sm-btn {
   display: inline-flex;
   align-items: center;
@@ -355,6 +435,9 @@
   border-radius: var(--sm-radius-sm);
   overflow: hidden;
   background: var(--sm-surface);
+}
+.sm-topbar .sm-segmented__item {
+  height: 32px;
 }
 .sm-segmented__item {
   display: inline-flex;
@@ -1562,11 +1645,23 @@
   font-size: 12px;
 }
 
+/* 浮层容器：popover / toast，不参与 .sm-root 的 grid 排布 */
+.sm-overlay-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+}
+.sm-overlay-layer > * {
+  pointer-events: auto;
+}
+
 /* 弹层（变量插入） ------------------------------------------------------- */
 .sm-popover {
   position: absolute;
   z-index: 100;
-  min-width: 260px;
+  min-width: 280px;
+  max-width: min(360px, calc(100% - 16px));
   background: var(--sm-surface);
   border: 1px solid var(--sm-border);
   border-radius: var(--sm-radius-sm);
@@ -1606,6 +1701,7 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   color: var(--sm-text-muted);
+  word-break: break-all;
 }
 
 .sm-popover__actions {

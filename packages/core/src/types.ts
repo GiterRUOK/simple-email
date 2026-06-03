@@ -234,6 +234,22 @@ export interface EditorUiOptions {
   /** 为 true 时隐藏顶栏「重置内容」按钮。 */
   hideTopbarResetContent?: boolean;
   /**
+   * 为 true 时顶栏默认可切换为仅图标（文案收入 `title` / `aria-label`），适合窄屏或嵌入宿主。
+   * 默认 false；嵌入场景可在宿主侧设为 true。
+   */
+  topbarCompact?: boolean;
+  /**
+   * 顶栏按钮文案展示策略（在 `topbarCompact === true` 时生效）。
+   * - `auto`（默认）：仅图标；根节点进入浏览器全屏或宽度 ≥ `topbarCompactMinWidth` 时展示文案。
+   * - `never`：始终仅图标（含全屏与宽屏）。
+   * - `always`：始终展示图标旁文案（等同不启用紧凑顶栏）。
+   */
+  topbarLabels?: 'always' | 'never' | 'auto';
+  /**
+   * `topbarLabels: 'auto'` 时，根节点宽度不低于该值（px）则展示顶栏文案。默认 1200。
+   */
+  topbarCompactMinWidth?: number;
+  /**
    * @deprecated 左栏已合并为单组，请用 `paletteBlockGroupTitle`。
    * 仍兼容：仅 `content` 键会作为合并后分组标题的回退。
    */
