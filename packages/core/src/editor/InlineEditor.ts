@@ -18,6 +18,7 @@ import {
   getCaretTextOffset,
   insertCaretMarker,
   mergeListItemOnBackspace,
+  mergeAdjacentSameTypeLists,
   mergeNextListItemOnDelete,
   restoreCaretAfterListMutation,
   splitListItemOnEnter,
@@ -488,6 +489,9 @@ export class InlineEditor {
     const onInput = () => {
       markEdited();
       syncTextPresence();
+      if (mode === 'rich' && multiline) {
+        mergeAdjacentSameTypeLists(el);
+      }
       onSelChange();
     };
 
