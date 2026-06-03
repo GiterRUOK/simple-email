@@ -82,7 +82,30 @@ const editor = new MailEditor({
     variables: [
       { key: 'user.name', label: '用户名', sample: '张三' },
       { key: 'user.email', label: '邮箱', sample: 'zhangsan@example.com' },
-      { key: 'unsubscribeUrl', label: '退订地址', sample: 'https://example.com/unsubscribe' },
+      {
+        key: 'unsubscribeUrl',
+        label: '退订地址',
+        kind: 'link',
+        sample: 'https://example.com/unsubscribe',
+      },
+      {
+        key: 'couponLink',
+        label: '优惠券链接',
+        kind: 'link',
+        sample: 'https://example.com/shop',
+      },
+      {
+        key: 'couponImage',
+        label: '优惠券图片',
+        kind: 'image',
+        sample: 'https://picsum.photos/seed/simplemail-coupon/320/160',
+      },
+      {
+        key: 'productImage',
+        label: '产品图片',
+        kind: 'image',
+        sample: 'https://picsum.photos/seed/simplemail-product/400/240',
+      },
     ],
     sections: [],
   },
