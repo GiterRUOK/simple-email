@@ -25,6 +25,7 @@ export class Modal {
   private bodyEl: HTMLElement;
   private footerEl: HTMLElement;
   private opts: ModalOptions;
+  private headerToolNodes: HTMLElement[] = [];
   private keydownHandler?: (e: KeyboardEvent) => void;
 
   constructor(opts: ModalOptions) {
@@ -77,6 +78,18 @@ export class Modal {
     this._renderHeader();
   }
 
+  /** 动态调整卡片宽高（如 CodeMirror 弹框按内容适配） */
+  setSize(width?: string, height?: string) {
+    if (width !== undefined) {
+      this.opts.width = width;
+      this.card.style.width = width;
+    }
+    if (height !== undefined) {
+      this.opts.height = height;
+      this.card.style.height = height;
+    }
+  }
+
   /** body 容器直接给外部填充 */
   get body(): HTMLElement {
     return this.bodyEl;
@@ -87,16 +100,22 @@ export class Modal {
     return this.footerEl;
   }
 
-  /** 在 header 右侧追加自定义工具按钮 */
+  /** 在 header 右侧追加自定义工具按钮（setTitle 重绘 header 时保留） */
   appendHeaderTool(el: HTMLElement) {
+    this.headerToolNodes.push(el);
     const tools = this.headerEl.querySelector('.sm-modal__header-tools');
     tools?.append(el);
+  }
+
+  get cardElement(): HTMLElement {
+    return this.card;
   }
 
   private _renderHeader() {
     this.headerEl.innerHTML = '';
     const title = h('div', { class: 'sm-modal__title' }, [this.opts.title]);
     const tools = h('div', { class: 'sm-modal__header-tools' });
+    for (const el of this.headerToolNodes) tools.append(el);
     const closeBtn = h(
       'button',
       {
