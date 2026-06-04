@@ -16,11 +16,14 @@ import type { InlineEditor, SelectionState } from './InlineEditor';
  *  - 按钮全部 mousedown.preventDefault：不抢焦点；select/color/url 这些
  *    必须 takeFocus 的控件不能 preventDefault，但因为 mousedown 已经存档了选区，
  *    onChange/onClick 时调 exec 即可。
- *  - 定位：贴在当前内联编辑根节点（正文容器）**上沿外**，不跟随选区以免压住文字；顶栏贴顶时落到下沿外。
+ *  - 定位：贴在当前内联编辑根节点（正文容器）**上沿外**，不跟随选区以免压住文字；
+ *    滚出中栏画布视口时钳制在 `.sm-canvas-wrap` 可见区域内（按需吸顶）。
  */
 export interface RichTextToolbarOptions {
   /** 工具条的定位上下文：rect 是相对该容器计算的 */
   positionRoot: HTMLElement;
+  /** 中栏画布滚动容器；省略时从 positionRoot 内查找 `.sm-canvas-wrap` */
+  scrollRoot?: HTMLElement;
 }
 
 const FONT_FAMILIES = [
@@ -54,6 +57,9 @@ export class RichTextToolbar {
   private listIndentGroup!: HTMLElement;
   private selectListIndent!: HTMLSelectElement;
   private syncingListIndentUi = false;
+  private scrollListenersBound = false;
+  private repositionRaf = 0;
+  private readonly boundReposition = () => this._scheduleReposition();
 
   constructor(opts: RichTextToolbarOptions) {
     this.opts = opts;
@@ -83,11 +89,17 @@ export class RichTextToolbar {
 
   show() {
     this.el.classList.add('is-visible');
+    this._bindScrollListeners();
   }
 
   hide() {
     this.el.classList.remove('is-visible');
     this.linkPanel.classList.remove('is-visible');
+    this._unbindScrollListeners();
+    if (this.repositionRaf) {
+      cancelAnimationFrame(this.repositionRaf);
+      this.repositionRaf = 0;
+    }
   }
 
   /** 由 InlineEditor 推选区状态进来 */
@@ -125,14 +137,12 @@ export class RichTextToolbar {
     this.selectFontWeight.value = matchFontWeight(f.fontWeight);
     this._syncListIndentUi(f.inList, f.listIndentPx);
 
-    const ed = this.editor;
-    requestAnimationFrame(() => {
-      if (!this.editor || ed !== this.editor || !this.el.classList.contains('is-visible')) return;
-      this._positionForAnchor(ed.getAnchorRect());
-    });
+    this._scheduleReposition();
   }
 
   destroy() {
+    this._unbindScrollListeners();
+    if (this.repositionRaf) cancelAnimationFrame(this.repositionRaf);
     this.el.remove();
   }
 
@@ -402,29 +412,76 @@ export class RichTextToolbar {
     this.inputLink.value = '';
   }
 
+  private _getScrollRoot(): HTMLElement {
+    return (
+      this.opts.scrollRoot ??
+      (this.opts.positionRoot.querySelector('.sm-canvas-wrap') as HTMLElement | null) ??
+      this.opts.positionRoot
+    );
+  }
+
+  private _scheduleReposition() {
+    if (this.repositionRaf) cancelAnimationFrame(this.repositionRaf);
+    const ed = this.editor;
+    this.repositionRaf = requestAnimationFrame(() => {
+      this.repositionRaf = 0;
+      if (!this.editor || ed !== this.editor || !this.el.classList.contains('is-visible')) return;
+      this._positionForAnchor(this.editor.getAnchorRect());
+    });
+  }
+
+  private _bindScrollListeners() {
+    if (this.scrollListenersBound) return;
+    this.scrollListenersBound = true;
+    const scrollRoot = this._getScrollRoot();
+    scrollRoot.addEventListener('scroll', this.boundReposition, { passive: true });
+    this.opts.positionRoot
+      .querySelector('.sm-body')
+      ?.addEventListener('scroll', this.boundReposition, { passive: true });
+    window.addEventListener('resize', this.boundReposition, { passive: true });
+  }
+
+  private _unbindScrollListeners() {
+    if (!this.scrollListenersBound) return;
+    this.scrollListenersBound = false;
+    const scrollRoot = this._getScrollRoot();
+    scrollRoot.removeEventListener('scroll', this.boundReposition);
+    this.opts.positionRoot
+      .querySelector('.sm-body')
+      ?.removeEventListener('scroll', this.boundReposition);
+    window.removeEventListener('resize', this.boundReposition);
+  }
+
   /**
-   * 相对 `positionRoot` 定位：默认贴在**正文容器**上沿上方，避免压在选区文字上；
-   * 若顶端空间不足则贴在容器下沿下方。
+   * 相对 `positionRoot` 定位：默认贴在**正文容器**上沿上方；
+   * 锚点滚出中栏画布视口时钳制在可见区域内（按需吸顶）。
    */
   private _positionForAnchor(anchor: DOMRect) {
     const rootRect = this.opts.positionRoot.getBoundingClientRect();
+    const viewRect = this._getScrollRoot().getBoundingClientRect();
     const gap = 6;
+    const edge = 8;
     const bar = this.el.getBoundingClientRect();
     const tw = bar.width || this.el.offsetWidth;
     const th = bar.height || this.el.offsetHeight || 40;
 
-    let top = anchor.top - rootRect.top - th - gap;
-    if (top < 8) {
-      top = anchor.bottom - rootRect.top + gap;
+    const viewTop = viewRect.top - rootRect.top + edge;
+    const viewBottom = viewRect.bottom - rootRect.top - th - edge;
+    const viewLeft = viewRect.left - rootRect.left + edge;
+    const viewRight = viewRect.right - rootRect.left - tw - edge;
+
+    const anchorTop = anchor.top - rootRect.top;
+    let top = anchorTop - th - gap;
+
+    if (top < viewTop) {
+      const belowAnchor = anchorTop + gap;
+      if (belowAnchor <= viewBottom) top = belowAnchor;
     }
 
-    const left = Math.max(
-      8,
-      Math.min(
-        anchor.left - rootRect.left + anchor.width / 2 - tw / 2,
-        rootRect.width - tw - 8,
-      ),
-    );
+    top = Math.max(viewTop, Math.min(top, viewBottom));
+
+    let left = anchor.left - rootRect.left + anchor.width / 2 - tw / 2;
+    left = Math.max(viewLeft, Math.min(left, viewRight));
 
     this.el.style.top = `${top}px`;
     this.el.style.left = `${left}px`;
