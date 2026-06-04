@@ -279,11 +279,21 @@ export class MailEditor {
     this.store.setSelection(null);
   }
 
-  /** 将画布恢复为构造时 `presetDoc`（或 `initialDoc`）对应的预置内容。 */
+  /**
+   * 将画布恢复为 `presetDoc` 快照（未传时等同构造时的预置合并结果）。
+   * 记入撤销栈（⌘Z 可恢复）；与 `setValue` 不同，不会清空 history。
+   */
   resetToPreset(): void {
+    this.canvas.commitInlineEdit();
     this._blurRightPanelIfFocused();
-    this.store.replace(structuredClone(this.presetContentDoc));
-    this._applyConfiguredVariables();
+    const preset = structuredClone(this.presetContentDoc);
+    const configuredVars = this.configuredVariables.length
+      ? this.configuredVariables.map((v) => ({ ...v }))
+      : null;
+    this.store.update((d) => {
+      Object.assign(d, preset);
+      if (configuredVars) d.variables = configuredVars;
+    });
     this.store.setSelection(null);
   }
 

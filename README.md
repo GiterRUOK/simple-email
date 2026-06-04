@@ -117,7 +117,7 @@ const { mjml, html } = editor.export({ withSampleVariables: true });
 | 按钮 | 行为 |
 |------|------|
 | **清空画布** | 移除所有 Section / Block；`meta`、`styles`、`variables` 不变。记入撤销栈（⌘Z 可恢复）。 |
-| **重置内容** | 整份替换为 **`presetDoc`** 快照（未传 `presetDoc` 时等同构造时的 `initialDoc` 合并结果）。**不**走撤销栈（与 `setValue` 相同，会清空 history）。 |
+| **重置内容** | 整份替换为 **`presetDoc`** 快照（未传 `presetDoc` 时等同构造时的 `initialDoc` 合并结果）。记入撤销栈（⌘Z 可恢复）。 |
 
 **宿主常见写法**：新建页 `initialDoc` 与 `presetDoc` 同为默认模板；编辑页 `initialDoc` 为接口返回的 `jsonContent`，`presetDoc` 仍为业务预置结构，避免「重置」把用户带回打开时的草稿。
 
