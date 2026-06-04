@@ -96,6 +96,7 @@ export class RightPanel {
   private currentTab: RightTab = 'props';
   private codeView: EditorView | null = null;
   private variablePickerOpen = false;
+  private variablePickerPinned = false;
   private variablePickerHandlers: VariablePickerHandlers | null = null;
 
   private _preferSliderControls(): boolean {
@@ -146,6 +147,7 @@ export class RightPanel {
   /** 在右栏展示变量列表（顶替属性面板，不遮挡画布） */
   openVariablePicker(vars: Variable[], handlers: VariablePickerHandlers) {
     this.variablePickerOpen = true;
+    this.variablePickerPinned = false;
     this.variablePickerHandlers = handlers;
     this._renderVariablePicker(vars);
   }
@@ -153,6 +155,7 @@ export class RightPanel {
   closeVariablePicker() {
     if (!this.variablePickerOpen) return;
     this.variablePickerOpen = false;
+    this.variablePickerPinned = false;
     this.variablePickerHandlers = null;
     this.el.classList.remove('sm-panel--variable-picker');
     clear(this.headEl);
@@ -163,6 +166,15 @@ export class RightPanel {
 
   isVariablePickerOpen(): boolean {
     return this.variablePickerOpen;
+  }
+
+  isVariablePickerPinned(): boolean {
+    return this.variablePickerPinned;
+  }
+
+  toggleVariablePickerPin(): boolean {
+    this.variablePickerPinned = !this.variablePickerPinned;
+    return this.variablePickerPinned;
   }
 
   /** 文档级（无选中）时不展示面包屑，避免与「邮件设置」标题重复 */
@@ -180,7 +192,13 @@ export class RightPanel {
     clear(this.contentEl);
     this.el.classList.add('sm-panel--variable-picker');
     this.headEl.hidden = false;
-    this.headEl.append(buildVariablePickerHead(() => handlers.onClose()));
+    this.headEl.append(
+      buildVariablePickerHead({
+        pinned: this.variablePickerPinned,
+        onClose: () => handlers.onClose(),
+        onTogglePin: () => this.toggleVariablePickerPin(),
+      }),
+    );
     this.contentEl.append(buildVariablePickerBody(vars, handlers));
   }
 

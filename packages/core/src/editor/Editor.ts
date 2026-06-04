@@ -596,11 +596,11 @@ export class MailEditor {
       this.rightPanel.openVariablePicker(vars, {
         onPickKey: (v) => {
           this.insertVariableKey(v);
-          this._closeVariablePicker();
+          if (!this.rightPanel.isVariablePickerPinned()) this._closeVariablePicker();
         },
         onPickElement: (v) => {
           this.insertVariableElement(v);
-          this._closeVariablePicker();
+          if (!this.rightPanel.isVariablePickerPinned()) this._closeVariablePicker();
         },
         onCopy: (token) => {
           void copyVariableToken(token).then((ok) => {
