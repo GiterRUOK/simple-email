@@ -113,6 +113,8 @@ export class MailEditor {
   private body: HTMLElement;
   /** 浮层（变量列表、toast），避免挂到 grid 的 .sm-root 上被挤成窄条 */
   private overlayLayer!: HTMLElement;
+  /** design 态右栏变量列表：未固定时点击外部收起 */
+  private variablePickerOutsideClick: ((ev: MouseEvent) => void) | null = null;
   private changeTimer: number | null = null;
   /** 显式品牌色时覆盖 CSS 变量；未设置则由 styles 按 light/dark 使用默认紫/靛 */
   private accentColorOverride: string | undefined;
@@ -429,6 +431,7 @@ export class MailEditor {
   }
 
   destroy() {
+    this._closeVariablePicker();
     this._unbindFullscreen();
     this._unbindTopbarLayoutWatch();
     this._unbindSystemThemeMqForAccent();
@@ -636,7 +639,31 @@ export class MailEditor {
     }, 60) as unknown as number;
   }
 
+  private _unbindVariablePickerOutsideClick() {
+    if (!this.variablePickerOutsideClick) return;
+    document.removeEventListener('click', this.variablePickerOutsideClick, true);
+    this.variablePickerOutsideClick = null;
+  }
+
+  private _bindVariablePickerOutsideClick(anchor: HTMLElement) {
+    this._unbindVariablePickerOutsideClick();
+    const handler = (ev: MouseEvent) => {
+      if (!this.rightPanel.isVariablePickerOpen() || this.rightPanel.isVariablePickerPinned()) return;
+      const target = ev.target as Node;
+      if (this.rightPanel.el.contains(target)) return;
+      if (anchor.contains(target) || target === anchor) return;
+      this._closeVariablePicker();
+    };
+    this.variablePickerOutsideClick = handler;
+    setTimeout(() => {
+      if (this.variablePickerOutsideClick === handler) {
+        document.addEventListener('click', handler, true);
+      }
+    }, 0);
+  }
+
   private _closeVariablePicker() {
+    this._unbindVariablePickerOutsideClick();
     if (!this.rightPanel.isVariablePickerOpen()) return;
     this.rightPanel.closeVariablePicker();
     this.topbar.setInsertVariableActive(false);
@@ -675,6 +702,7 @@ export class MailEditor {
         },
         onClose: () => this._closeVariablePicker(),
       });
+      this._bindVariablePickerOutsideClick(anchor);
       this.topbar.setInsertVariableActive(true);
       return;
     }
