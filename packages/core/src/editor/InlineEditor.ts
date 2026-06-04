@@ -20,10 +20,10 @@ import {
 } from '../utils/emailListStyles';
 import type { GlobalStyles } from '../types';
 import {
-  convertListTag,
+  applyListCommandForSelection,
   detectListFormats,
   findListItem,
-  findListRoot,
+  getListItemsInRange,
   getCaretTextOffsetAtRangeEnd,
   insertSelectionBoundaryMarkers,
   mergeListItemOnBackspace,
@@ -33,7 +33,6 @@ import {
   restoreCaretAfterListMutation,
   restoreCaretToEndOfListInSelectionBounds,
   splitListItemOnEnter,
-  unwrapList,
 } from '../utils/inlineListEditing';
 import {
   richTextExecCommand,
@@ -202,20 +201,15 @@ export class InlineEditor {
     const isListCmd = command === 'insertOrderedList' || command === 'insertUnorderedList';
     if (isListCmd && sel?.rangeCount) {
       const range = sel.getRangeAt(0);
-      const li = findListItem(sel.anchorNode, this.el);
-      const list = li ? findListRoot(li) : null;
+      const itemsInRange = range.collapsed
+        ? []
+        : getListItemsInRange(range, this.el);
       const savedOffset = getCaretTextOffsetAtRangeEnd(this.el, range);
       const boundaryMarkers = insertSelectionBoundaryMarkers(range);
       this.suppressListMerge = true;
       try {
-        if (list) {
-          const wantUl = command === 'insertUnorderedList';
-          const inUl = list.tagName === 'UL';
-          if (wantUl === inUl) {
-            unwrapList(list);
-          } else {
-            convertListTag(list, wantUl ? 'ul' : 'ol');
-          }
+        const wantUl = command === 'insertUnorderedList';
+        if (applyListCommandForSelection(this.el, range, wantUl, itemsInRange)) {
           restoreCaretAfterListMutation(this.el, boundaryMarkers.end, savedOffset);
         } else {
           richTextExecCommand('styleWithCSS', false, 'false');

@@ -548,6 +548,187 @@ export function mergeNextListItemOnDelete(li: HTMLLIElement, range: Range): bool
   return true;
 }
 
+function rangeIntersectsNode(range: Range, node: Node): boolean {
+  try {
+    const nodeRange = document.createRange();
+    nodeRange.selectNodeContents(node);
+    return (
+      range.compareBoundaryPoints(Range.END_TO_START, nodeRange) > -1 &&
+      range.compareBoundaryPoints(Range.START_TO_END, nodeRange) < 1
+    );
+  } catch {
+    return false;
+  }
+}
+
+function sortByDocumentOrder<T extends Node>(nodes: T[]): T[] {
+  return [...nodes].sort((a, b) => {
+    const pos = a.compareDocumentPosition(b);
+    if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+    if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+    return 0;
+  });
+}
+
+/** 选区触及的列表项（块级，按文档顺序） */
+export function getListItemsInRange(
+  range: Range,
+  root: HTMLElement,
+): HTMLLIElement[] {
+  const items: HTMLLIElement[] = [];
+  for (const node of root.querySelectorAll('li')) {
+    if (!(node instanceof HTMLLIElement)) continue;
+    if (!findListRoot(node)) continue;
+    if (!rangeIntersectsNode(range, node)) continue;
+    items.push(node);
+  }
+  return sortByDocumentOrder(items);
+}
+
+function copyListElementAttributes(from: ListElement, to: ListElement): void {
+  const indentAttr = from.getAttribute('data-sm-list-indent');
+  if (indentAttr != null) to.setAttribute('data-sm-list-indent', indentAttr);
+  const style = from.getAttribute('style');
+  if (style) to.setAttribute('style', style);
+}
+
+function appendListWithItems(
+  frag: DocumentFragment,
+  tag: 'ul' | 'ol',
+  source: ListElement,
+  items: HTMLLIElement[],
+): void {
+  if (!items.length) return;
+  const el = document.createElement(tag) as ListElement;
+  copyListElementAttributes(source, el);
+  items.forEach((li) => el.appendChild(li));
+  frag.appendChild(el);
+}
+
+function appendUnwrappedItems(frag: DocumentFragment, items: HTMLLIElement[]): void {
+  for (const li of items) {
+    const p = document.createElement('p');
+    while (li.firstChild) p.appendChild(li.firstChild);
+    if (!p.hasChildNodes()) p.appendChild(document.createElement('br'));
+    frag.appendChild(p);
+  }
+}
+
+type ListSegmentMiddle =
+  | 'unwrap'
+  | { tag: 'ul' | 'ol' };
+
+/** 将列表拆成前/中/后三段：中段改类型或取消列表 */
+function replaceListWithSegments(
+  list: ListElement,
+  before: HTMLLIElement[],
+  middle: HTMLLIElement[],
+  after: HTMLLIElement[],
+  middleMode: ListSegmentMiddle,
+): void {
+  const parent = list.parentNode;
+  if (!parent) return;
+
+  const origTag = list.tagName.toLowerCase() as 'ul' | 'ol';
+  const frag = document.createDocumentFragment();
+
+  appendListWithItems(frag, origTag, list, before);
+
+  if (middleMode === 'unwrap') {
+    appendUnwrappedItems(frag, middle);
+  } else {
+    appendListWithItems(frag, middleMode.tag, list, middle);
+  }
+
+  appendListWithItems(frag, origTag, list, after);
+
+  parent.insertBefore(frag, list);
+  list.remove();
+}
+
+function applyListTypeToWholeList(list: ListElement, wantUl: boolean): void {
+  const inUl = list.tagName === 'UL';
+  const toggleOff = wantUl === inUl;
+  if (toggleOff) unwrapList(list);
+  else convertListTag(list, wantUl ? 'ul' : 'ol');
+}
+
+/**
+ * 切换列表类型。
+ * - 折叠光标在列表内：整表转换/取消。
+ * - 有选区：仅影响选区触及的 li；选满整表时仍整表处理。
+ * wantUl=true 为无序；与当前类型相同时为取消列表。
+ */
+export function applyListCommandForSelection(
+  root: HTMLElement,
+  range: Range,
+  wantUl: boolean,
+  /** 非折叠选区在 DOM 变更前算好的 li；折叠时忽略 */
+  affectedItems?: HTMLLIElement[],
+): boolean {
+  if (range.collapsed) {
+    const li = findListItem(range.startContainer, root);
+    const list = li ? findListRoot(li) : null;
+    if (!list) return false;
+    applyListTypeToWholeList(list, wantUl);
+    return true;
+  }
+
+  const items = affectedItems ?? getListItemsInRange(range, root);
+  if (!items.length) return false;
+
+  const byList = new Map<ListElement, HTMLLIElement[]>();
+  for (const li of items) {
+    const list = findListRoot(li);
+    if (!list) continue;
+    const group = byList.get(list) ?? [];
+    group.push(li);
+    byList.set(list, group);
+  }
+
+  const lists = sortByDocumentOrder([...byList.keys()]).reverse();
+
+  for (const list of lists) {
+    const selected = sortByDocumentOrder(byList.get(list) ?? []);
+    const allItems = Array.from(list.children).filter(
+      (c): c is HTMLLIElement => c.tagName === 'LI',
+    );
+    const selectedSet = new Set(selected);
+    const allSelected =
+      selected.length === allItems.length &&
+      allItems.every((li) => selectedSet.has(li));
+
+    if (allSelected) {
+      applyListTypeToWholeList(list, wantUl);
+      continue;
+    }
+
+    const inUl = list.tagName === 'UL';
+    const toggleOff = wantUl === inUl;
+
+    const indices = selected
+      .map((li) => allItems.indexOf(li))
+      .filter((i) => i >= 0)
+      .sort((a, b) => a - b);
+    if (!indices.length) continue;
+
+    const firstIdx = indices[0]!;
+    const lastIdx = indices[indices.length - 1]!;
+    const before = allItems.slice(0, firstIdx);
+    const middle = allItems.slice(firstIdx, lastIdx + 1);
+    const after = allItems.slice(lastIdx + 1);
+
+    if (toggleOff) {
+      replaceListWithSegments(list, before, middle, after, 'unwrap');
+    } else {
+      replaceListWithSegments(list, before, middle, after, {
+        tag: wantUl ? 'ul' : 'ol',
+      });
+    }
+  }
+  return true;
+}
+
 /** 取消列表：每个 li 拆成段落 */
 export function unwrapList(list: HTMLUListElement | HTMLOListElement): void {
   const parent = list.parentNode;
