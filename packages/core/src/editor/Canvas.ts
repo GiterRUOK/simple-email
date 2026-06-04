@@ -101,7 +101,13 @@ export class Canvas {
 
     this._render();
 
-    opts.store.subscribe(() => {
+    opts.store.subscribe((detail) => {
+      // 编辑态下若走了文档级 undo/redo，必须丢弃未提交 DOM，否则失焦提交会与 store 脱节（整节消失等）
+      if (this.editingBlockId && detail?.source === 'history') {
+        this.abortInlineEdit();
+        this._render();
+        return;
+      }
       if (this.editingBlockId) {
         this.pendingRender = true;
         return;
@@ -123,6 +129,30 @@ export class Canvas {
   /** 强制提交并退出当前内联编辑（切换源码模式、destroy 前等场景） */
   commitInlineEdit() {
     this.inlineEditor?.commit();
+  }
+
+  get isInlineEditing(): boolean {
+    return this.editingBlockId != null;
+  }
+
+  /**
+   * 放弃未提交的内联编辑（不写入 store）。
+   * 用于文档级撤销/重做：编辑期间画布不重绘，若直接 undo 会导致 DOM 与 doc 不一致。
+   */
+  abortInlineEdit() {
+    if (!this.editingBlockId) return;
+    const id = this.editingBlockId;
+    this.editingBlockId = null;
+    this.pendingRender = false;
+    if (this.inlineEditor) {
+      this.inlineEditor.destroy(false);
+      this.inlineEditor = null;
+    }
+    this.opts.toolbar.detach();
+    const blockEl = this.inner.querySelector(
+      `.sm-block[data-id="${cssEscape(id)}"]`,
+    ) as HTMLElement | null;
+    blockEl?.classList.remove('is-editing');
   }
 
   /** 强制重绘（内联编辑中会延迟到 commit 后） */

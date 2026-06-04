@@ -156,8 +156,10 @@ export class MailEditor {
   };
 
   /**
-   * 文档级撤销/重做（捕获阶段）：焦点在右栏 input/CodeMirror 内时，冒泡到 root 的监听太晚，
-   * 浏览器会先处理控件内撤销；仅在 store 仍有历史时拦截并走全局 undo/redo。
+   * 文档级撤销/重做（捕获阶段）。
+   * - 画布内联 contenteditable：交给浏览器撤销文字，不走 store。
+   * - 右栏 input / CodeMirror：控件自带撤销，不走 store。
+   * - 其余区域：在 store 有历史时拦截并 undo/redo 整份文档。
    */
   private _mailUndoRedoHandler = (e: KeyboardEvent) => {
     const meta = e.metaKey || e.ctrlKey;
@@ -166,14 +168,39 @@ export class MailEditor {
     if (k !== 'z') return;
     const t = e.target as Node | null;
     if (!t || !this.root.contains(t)) return;
+    if (this._shouldDeferToLocalUndoRedo(t)) return;
     const undo = !e.shiftKey;
     const redo = e.shiftKey;
     if (undo && !this.store.canUndo()) return;
     if (redo && !this.store.canRedo()) return;
     e.preventDefault();
-    if (undo) this.store.undo();
-    else this.store.redo();
+    if (undo) this._storeUndo();
+    else this._storeRedo();
   };
+
+  /** 内联编辑、右栏表单等应使用控件/浏览器本地撤销，而非文档 history */
+  private _shouldDeferToLocalUndoRedo(target: Node): boolean {
+    const el =
+      target instanceof Element ? target : (target.parentElement as Element | null);
+    if (!el) return false;
+    if (el.closest('.sm-inline-editing')) return true;
+    if (el.closest('.cm-editor')) return true;
+    const panelField = el.closest('.sm-panel--right input, .sm-panel--right textarea, .sm-panel--right select');
+    if (panelField) return true;
+    return false;
+  }
+
+  private _storeUndo() {
+    if (this.canvas.isInlineEditing) this.canvas.abortInlineEdit();
+    this._blurRightPanelIfFocused();
+    this.store.undo();
+  }
+
+  private _storeRedo() {
+    if (this.canvas.isInlineEditing) this.canvas.abortInlineEdit();
+    this._blurRightPanelIfFocused();
+    this.store.redo();
+  }
 
   constructor(opts: EditorOptions) {
     this.opts = opts;
@@ -435,10 +462,10 @@ export class MailEditor {
       onThemeChange: (t) => this.setTheme(t),
       onModeChange: (m) => this._setMode(m),
       onUndo: () => {
-        this.store.undo();
+        this._storeUndo();
       },
       onRedo: () => {
-        this.store.redo();
+        this._storeRedo();
       },
       onMailSettings: () => this._focusMailSettings(),
       showMailSettingsButton: this.opts.ui?.hideTopbarMailSettings !== true,
