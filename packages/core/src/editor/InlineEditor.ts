@@ -24,12 +24,14 @@ import {
   detectListFormats,
   findListItem,
   findListRoot,
-  getCaretTextOffset,
-  insertCaretMarker,
+  getCaretTextOffsetAtRangeEnd,
+  insertSelectionBoundaryMarkers,
   mergeListItemOnBackspace,
   mergeAdjacentSameTypeLists,
   mergeNextListItemOnDelete,
+  removeSelectionBoundaryMarkers,
   restoreCaretAfterListMutation,
+  restoreCaretToEndOfListInSelectionBounds,
   splitListItemOnEnter,
   unwrapList,
 } from '../utils/inlineListEditing';
@@ -112,6 +114,8 @@ export class InlineEditor {
   private edited = false;
   /** 是否曾有过文本（含空格）；用于区分「仅换行」与「输入后清空残留的 <br>」 */
   private hadTextInSession = false;
+  /** 工具条执行列表命令时，跳过 input 里的相邻列表合并（避免合并后再用旧偏移恢复光标） */
+  private suppressListMerge = false;
 
   constructor(opts: InlineEditorOptions) {
     this.opts = opts;
@@ -200,24 +204,33 @@ export class InlineEditor {
       const range = sel.getRangeAt(0);
       const li = findListItem(sel.anchorNode, this.el);
       const list = li ? findListRoot(li) : null;
-      const savedOffset = getCaretTextOffset(this.el, range);
-      const marker = range.collapsed ? insertCaretMarker(range) : null;
-      if (list) {
-        const wantUl = command === 'insertUnorderedList';
-        const inUl = list.tagName === 'UL';
-        if (wantUl === inUl) {
-          unwrapList(list);
+      const savedOffset = getCaretTextOffsetAtRangeEnd(this.el, range);
+      const boundaryMarkers = insertSelectionBoundaryMarkers(range);
+      this.suppressListMerge = true;
+      try {
+        if (list) {
+          const wantUl = command === 'insertUnorderedList';
+          const inUl = list.tagName === 'UL';
+          if (wantUl === inUl) {
+            unwrapList(list);
+          } else {
+            convertListTag(list, wantUl ? 'ul' : 'ol');
+          }
+          restoreCaretAfterListMutation(this.el, boundaryMarkers.end, savedOffset);
         } else {
-          convertListTag(list, wantUl ? 'ul' : 'ol');
+          richTextExecCommand('styleWithCSS', false, 'false');
+          richTextExecCommand(command, false, value);
+          if (!restoreCaretToEndOfListInSelectionBounds(this.el)) {
+            restoreCaretAfterListMutation(this.el, boundaryMarkers.end, savedOffset);
+          }
         }
-        restoreCaretAfterListMutation(this.el, marker, savedOffset);
-        this.saveSelection();
-        this._emitSelection();
-        return;
+      } finally {
+        this.suppressListMerge = false;
+        removeSelectionBoundaryMarkers(this.el);
       }
-      richTextExecCommand('styleWithCSS', false, 'false');
-      richTextExecCommand(command, false, value);
-      restoreCaretAfterListMutation(this.el, marker, savedOffset);
+      this.saveSelection();
+      this._emitSelection();
+      return;
     } else {
       richTextExecCommand('styleWithCSS', false, isListCmd ? 'false' : 'true');
       richTextExecCommand(command, false, value);
@@ -522,7 +535,7 @@ export class InlineEditor {
     const onInput = () => {
       markEdited();
       syncTextPresence();
-      if (mode === 'rich' && multiline) {
+      if (mode === 'rich' && multiline && !this.suppressListMerge) {
         mergeAdjacentSameTypeLists(el);
       }
       onSelChange();

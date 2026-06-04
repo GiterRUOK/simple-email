@@ -1,5 +1,8 @@
 /** contenteditable 内 ul/ol 的 Enter / Backspace / 退出列表等 DOM 操作 */
 
+/** 空列表项 Enter 退出后插入的正文段，勿当作可合并的分隔块 */
+export const LIST_GAP_ATTR = 'data-sm-list-gap';
+
 export function findListItem(node: Node | null, root: HTMLElement): HTMLLIElement | null {
   while (node && node !== root) {
     if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'LI') {
@@ -25,6 +28,7 @@ type ListElement = HTMLUListElement | HTMLOListElement;
 
 /** 两个列表之间可忽略的分隔块（空段落、仅含 br 的 div 等） */
 export function isIgnorableListSeparator(el: Element): boolean {
+  if (el.hasAttribute(LIST_GAP_ATTR)) return false;
   if (el.tagName !== 'P' && el.tagName !== 'DIV') return false;
   const clone = el.cloneNode(true) as HTMLElement;
   clone.querySelectorAll('br').forEach((br) => br.remove());
@@ -91,11 +95,24 @@ export function isCaretAtLiStart(li: HTMLLIElement, range: Range): boolean {
   return probe.toString().replace(/\u200b/g, '').length === 0;
 }
 
+function fragmentHasSubstantiveText(frag: DocumentFragment): boolean {
+  const box = document.createElement('div');
+  box.appendChild(frag);
+  box.querySelectorAll('br').forEach((br) => br.remove());
+  return (box.textContent ?? '').replace(/\u200b/g, '').trim().length > 0;
+}
+
+/** 光标后是否仅剩 br / 空块等可忽略内容（视为处于列表项末尾） */
 export function isCaretAtLiEnd(li: HTMLLIElement, range: Range): boolean {
-  const probe = document.createRange();
-  probe.selectNodeContents(li);
-  probe.setStart(range.endContainer, range.endOffset);
-  return probe.toString().replace(/\u200b/g, '').length === 0;
+  const after = document.createRange();
+  try {
+    after.setStart(range.endContainer, range.endOffset);
+    if (li.lastChild) after.setEndAfter(li.lastChild);
+    else after.setEnd(li, 0);
+  } catch {
+    return false;
+  }
+  return !fragmentHasSubstantiveText(after.cloneContents());
 }
 
 export function placeCaretInElement(el: HTMLElement, atStart: boolean): void {
@@ -164,12 +181,12 @@ export function getElementVisibleTextLength(el: HTMLElement): number {
 }
 
 const CARET_MARKER_ATTR = 'data-sm-caret';
+const RANGE_START_MARKER_ATTR = 'data-sm-sel-start';
 
-/** 在折叠光标处插入临时标记（空行/空列表项时比文本偏移更准） */
-export function insertCaretMarker(range: Range): HTMLSpanElement | null {
+function insertBoundaryMarker(range: Range, attr: string): HTMLSpanElement | null {
   if (!range.collapsed) return null;
   const marker = document.createElement('span');
-  marker.setAttribute(CARET_MARKER_ATTR, '1');
+  marker.setAttribute(attr, '1');
   marker.appendChild(document.createTextNode('\u200b'));
   try {
     range.insertNode(marker);
@@ -178,6 +195,51 @@ export function insertCaretMarker(range: Range): HTMLSpanElement | null {
     marker.remove();
     return null;
   }
+}
+
+/** 在折叠光标处插入临时标记（空行/空列表项时比文本偏移更准） */
+export function insertCaretMarker(range: Range): HTMLSpanElement | null {
+  return insertBoundaryMarker(range, CARET_MARKER_ATTR);
+}
+
+/** 在选区起止处插入边界标记（用于列表命令后定位新建列表） */
+export function insertSelectionBoundaryMarkers(range: Range): {
+  start: HTMLSpanElement | null;
+  end: HTMLSpanElement | null;
+} {
+  const startRange = range.cloneRange();
+  startRange.collapse(true);
+  const endRange = range.cloneRange();
+  endRange.collapse(false);
+  return {
+    start: insertBoundaryMarker(startRange, RANGE_START_MARKER_ATTR),
+    end: insertBoundaryMarker(endRange, CARET_MARKER_ATTR),
+  };
+}
+
+/** 在选区末尾插入光标标记（列表等命令后应落在选区末端） */
+export function insertCaretMarkerAtRangeEnd(range: Range): HTMLSpanElement | null {
+  const atEnd = range.cloneRange();
+  atEnd.collapse(false);
+  return insertCaretMarker(atEnd);
+}
+
+export function removeSelectionBoundaryMarkers(root: HTMLElement): void {
+  root
+    .querySelectorAll(
+      `span[${RANGE_START_MARKER_ATTR}="1"], span[${CARET_MARKER_ATTR}="1"]`,
+    )
+    .forEach((m) => m.remove());
+}
+
+/** 选区末尾在容器内的可见文本偏移 */
+export function getCaretTextOffsetAtRangeEnd(
+  container: HTMLElement,
+  range: Range,
+): number {
+  const atEnd = range.cloneRange();
+  atEnd.collapse(false);
+  return getCaretTextOffset(container, atEnd);
 }
 
 /** 将光标恢复到标记处并移除标记 */
@@ -195,6 +257,78 @@ export function restoreCaretMarker(root: HTMLElement): boolean {
   sel.removeAllRanges();
   sel.addRange(range);
   return true;
+}
+
+function normalizeSelectionSpan(start: Node, end: Node): { anchor: Node; far: Node } {
+  if (start.compareDocumentPosition(end) & Node.DOCUMENT_POSITION_FOLLOWING) {
+    return { anchor: start, far: end };
+  }
+  return { anchor: end, far: start };
+}
+
+function listInSelectionSpan(list: Element, start: Node, end: Node): boolean {
+  if (list.contains(start) || list.contains(end)) return true;
+
+  const { anchor, far } = normalizeSelectionSpan(start, end);
+  const afterAnchor =
+    (list.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+  const beforeFar =
+    (list.compareDocumentPosition(far) & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
+  return afterAnchor && beforeFar;
+}
+
+function lastListInDocumentOrder(lists: ListElement[]): ListElement | null {
+  let best: ListElement | null = null;
+  for (const list of lists) {
+    if (
+      !best ||
+      (best.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    ) {
+      best = list;
+    }
+  }
+  return best;
+}
+
+function placeCaretAtEndOfList(list: ListElement): boolean {
+  const items = Array.from(list.children).filter(
+    (c): c is HTMLLIElement => c.tagName === 'LI',
+  );
+  const lastLi = items[items.length - 1];
+  if (!lastLi) return false;
+  placeCaretAtEndOfElement(lastLi);
+  return true;
+}
+
+/**
+ * 新建列表后：光标落在选区范围内（起止标记之间）文档顺序最靠后的列表末项。
+ * 空行选中时末端标记常落在上方已有列表内，不能只看「标记所在列表」。
+ */
+export function restoreCaretToEndOfListInSelectionBounds(root: HTMLElement): boolean {
+  const start = root.querySelector(`span[${RANGE_START_MARKER_ATTR}="1"]`);
+  const end = root.querySelector(`span[${CARET_MARKER_ATTR}="1"]`);
+  if (
+    !(start instanceof HTMLSpanElement) ||
+    !(end instanceof HTMLSpanElement) ||
+    !root.contains(start) ||
+    !root.contains(end)
+  ) {
+    return false;
+  }
+
+  const matched: ListElement[] = [];
+  for (const node of root.querySelectorAll('ul, ol')) {
+    if (!(node instanceof HTMLElement) || !root.contains(node)) continue;
+    const list = node as ListElement;
+    if (listInSelectionSpan(list, start, end)) matched.push(list);
+  }
+
+  start.remove();
+  end.remove();
+
+  const target = lastListInDocumentOrder(matched);
+  if (!target) return false;
+  return placeCaretAtEndOfList(target);
 }
 
 /** 列表操作后恢复光标：优先标记点，否则文本偏移 */
@@ -229,6 +363,7 @@ export function exitListFromEmptyItem(li: HTMLLIElement): void {
   li.remove();
 
   const p = document.createElement('p');
+  p.setAttribute(LIST_GAP_ATTR, '1');
   p.appendChild(document.createElement('br'));
 
   if (list.children.length === 0) {
@@ -281,14 +416,22 @@ export function splitListItemOnEnter(li: HTMLLIElement, range: Range): void {
   if (li.lastChild) tailRange.setEndAfter(li.lastChild);
   else tailRange.setEnd(li, 0);
 
-  const newLi = document.createElement('li');
-  const fragment = tailRange.extractContents();
-  if ((fragment.textContent ?? '').replace(/\u200b/g, '').trim()) {
-    newLi.appendChild(fragment);
-  } else {
+  const tailProbe = document.createRange();
+  tailProbe.setStart(range.startContainer, range.startOffset);
+  if (li.lastChild) tailProbe.setEndAfter(li.lastChild);
+  else tailProbe.setEnd(li, 0);
+  if (!fragmentHasSubstantiveText(tailProbe.cloneContents())) {
+    const newLi = document.createElement('li');
     newLi.appendChild(document.createElement('br'));
+    if (li.nextSibling) list.insertBefore(newLi, li.nextSibling);
+    else list.appendChild(newLi);
+    placeCaretInElement(newLi, true);
+    return;
   }
 
+  const newLi = document.createElement('li');
+  const fragment = tailRange.extractContents();
+  newLi.appendChild(fragment);
   ensureLiHasPlaceholder(li);
 
   if (li.nextSibling) list.insertBefore(newLi, li.nextSibling);
