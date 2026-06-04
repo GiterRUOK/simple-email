@@ -288,6 +288,12 @@ export interface EditorUiOptions {
    * 仍注册、渲染、可被 palette 展开引用，但不显示在左栏的 block type（如组合块内部用的 divider）。
    */
   hiddenPaletteBlockTypes?: string[];
+  /**
+   * 为 true 时：右栏 Section 可配置「动态变量名」、画布展示动态变量节标识，
+   * 左栏拖入带 `sectionAttrs.dynamicVariantKey` 的组合块会创建动态变量 Section。
+   * 默认 false；宿主（如后管）按需开启。已写入文档的 key 仍会在导出时生效。
+   */
+  enableDynamicVariantKey?: boolean;
 }
 
 export interface EditorEvents {

@@ -169,6 +169,7 @@ editor.getTheme();
 | `hideTopbarFullscreen?: boolean` | 隐藏顶栏全屏按钮。 |
 | `hideTopbarClearCanvas?: boolean` | 隐藏顶栏「清空画布」。 |
 | `hideTopbarResetContent?: boolean` | 隐藏顶栏「重置内容」。 |
+| `enableDynamicVariantKey?: boolean` | 为 `true` 时右栏 Section 可填「动态变量名」、画布标识动态变量节，palette 可创建带 `dynamicVariantKey` 的 Section。默认 `false`；已写入文档的 key 导出仍生效。 |
 
 ### 构造选项（画布行为）
 

@@ -10,6 +10,7 @@ import {
 import type {
   Block,
   Column,
+  EditorUiOptions,
   EmailDoc,
   PaletteDropResult,
   RenderContext,
@@ -48,6 +49,8 @@ export interface CanvasOptions {
    * 应传入 MailEditor 根节点；若挂到 `document.body`，`var(--sm-code-bg)` 等会失效，弹框背景会变透明。
    */
   layerRoot: HTMLElement;
+  /** 与 MailEditor.opts.ui 对齐 */
+  ui?: EditorUiOptions;
 }
 
 /**
@@ -333,7 +336,10 @@ export class Canvas {
     }px ${a.paddingLeft ?? 0}px`;
 
     const layoutShort = layoutHumanLabel(section.layout);
-    const dvKey = getSectionDynamicVariantKey(section);
+    const dvKey =
+      this.opts.ui?.enableDynamicVariantKey === true
+        ? getSectionDynamicVariantKey(section)
+        : undefined;
     const sectionChip = dvKey
       ? `动态变量 ${sectionIndex + 1} · {{${dvKey}}}`
       : `区块 ${sectionIndex + 1} · ${layoutShort}`;
@@ -820,6 +826,16 @@ export class Canvas {
     }
   }
 
+  /** 未开启 `enableDynamicVariantKey` 时剥离 palette 上的动态变量节属性 */
+  private _paletteSectionAttrsForDrop(
+    sectionAttrs?: Partial<SectionAttrs>,
+  ): Partial<SectionAttrs> | undefined {
+    if (!sectionAttrs) return undefined;
+    if (this.opts.ui?.enableDynamicVariantKey === true) return sectionAttrs;
+    const { dynamicVariantKey: _dv, ...rest } = sectionAttrs;
+    return Object.keys(rest).length ? rest : undefined;
+  }
+
   private _handleSectionAdd(e: Sortable.SortableEvent) {
     this._commitEditingBeforeStructureChange();
     const item = e.item;
@@ -843,7 +859,7 @@ export class Canvas {
       item.parentElement?.removeChild(item);
       const { blocks, sectionAttrs } = this._resolvePaletteDrop(blockType);
       const newSection = createSection('1');
-      this._applySectionAttrs(newSection, sectionAttrs);
+      this._applySectionAttrs(newSection, this._paletteSectionAttrsForDrop(sectionAttrs));
       newSection.columns[0].blocks.splice(newIndex, 0, ...blocks);
       this.opts.store.update((d) => {
         d.sections.splice(newIndex, 0, newSection);
@@ -909,9 +925,10 @@ export class Canvas {
     if (sourceGroup === 'blocks' && blockType) {
       item.parentElement?.removeChild(item);
       const drop = this._resolvePaletteDrop(blockType);
-      if (drop.sectionAttrs?.dynamicVariantKey) {
+      const paletteSectionAttrs = this._paletteSectionAttrsForDrop(drop.sectionAttrs);
+      if (paletteSectionAttrs?.dynamicVariantKey) {
         const newSection = createSection('1');
-        this._applySectionAttrs(newSection, drop.sectionAttrs);
+        this._applySectionAttrs(newSection, paletteSectionAttrs);
         newSection.columns[0].blocks.push(...drop.blocks);
         this.opts.store.update((d) => {
           const secIdx = d.sections.findIndex((s) => s.id === sectionId);

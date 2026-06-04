@@ -543,6 +543,7 @@ export class MailEditor {
       autoWrapSection: autoWrap,
       clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin === true,
       layerRoot: this.root,
+      ui: this.opts.ui,
     });
     this.rightPanel = new RightPanel({
       store: this.store,

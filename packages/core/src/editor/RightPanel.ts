@@ -461,24 +461,34 @@ export class RightPanel {
 
   private _renderSectionForm(section: Section): HTMLElement {
     const a = section.attrs;
-    const dvKey = getSectionDynamicVariantKey(section);
+    const dvUiEnabled = this.opts.ui?.enableDynamicVariantKey === true;
+    const dvKey = dvUiEnabled ? getSectionDynamicVariantKey(section) : undefined;
+    const dynamicVariantKeyField = dvUiEnabled
+      ? (() => {
+          const field = this._textField(
+            '动态变量名',
+            a.dynamicVariantKey ?? '',
+            (v) =>
+              this.opts.store.update((d) => {
+                const s = findSection(d, section.id);
+                if (!s) return;
+                const trimmed = v.trim();
+                s.attrs.dynamicVariantKey = trimmed || undefined;
+              }),
+            '谨慎填写，需确认业务场景是否支持',
+            `section:${section.id}:attrs.dynamicVariantKey`,
+          );
+          field.append(
+            h('div', { class: 'sm-field__help' }, ['本段内容将整体替换成该动态变量名']),
+          );
+          return field;
+        })()
+      : null;
     return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, [
       h('div', { class: 'sm-panel__title' }, [
         dvKey ? '动态变量 Section' : 'Section 设置',
       ]),
-      this._textField(
-        '动态变量名',
-        a.dynamicVariantKey ?? '',
-        (v) =>
-          this.opts.store.update((d) => {
-            const s = findSection(d, section.id);
-            if (!s) return;
-            const trimmed = v.trim();
-            s.attrs.dynamicVariantKey = trimmed || undefined;
-          }),
-        '如 couponGroup；导出 HTML 根节点带 data-dv=该值',
-        `section:${section.id}:attrs.dynamicVariantKey`,
-      ),
+      ...(dynamicVariantKeyField ? [dynamicVariantKeyField] : []),
       ...(isMultiColumnLayout(section.layout)
         ? [
             this._multiColumnLayoutField(
