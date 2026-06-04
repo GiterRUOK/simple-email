@@ -34,6 +34,8 @@
   /* 展示边框：Section 100% · Block 70%；hover 用 --sm-primary */
   --sm-outline-layout-section: var(--sm-outline-muted);
   --sm-outline-layout-block: color-mix(in srgb, var(--sm-outline-muted) 70%, transparent);
+  /* Block 交互时外层 Section 弱描边（弱于 Block 主色 hover） */
+  --sm-outline-section-context: color-mix(in srgb, var(--sm-primary) 30%, transparent);
   --sm-empty-column-border: #d6d8dd;
   --sm-empty-column-stripe: rgba(0, 0, 0, 0.02);
   --sm-on-primary: #ffffff;
@@ -744,7 +746,7 @@
 .sm-section-host.is-selected .sm-section.sm-section--dynamic-variant {
   outline-color: var(--sm-primary);
 }
-/* 展示边框：Section 更深；内层 Block 交互时弱化外层，避免框中框 */
+/* 展示边框：Section 更深；内层 Block 交互时外层改为弱描边，避免与 Block 主色框叠成「双强框」 */
 .sm-root.sm-show-layout-borders .sm-section-host:not(.is-selected) .sm-section {
   outline-color: var(--sm-outline-layout-section);
 }
@@ -753,10 +755,17 @@
   .sm-section {
   outline-offset: -2px;
 }
+.sm-section-host:not(.is-selected):has(.sm-block:hover, .sm-block.is-selected, .sm-block.is-editing)
+  .sm-section,
 .sm-root.sm-show-layout-borders
   .sm-section-host:not(.is-selected):has(.sm-block:hover, .sm-block.is-selected, .sm-block.is-editing)
   .sm-section {
-  outline-color: transparent;
+  outline-color: var(--sm-outline-section-context);
+  outline-offset: 0;
+}
+.sm-section-host:not(.is-selected):has(.sm-block:hover, .sm-block.is-selected, .sm-block.is-editing)
+  .sm-section.sm-section--dynamic-variant {
+  outline-color: var(--sm-outline-section-context);
 }
 .sm-section-host:hover:not(.is-selected):not(:has(.sm-block:hover, .sm-block.is-selected, .sm-block.is-editing))
   .sm-section {
