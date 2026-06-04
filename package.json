@@ -1,8 +1,8 @@
 {
   "name": "mail-editor-pancake",
-  "version": "0.0.9",
+  "version": "0.1.0",
   "private": false,
-  "description": "面向运营的轻量邮件可视化编辑器（monorepo 根）",
+  "description": "面向运营的轻量邮件可视化编辑器",
   "scripts": {
     "dev": "pnpm --filter @simple-mail/playground-vanilla dev",
     "build": "pnpm -r --filter \"./packages/*\" build",
