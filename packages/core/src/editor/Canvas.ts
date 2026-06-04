@@ -76,6 +76,9 @@ export class Canvas {
   private pendingRender = false;
   /** 设计模式下禁用画布内超链接导航（预览弹框 iframe 不在此 DOM 内，不受影响） */
   private linkNavSuppression = new AbortController();
+  /** clearSelectionOnCanvasMargin：记录本次指针是否从编辑区内按下（区分拖选松手 vs 点空白退出） */
+  private clearSelectionGestureTracking = new AbortController();
+  private pointerGestureStartedInInlineEdit = false;
   private blockCodeModal: BlockCodeModal;
 
   constructor(opts: CanvasOptions) {
@@ -92,6 +95,7 @@ export class Canvas {
 
     this._bindDesignModeLinkSuppression();
     if (opts.clearSelectionOnCanvasMargin) {
+      this._bindClearSelectionGestureTracking();
       this._bindClearSelectionOnCanvasWhitespace();
       this._bindClearSelectionOnCanvasMargin();
     }
@@ -167,9 +171,44 @@ export class Canvas {
 
   destroy() {
     this.linkNavSuppression.abort();
+    this.clearSelectionGestureTracking.abort();
     this._exitEditing(false);
     this._destroySortables();
     this.blockCodeModal.destroy();
+  }
+
+  /**
+   * clearSelectionOnCanvasMargin：mousedown 在编辑区内、mouseup 落在灰底/留白时，
+   * 浏览器仍可能对 mouseup 目标派发 click；需与 Section padding 的拖选抑制同理。
+   */
+  private _bindClearSelectionGestureTracking() {
+    const opts = { capture: true, signal: this.clearSelectionGestureTracking.signal } as const;
+    document.addEventListener(
+      'mousedown',
+      (e: MouseEvent) => {
+        if (e.button !== 0) {
+          this.pointerGestureStartedInInlineEdit = false;
+          return;
+        }
+        if (!this.editingBlockId) {
+          this.pointerGestureStartedInInlineEdit = false;
+          return;
+        }
+        const editingEl = this.inner.querySelector('.sm-inline-editing');
+        if (!editingEl) {
+          this.pointerGestureStartedInInlineEdit = false;
+          return;
+        }
+        const t = e.target;
+        if (!(t instanceof Node)) {
+          this.pointerGestureStartedInInlineEdit = false;
+          return;
+        }
+        const node = t.nodeType === Node.TEXT_NODE ? t.parentNode : t;
+        this.pointerGestureStartedInInlineEdit = !!(node && editingEl.contains(node));
+      },
+      opts,
+    );
   }
 
   /**
@@ -183,6 +222,7 @@ export class Canvas {
       const el = t instanceof Element ? t : t.parentElement;
       if (!el) return;
       if (el === this.inner || el.closest('.sm-empty-doc')) {
+        if (this._shouldSuppressClearSelectionFromTextDrag()) return;
         this.commitInlineEdit();
         this.opts.store.setSelection(null);
       }
@@ -197,6 +237,7 @@ export class Canvas {
       if (!this.el.contains(t)) return;
       if (this.inner.contains(t)) return;
       if (this.addBar.contains(t)) return;
+      if (this._shouldSuppressClearSelectionFromTextDrag()) return;
       this.commitInlineEdit();
       this.opts.store.setSelection(null);
     });
@@ -984,9 +1025,16 @@ export class Canvas {
   }
 
   /**
-   * 内联编辑中拖选文字，若 mouseup 落在 Section padding 等非 Block 区域，
-   * 浏览器仍会向 Section 冒泡 click；此时选区仍在编辑区内，不应切换右侧面板到 Section。
+   * 内联编辑中从编辑区拖选文字，若 mouseup 落在 Section padding / 灰底 / 留白，
+   * 浏览器仍可能对 mouseup 目标派发 click；选区仍在编辑区内时不应提交或改选中。
    */
+  private _shouldSuppressClearSelectionFromTextDrag(): boolean {
+    return (
+      this.pointerGestureStartedInInlineEdit &&
+      this._shouldSuppressSectionSelectFromTextInteraction()
+    );
+  }
+
   private _shouldSuppressSectionSelectFromTextInteraction(): boolean {
     if (!this.editingBlockId) return false;
     const editingEl = this.inner.querySelector('.sm-inline-editing');
