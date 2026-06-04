@@ -719,17 +719,29 @@
   font-weight: bolder;
 }
 
-.sm-canvas .sm-text-content :where(ul, ol) {
+.sm-canvas .sm-text-content :where(ul:not([data-sm-list-indent]), ol:not([data-sm-list-indent])) {
   margin: 0.5em 0;
-  padding-left: 1.5em;
+  padding-left: var(--sm-list-indent-default, 1.5em);
   list-style-position: outside;
 }
 
-.sm-canvas .sm-text-content ul {
+.sm-canvas .sm-text-content ul:not([data-sm-list-indent]) {
   list-style-type: disc;
 }
 
-.sm-canvas .sm-text-content ol {
+.sm-canvas .sm-text-content ol:not([data-sm-list-indent]) {
+  list-style-type: decimal;
+}
+
+.sm-canvas .sm-text-content :where(ul[data-sm-list-indent], ol[data-sm-list-indent]) {
+  list-style-position: outside;
+}
+
+.sm-canvas .sm-text-content ul[data-sm-list-indent] {
+  list-style-type: disc;
+}
+
+.sm-canvas .sm-text-content ol[data-sm-list-indent] {
   list-style-type: decimal;
 }
 
@@ -1554,17 +1566,29 @@
   background-color: color-mix(in srgb, var(--sm-primary-soft) 35%, transparent);
 }
 
-.sm-inline-editing :where(ul, ol) {
+.sm-inline-editing :where(ul:not([data-sm-list-indent]), ol:not([data-sm-list-indent])) {
   margin: 0.5em 0;
-  padding-left: 1.5em;
+  padding-left: var(--sm-list-indent-default, 1.5em);
   list-style-position: outside;
 }
 
-.sm-inline-editing ul {
+.sm-inline-editing ul:not([data-sm-list-indent]) {
   list-style-type: disc;
 }
 
-.sm-inline-editing ol {
+.sm-inline-editing ol:not([data-sm-list-indent]) {
+  list-style-type: decimal;
+}
+
+.sm-inline-editing :where(ul[data-sm-list-indent], ol[data-sm-list-indent]) {
+  list-style-position: outside;
+}
+
+.sm-inline-editing ul[data-sm-list-indent] {
+  list-style-type: disc;
+}
+
+.sm-inline-editing ol[data-sm-list-indent] {
   list-style-type: decimal;
 }
 
@@ -1665,6 +1689,11 @@
   color: var(--sm-float-bar-placeholder);
 }
 .sm-floating-toolbar__link-panel .sm-btn { height: 26px; }
+
+.sm-floating-toolbar__select--list-indent {
+  min-width: 52px;
+  max-width: 72px;
+}
 
 /* 自定义色板（右栏 / 富文本色卡） ---------------------------------------- */
 .sm-color-picker-layer {

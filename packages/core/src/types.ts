@@ -34,6 +34,11 @@ export interface GlobalStyles {
   linkColor: string;
   /** 无单位倍数（如 1.25）或固定值（如 24px） */
   lineHeight: string;
+  /**
+   * 未单独设置缩进的列表使用的全局左缩进（px）。
+   * 不设时等价于内置默认 24px。
+   */
+  listIndentDefaultPx?: number;
 }
 
 export interface Variable {

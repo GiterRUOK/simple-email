@@ -11,6 +11,15 @@
  */
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import {
+  findListAtSelection,
+  getListIndent,
+  LIST_INDENT_DEFAULT_PX,
+  resolveGlobalListIndentPx,
+  setListIndent as applyListIndentToElement,
+  type ListIndentValue,
+} from '../utils/emailListStyles';
+import type { GlobalStyles } from '../types';
+import {
   convertListTag,
   detectListFormats,
   findListItem,
@@ -46,6 +55,8 @@ export interface InlineEditorOptions {
   onCommit: (value: string) => void;
   onCancel: () => void;
   onSelectionChange?: (state: SelectionState | null) => void;
+  /** 文档全局列表默认缩进（px），用于工具条展示继承值 */
+  globalStyles?: GlobalStyles;
 }
 
 export interface SelectionState {
@@ -66,6 +77,14 @@ export interface SelectionState {
     fontName: string | null;
     fontWeight: string | null;
     backColor: string | null;
+    /** 光标是否在 ul/ol 内 */
+    inList: boolean;
+    /** null = 跟随邮件全局；非 null = 本列表显式 px */
+    listIndentPx: ListIndentValue;
+    /** 邮件全局列表默认缩进（px） */
+    listIndentGlobalPx: number;
+    /** 当前列表实际生效的缩进（px） */
+    listIndentEffectivePx: number;
   };
 }
 
@@ -208,6 +227,20 @@ export class InlineEditor {
       this.pendingHiliteAnchor = hiliteAnchor;
     }
     // 命令执行后选区可能已经变化（例如插入链接会扩展），刷新存档
+    this.saveSelection();
+    this._emitSelection();
+  }
+
+  /** 设置当前列表缩进；null 表示恢复默认（不设值） */
+  setListIndent(px: ListIndentValue) {
+    this.edited = true;
+    this._ensureFocus();
+    this._restoreSelection();
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return;
+    const list = findListAtSelection(sel.anchorNode, this.el);
+    if (!list) return;
+    applyListIndentToElement(list, px);
     this.saveSelection();
     this._emitSelection();
   }
@@ -611,6 +644,13 @@ export class InlineEditor {
     if (inline.backColor) this._clearPendingHilite();
 
     const listFormats = detectListFormats(sel.anchorNode, this.el);
+    const activeList = findListAtSelection(sel.anchorNode, this.el);
+    const listIndentPx = activeList ? getListIndent(activeList) : null;
+    const listIndentGlobalPx = this.opts.globalStyles
+      ? resolveGlobalListIndentPx(this.opts.globalStyles)
+      : LIST_INDENT_DEFAULT_PX;
+    const listIndentEffectivePx =
+      listIndentPx != null ? listIndentPx : listIndentGlobalPx;
 
     const state: SelectionState = {
       hasSelection: true,
@@ -630,6 +670,10 @@ export class InlineEditor {
         fontName: safeQueryValue('fontName'),
         fontWeight: inline.fontWeight,
         backColor,
+        inList: !!activeList,
+        listIndentPx,
+        listIndentGlobalPx,
+        listIndentEffectivePx,
       },
     };
     this.lastSelectionState = state;
@@ -919,10 +963,13 @@ export function sanitizeRichHtml(html: string): string {
       }
       // 属性白名单
       const allowedAttrs = ['href', 'target', 'rel', 'style', 'class'];
+      const listExtraAttrs = ['data-sm-list-indent'];
       [...el.attributes].forEach((attr) => {
-        if (!allowedAttrs.includes(attr.name.toLowerCase())) {
-          el.removeAttribute(attr.name);
-        }
+        const name = attr.name.toLowerCase();
+        const ok =
+          allowedAttrs.includes(name) ||
+          ((tag === 'ul' || tag === 'ol') && listExtraAttrs.includes(name));
+        if (!ok) el.removeAttribute(attr.name);
       });
       // 链接安全
       if (tag === 'a') {

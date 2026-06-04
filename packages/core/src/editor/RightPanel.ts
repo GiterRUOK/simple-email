@@ -26,6 +26,11 @@ import { bindColorPickerInput } from './ColorPickerPopover';
 import { normalizeAccentHex } from '../utils/accentColor';
 import { clear, h } from '../utils/dom';
 import { metaWidthInputString, parseMetaWidthFromUserInput, parseSectionWidthFromUserInput, sectionWidthInputString } from '../utils/contentWidth';
+import {
+  LIST_INDENT_PRESETS_PX,
+  normalizeGlobalListIndentStorage,
+  resolveGlobalListIndentPx,
+} from '../utils/emailListStyles';
 import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import type { ImageAssetsHandlers, ImageFieldContext } from './imageAssets';
 import { FocusBreadcrumb } from './FocusBreadcrumb';
@@ -447,6 +452,7 @@ export class RightPanel {
           }),
         'doc:styles.linkColor',
       ),
+      this._listIndentDefaultField(doc),
     );
     return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, rows);
   }
@@ -1347,6 +1353,33 @@ export class RightPanel {
       h('label', { class: 'sm-field__label' }, [label]),
       sel,
     ]);
+  }
+
+  /** 邮件设置：列表默认缩进（平铺）；未配置时初始为 24px */
+  private _listIndentDefaultField(doc: EmailDoc): HTMLElement {
+    const current = String(resolveGlobalListIndentPx(doc.styles));
+    const options = LIST_INDENT_PRESETS_PX.map((px) => ({
+      label: String(px),
+      value: String(px),
+    }));
+    const help = h('div', { class: 'sm-field__help' }, [
+      '未单独设置缩进的列表使用此值。',
+    ]);
+    const field = this._segmentedSelectField(
+      '列表默认缩进',
+      current,
+      options,
+      (v) =>
+        this.opts.store.update((d) => {
+          const stored = normalizeGlobalListIndentStorage(Number(v));
+          if (stored === undefined) delete d.styles.listIndentDefaultPx;
+          else d.styles.listIndentDefaultPx = stored;
+        }),
+      'doc:styles.listIndentDefaultPx',
+      true,
+    );
+    field.append(help);
+    return field;
   }
 
   /** select 平铺：与顶栏 sm-segmented 视觉一致，占满右栏宽度 */

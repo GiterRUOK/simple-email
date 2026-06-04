@@ -2,6 +2,10 @@ import mjmlCompile from 'mjml-browser';
 import type { EmailDoc, RenderEngine, Variable } from '../types';
 import type { Registry } from '../registry/registry';
 import { annotateDynamicVariantHtmlAttributes } from '../utils/dynamicVariantHtml';
+import {
+  normalizeEmailListsInHtml,
+  resolveGlobalListIndentPx,
+} from '../utils/emailListStyles';
 import { docToMjml } from './mjml';
 
 export interface RenderResult {
@@ -41,6 +45,7 @@ export function renderDoc(
 
   let html = compiled.html;
   html = annotateDynamicVariantHtmlAttributes(html, doc);
+  html = normalizeEmailListsInHtml(html, resolveGlobalListIndentPx(doc.styles));
   if (opts.withSampleVariables) {
     html = replaceVariables(html, doc.variables);
   }

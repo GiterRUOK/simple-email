@@ -1,6 +1,7 @@
 import { bindColorPickerInput } from './ColorPickerPopover';
 import { h } from '../utils/dom';
 import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
+import { LIST_INDENT_PRESETS_PX, type ListIndentValue } from '../utils/emailListStyles';
 import type { InlineEditor, SelectionState } from './InlineEditor';
 
 /**
@@ -50,6 +51,9 @@ export class RichTextToolbar {
   private linkPanel!: HTMLElement;
   /** 最近一次选区推断出的链接，供打开面板时预填 */
   private lastLinkHref: string | null = null;
+  private listIndentGroup!: HTMLElement;
+  private selectListIndent!: HTMLSelectElement;
+  private syncingListIndentUi = false;
 
   constructor(opts: RichTextToolbarOptions) {
     this.opts = opts;
@@ -119,6 +123,7 @@ export class RichTextToolbar {
     if (f.fontName) this.selectFontFamily.value = matchFamily(f.fontName);
     this.selectFontSize.value = matchFontSize(f.fontSize);
     this.selectFontWeight.value = matchFontWeight(f.fontWeight);
+    this._syncListIndentUi(f.inList, f.listIndentPx);
 
     const ed = this.editor;
     requestAnimationFrame(() => {
@@ -184,6 +189,31 @@ export class RichTextToolbar {
       '有序列表',
       exec('insertOrderedList'),
     );
+
+    this.selectListIndent = h('select', {
+      class: 'sm-floating-toolbar__select sm-floating-toolbar__select--list-indent',
+      title: '列表缩进',
+      onchange: (e: Event) => {
+        if (this.syncingListIndentUi) return;
+        const raw = (e.target as HTMLSelectElement).value;
+        if (raw === '') this.editor?.setListIndent(null);
+        else this.editor?.setListIndent(Number(raw));
+      },
+    }) as HTMLSelectElement;
+    {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '缩进';
+      this.selectListIndent.append(placeholder);
+      for (const px of LIST_INDENT_PRESETS_PX) {
+        const opt = document.createElement('option');
+        opt.value = String(px);
+        opt.textContent = String(px);
+        this.selectListIndent.append(opt);
+      }
+    }
+    this.listIndentGroup = this._group([this.selectListIndent]);
+    this.listIndentGroup.style.display = 'none';
 
     // 字体：select 不能 preventDefault（否则下拉打不开）；mousedown(capture) 已存档选区
     this.selectFontFamily = h('select', {
@@ -344,6 +374,7 @@ export class RichTextToolbar {
       this._group([this.btns.alignLeft, this.btns.alignCenter, this.btns.alignRight]),
       sep(),
       this._group([this.btns.ul, this.btns.ol]),
+      this.listIndentGroup,
       sep(),
       this._group([this.btns.link, this.btns.unlink, this.btns.clear]),
       this.linkPanel,
@@ -397,6 +428,25 @@ export class RichTextToolbar {
 
     this.el.style.top = `${top}px`;
     this.el.style.left = `${left}px`;
+  }
+
+  private _syncListIndentUi(inList: boolean, indent: ListIndentValue) {
+    this.listIndentGroup.style.display = inList ? '' : 'none';
+    if (!inList) return;
+
+    this.syncingListIndentUi = true;
+    if (indent === null) {
+      this.selectListIndent.value = '';
+    } else {
+      const preset = LIST_INDENT_PRESETS_PX.find((px) => px === indent);
+      const shown =
+        preset ??
+        LIST_INDENT_PRESETS_PX.reduce((best, px) =>
+          Math.abs(px - indent) < Math.abs(best - indent) ? px : best,
+        );
+      this.selectListIndent.value = String(shown);
+    }
+    this.syncingListIndentUi = false;
   }
 
   private _setActive(key: string, on: boolean) {

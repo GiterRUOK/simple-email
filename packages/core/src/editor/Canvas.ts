@@ -19,6 +19,7 @@ import type {
 } from '../types';
 import { getSectionDynamicVariantKey } from '../utils/dynamicVariantSection';
 import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
+import { globalListIndentCssVarValue } from '../utils/emailListStyles';
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import { clear, escapeHtml, h } from '../utils/dom';
 import {
@@ -245,6 +246,10 @@ export class Canvas {
     this.inner.style.color = doc.styles.color;
     this.inner.style.lineHeight = doc.styles.lineHeight ?? '1.25';
     this.inner.style.setProperty('--sm-editor-link-color', doc.styles.linkColor);
+    this.inner.style.setProperty(
+      '--sm-list-indent-default',
+      globalListIndentCssVarValue(doc.styles),
+    );
 
     if (!doc.sections.length) {
       this.inner.append(
@@ -698,6 +703,7 @@ export class Canvas {
       mode: def.inlineEditable.mode,
       multiline: !!def.inlineEditable.multiline,
       placeholder: def.inlineEditable.placeholder,
+      globalStyles: this.opts.store.doc.styles,
       onCommit: (value) => {
         const propKey = def.inlineEditable!.propKey;
         const editingId = block.id;

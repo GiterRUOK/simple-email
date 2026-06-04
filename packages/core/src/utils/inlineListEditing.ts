@@ -429,6 +429,10 @@ export function convertListTag(
   if (list.tagName.toLowerCase() === tag) return list;
   const next = document.createElement(tag) as HTMLUListElement | HTMLOListElement;
   while (list.firstChild) next.appendChild(list.firstChild);
+  const indentAttr = list.getAttribute('data-sm-list-indent');
+  if (indentAttr != null) next.setAttribute('data-sm-list-indent', indentAttr);
+  const style = list.getAttribute('style');
+  if (style) next.setAttribute('style', style);
   list.replaceWith(next);
   return next;
 }
