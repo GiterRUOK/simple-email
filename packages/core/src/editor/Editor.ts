@@ -1039,11 +1039,10 @@ export class MailEditor {
       bar.setCompact(true);
       return;
     }
+    // 在同一帧内展开并测量溢出，避免先展示文案、下一帧再收起的闪烁
     bar.setCompact(false);
-    requestAnimationFrame(() => {
-      const el = bar.el;
-      if (el.scrollWidth > el.clientWidth + 2) bar.setCompact(true);
-    });
+    const el = bar.el;
+    if (el.scrollWidth > el.clientWidth + 2) bar.setCompact(true);
   }
 
   private _bindTopbarLayoutWatch() {
