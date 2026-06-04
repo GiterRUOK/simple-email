@@ -20,6 +20,7 @@ import type {
   SectionLayout,
   Variable,
 } from '../types';
+import { getSectionDynamicVariantKey } from '../utils/dynamicVariantSection';
 import { defaultSocialIconBackground } from '../socialDefaults';
 import { bindColorPickerInput } from './ColorPickerPopover';
 import { normalizeAccentHex } from '../utils/accentColor';
@@ -436,8 +437,24 @@ export class RightPanel {
 
   private _renderSectionForm(section: Section): HTMLElement {
     const a = section.attrs;
+    const dvKey = getSectionDynamicVariantKey(section);
     return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, [
-      h('div', { class: 'sm-panel__title' }, ['Section 设置']),
+      h('div', { class: 'sm-panel__title' }, [
+        dvKey ? '动态变量 Section' : 'Section 设置',
+      ]),
+      this._textField(
+        '动态变量名',
+        a.dynamicVariantKey ?? '',
+        (v) =>
+          this.opts.store.update((d) => {
+            const s = findSection(d, section.id);
+            if (!s) return;
+            const trimmed = v.trim();
+            s.attrs.dynamicVariantKey = trimmed || undefined;
+          }),
+        '如 couponGroup；导出 HTML 根节点带 data-dv=该值',
+        `section:${section.id}:attrs.dynamicVariantKey`,
+      ),
       ...(isMultiColumnLayout(section.layout)
         ? [
             this._multiColumnLayoutField(

@@ -452,8 +452,10 @@ new MailEditor({ container, blocks: [...allBlocks, couponBlock] });
 在 `BlockDefinition` 上可选声明：
 
 ```ts
-expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
+expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[] | PaletteDropResult;
 ```
+
+`PaletteDropResult`：`{ blocks: Block[]; sectionAttrs?: Partial<SectionAttrs> }`。拖到 **sections 间隙**（自动新建单列 Section）时会合并 `sectionAttrs`（含宿主自定义 `meta` 扩展袋）；拖入已有列内仅插入 `blocks`。
 
 - 从左栏拖入该条目时，引擎会在目标列（或拖到 Section 间隙时自动包裹的**单列 Section**）内 **`splice` 插入**回调返回的多个块；**文档 JSON 里不会出现该定义的 `type`**，仅在注册表中作为左栏卡片存在。
 - 回调内请使用传入的 `createBlock('image' | 'text' | …)`，以便 ID、`defaultProps` 与内置块一致。

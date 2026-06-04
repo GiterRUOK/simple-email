@@ -7,7 +7,17 @@ import {
   pruneSectionIfEmpty,
   type Store,
 } from '../store/store';
-import type { Block, Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
+import type {
+  Block,
+  Column,
+  EmailDoc,
+  PaletteDropResult,
+  RenderContext,
+  Section,
+  SectionAttrs,
+  SectionLayout,
+} from '../types';
+import { getSectionDynamicVariantKey } from '../utils/dynamicVariantSection';
 import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import { clear, escapeHtml, h } from '../utils/dom';
@@ -247,7 +257,10 @@ export class Canvas {
     }px ${a.paddingLeft ?? 0}px`;
 
     const layoutShort = layoutHumanLabel(section.layout);
-    const sectionChip = `区块 ${sectionIndex + 1} · ${layoutShort}`;
+    const dvKey = getSectionDynamicVariantKey(section);
+    const sectionChip = dvKey
+      ? `动态变量 ${sectionIndex + 1} · {{${dvKey}}}`
+      : `区块 ${sectionIndex + 1} · ${layoutShort}`;
 
     const sw = blockButtonWidthCss(a.width);
     const box =
@@ -259,7 +272,7 @@ export class Canvas {
     });
 
     const wrap = h('div', {
-      class: 'sm-section',
+      class: `sm-section${dvKey ? ' sm-section--dynamic-variant' : ''}`,
       title: `${sectionChip}。子组件铺满列内时：按 Esc 或 Alt+点击块可选中本节。`,
       style: `padding:${padding};${a.backgroundColor ? `background:${a.backgroundColor};` : ''}${box}`,
     });
@@ -711,12 +724,23 @@ export class Canvas {
     if (this.editingBlockId) this.commitInlineEdit();
   }
 
-  private _blocksFromPaletteDrop(blockType: string): Block[] {
+  private _resolvePaletteDrop(blockType: string): PaletteDropResult {
     const def = this.opts.registry.get(blockType);
     if (def?.expandPaletteDrop) {
-      return def.expandPaletteDrop((t) => this.opts.registry.createBlock(t));
+      const out = def.expandPaletteDrop((t) => this.opts.registry.createBlock(t));
+      if (Array.isArray(out)) return { blocks: out };
+      return out;
     }
-    return [this.opts.registry.createBlock(blockType)];
+    return { blocks: [this.opts.registry.createBlock(blockType)] };
+  }
+
+  private _applySectionAttrs(target: Section, partial?: Partial<SectionAttrs>) {
+    if (!partial) return;
+    const { meta, ...rest } = partial;
+    Object.assign(target.attrs, rest);
+    if (meta && typeof meta === 'object') {
+      target.attrs.meta = { ...(target.attrs.meta ?? {}), ...meta };
+    }
   }
 
   private _handleSectionAdd(e: Sortable.SortableEvent) {
@@ -740,8 +764,9 @@ export class Canvas {
     // 路径 B：左栏内容/自定义卡片拖到 sections 之间 → 自动裹一列 Section
     if (sourceGroup === 'blocks' && blockType) {
       item.parentElement?.removeChild(item);
-      const blocks = this._blocksFromPaletteDrop(blockType);
+      const { blocks, sectionAttrs } = this._resolvePaletteDrop(blockType);
       const newSection = createSection('1');
+      this._applySectionAttrs(newSection, sectionAttrs);
       newSection.columns[0].blocks.splice(newIndex, 0, ...blocks);
       this.opts.store.update((d) => {
         d.sections.splice(newIndex, 0, newSection);
@@ -806,7 +831,28 @@ export class Canvas {
 
     if (sourceGroup === 'blocks' && blockType) {
       item.parentElement?.removeChild(item);
-      const blocks = this._blocksFromPaletteDrop(blockType);
+      const drop = this._resolvePaletteDrop(blockType);
+      if (drop.sectionAttrs?.dynamicVariantKey) {
+        const newSection = createSection('1');
+        this._applySectionAttrs(newSection, drop.sectionAttrs);
+        newSection.columns[0].blocks.push(...drop.blocks);
+        this.opts.store.update((d) => {
+          const secIdx = d.sections.findIndex((s) => s.id === sectionId);
+          const insertAt = secIdx >= 0 ? secIdx + 1 : d.sections.length;
+          d.sections.splice(insertAt, 0, newSection);
+        });
+        const head = drop.blocks[0];
+        if (head) {
+          this.opts.store.setSelection({
+            kind: 'block',
+            sectionId: newSection.id,
+            columnIndex: 0,
+            blockId: head.id,
+          });
+        }
+        return;
+      }
+      const blocks = drop.blocks;
       this.opts.store.update((d) => {
         const sec = d.sections.find((s) => s.id === sectionId);
         if (!sec) return;

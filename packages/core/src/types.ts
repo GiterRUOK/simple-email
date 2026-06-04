@@ -76,6 +76,15 @@ export interface SectionAttrs {
    * 本节内容区最大宽度（窄于邮件 `meta.width` 时居中）。支持 `480`、`480px`、`90%`；留空则与邮件同宽。
    */
   width?: string | number;
+  /**
+   * 动态变量组合：设置后本节编译结果在导出时替换为 `{{dynamicVariantKey}}`；
+   * 具体存贮与业务含义由宿主处理（如券包 couponGroup）。
+   */
+  dynamicVariantKey?: string;
+  /**
+   * 宿主扩展元数据；编辑器不解释、不参与 MJML 编译，仅随 EmailDoc 序列化。
+   */
+  meta?: Record<string, unknown>;
 }
 
 export interface Column {
@@ -176,7 +185,15 @@ export interface BlockDefinition<P extends object = Record<string, unknown>> {
    * 用于「组合模板」：画布内仅为通用 image/text 等，便于逐项修改。
    * 文档里不会出现本定义的 `type`，仅作左栏入口；若需提供请返回内置块的实例。
    */
-  expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[];
+  expandPaletteDrop?: (
+    createBlock: (type: string) => Block,
+  ) => Block[] | PaletteDropResult;
+}
+
+/** 左栏组合拖入：可附带新建 Section 的 attrs（如 meta 扩展袋） */
+export interface PaletteDropResult {
+  blocks: Block[];
+  sectionAttrs?: Partial<SectionAttrs>;
 }
 
 export interface InlineEditableConfig<P extends object = Record<string, unknown>> {

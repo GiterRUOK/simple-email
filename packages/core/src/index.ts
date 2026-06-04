@@ -10,6 +10,17 @@ export {
   resolveLockedMjmlCanvasContent,
 } from './utils/lockedMjml';
 export { renderDoc, replaceVariables } from './renderer';
+export { annotateDynamicVariantHtmlAttributes } from './utils/dynamicVariantHtml';
+export {
+  DYNAMIC_VARIANT_HTML_ATTR,
+  dynamicVariantPlaceholder,
+  extractDynamicVariantSlots,
+  getSectionDynamicVariantKey,
+  isDynamicVariantSection,
+  renderSectionBodyHtml,
+  sectionMjClassName,
+} from './utils/dynamicVariantSection';
+export type { ExtractDynamicVariantSlotsResult } from './utils/dynamicVariantSection';
 export {
   buildBodyVariableElementInsert,
   buildBodyVariableInsert,
@@ -60,6 +71,7 @@ export type {
   SectionLayout,
   Selection,
   Variable,
+  PaletteDropResult,
 } from './types';
 export type { EditorTheme } from './editor/theme';
 export type {

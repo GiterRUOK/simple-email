@@ -738,6 +738,12 @@
   outline-offset: 0;
   transition: outline-color 0.12s, outline-offset 0.12s;
 }
+.sm-section.sm-section--dynamic-variant {
+  outline-color: color-mix(in srgb, var(--sm-primary) 35%, transparent);
+}
+.sm-section-host.is-selected .sm-section.sm-section--dynamic-variant {
+  outline-color: var(--sm-primary);
+}
 /* 展示边框：Section 更深；内层 Block 交互时弱化外层，避免框中框 */
 .sm-root.sm-show-layout-borders .sm-section-host:not(.is-selected) .sm-section {
   outline-color: var(--sm-outline-layout-section);

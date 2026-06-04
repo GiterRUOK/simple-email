@@ -1,5 +1,6 @@
 import type { Registry } from '../registry/registry';
 import type { Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
+import { getSectionDynamicVariantKey, sectionMjClassName } from '../utils/dynamicVariantKey';
 import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import { escapeAttr } from '../utils/dom';
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
@@ -41,10 +42,6 @@ ${sections}
 </mjml>`;
 }
 
-function sectionMjClassName(sectionId: string): string {
-  return `sm-sec-${sectionId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-}
-
 /** 为设置了宽度的 Section 生成 max-width 规则（css-class 挂在 mj-section 上） */
 function sectionWidthConstraintCss(doc: EmailDoc): string {
   return doc.sections
@@ -65,7 +62,9 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
     .join(' ');
   const bg = a.backgroundColor ? ` background-color="${escapeAttr(a.backgroundColor)}"` : '';
   const secW = blockButtonWidthCss(a.width);
-  const secCls = secW ? ` css-class="${escapeAttr(sectionMjClassName(section.id))}"` : '';
+  const dvKey = getSectionDynamicVariantKey(section);
+  const secCls =
+    secW || dvKey ? ` css-class="${escapeAttr(sectionMjClassName(section.id))}"` : '';
   const widths = layoutWidths(section.layout);
   const gapPx = Math.max(0, section.attrs.columnGap ?? 0);
 
