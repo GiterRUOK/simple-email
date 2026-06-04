@@ -250,6 +250,8 @@ export interface EditorUiOptions {
   hideTopbarClearCanvas?: boolean;
   /** 为 true 时隐藏顶栏「重置内容」按钮。 */
   hideTopbarResetContent?: boolean;
+  /** 为 true 时隐藏顶栏「复制设计稿」「导入设计稿」按钮。 */
+  hideTopbarDocClipboard?: boolean;
   /** 为 true 时隐藏顶栏「插入变量」按钮（由宿主在编辑器外提供时可用）。 */
   hideTopbarInsertVariable?: boolean;
   /**

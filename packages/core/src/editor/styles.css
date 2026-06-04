@@ -2235,6 +2235,36 @@
   color: var(--sm-text, #1f2328);
 }
 
+/* Import doc modal --------------------------------------------------------- */
+.sm-import-doc__hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--sm-text-muted, #6b7280);
+}
+.sm-import-doc__hint--error {
+  color: var(--sm-danger, #dc2626);
+}
+.sm-import-doc__input {
+  display: block;
+  width: 100%;
+  min-height: 280px;
+  padding: 10px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  border: 1px solid var(--sm-border, #e5e7eb);
+  border-radius: 6px;
+  resize: vertical;
+  color: var(--sm-text, #1f2328);
+  background: var(--sm-code-bg, #fafbfc);
+  box-sizing: border-box;
+}
+.sm-import-doc__input:focus {
+  outline: 2px solid var(--sm-primary-soft, rgba(79, 70, 229, 0.35));
+  border-color: var(--sm-primary, #4f46e5);
+}
+
 /* Toast -------------------------------------------------------------------- */
 .sm-toast {
   position: absolute;

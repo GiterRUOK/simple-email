@@ -84,6 +84,14 @@ export type {
 export type { OpenImageGalleryModalOptions } from './editor/ImageGalleryModal';
 export { openImageGalleryModal } from './editor/ImageGalleryModal';
 export {
+  DOC_CLIPBOARD_FORMAT_VERSION,
+  DOC_CLIPBOARD_KIND,
+  parseDocClipboard,
+  regenerateDocIds,
+  serializeDocClipboard,
+} from './utils/docClipboard';
+export type { DocClipboardEnvelope } from './utils/docClipboard';
+export {
   blockButtonWidthCss,
   docContentWidthCss,
   metaWidthInputString,

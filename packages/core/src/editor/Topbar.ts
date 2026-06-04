@@ -42,6 +42,10 @@ export interface TopbarOptions {
   /** 为 false 时不展示「重置内容」 */
   showResetContentButton?: boolean;
   onResetContent?: () => void;
+  /** 为 false 时不展示「复制设计稿」「导入设计稿」 */
+  showDocClipboardButtons?: boolean;
+  onCopyDocDesign?: () => void;
+  onImportDocDesign?: () => void;
   /** 为 false 时不展示「插入变量」 */
   showInsertVariableButton?: boolean;
 }
@@ -233,6 +237,30 @@ export class Topbar {
           onclick: () => this.opts.onResetContent!(),
         }),
       );
+    }
+    if (this.opts.showDocClipboardButtons !== false) {
+      if (typeof this.opts.onCopyDocDesign === 'function') {
+        contentActionKids.push(
+          actionBtn({
+            class: 'sm-btn--ghost',
+            title: '复制设计稿：将画布 JSON 写入剪贴板，可在另一封邮件中导入',
+            icon: iconCopyDoc(),
+            label: '复制设计稿',
+            onclick: () => this.opts.onCopyDocDesign!(),
+          }),
+        );
+      }
+      if (typeof this.opts.onImportDocDesign === 'function') {
+        contentActionKids.push(
+          actionBtn({
+            class: 'sm-btn--ghost',
+            title: '导入设计稿：从剪贴板或粘贴 JSON 覆盖当前画布',
+            icon: iconImportDoc(),
+            label: '导入设计稿',
+            onclick: () => this.opts.onImportDocDesign!(),
+          }),
+        );
+      }
     }
     const contentActionsGroup =
       contentActionKids.length > 0 && h('div', { class: 'sm-topbar__group' }, contentActionKids);
@@ -462,6 +490,16 @@ function iconClearCanvas(): SVGElement {
 function iconResetContent(): SVGElement {
   return svgPathFill(
     'M864 512a352 352 0 0 0-600.96-248.96c-15.744 15.872-40.704 42.88-63.232 67.648H320a32 32 0 1 1 0 64H128a31.872 31.872 0 0 1-32-32v-192a32 32 0 1 1 64 0v108.672c20.544-22.528 42.688-46.4 57.856-61.504a416 416 0 1 1 0 588.288 32 32 0 1 1 45.248-45.248A352 352 0 0 0 864 512z',
+  );
+}
+function iconCopyDoc(): SVGElement {
+  return svg(
+    '<rect x="6.5" y="6.5" width="9" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4" fill="none"/><rect x="4.5" y="3.5" width="9" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4" fill="var(--sm-surface, #fff)"/>',
+  );
+}
+function iconImportDoc(): SVGElement {
+  return svg(
+    '<path d="M10 4.5v6.5M7.2 9.2 10 12l2.8-2.8M5.5 14.5h9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="14" width="12" height="2.5" rx=".6" fill="currentColor"/>',
   );
 }
 /** 显示边框：圆角矩形描边（开启时由 toggle 样式点亮 currentColor） */

@@ -28,6 +28,12 @@ import { Topbar, type EditorMode } from './Topbar';
 import type { EditorTheme } from './theme';
 import type { ImageAssetsHandlers } from './imageAssets';
 import { accentPrimarySoftRgba, normalizeAccentHex } from '../utils/accentColor';
+import {
+  parseDocClipboard,
+  regenerateDocIds,
+  serializeDocClipboard,
+} from '../utils/docClipboard';
+import { ImportDocModal, readTextFromClipboard, writeTextToClipboard } from './ImportDocModal';
 
 import './styles.css';
 
@@ -116,6 +122,7 @@ export class MailEditor {
   private presetContentDoc: EmailDoc;
   /** 宿主通过 setVariables 注入的列表；setValue 恢复文档后仍会写回，避免被 doc JSON 里的空数组覆盖 */
   private configuredVariables: Variable[] = [];
+  private importDocModal: ImportDocModal | null = null;
   private topbarLayoutObserver: ResizeObserver | null = null;
   private topbarLayoutRaf = 0;
   private systemThemeMq: MediaQueryList | null = null;
@@ -384,6 +391,34 @@ export class MailEditor {
     });
   }
 
+  /**
+   * 将当前画布设计稿（EmailDoc JSON 信封）写入剪贴板，供另一实例「导入设计稿」使用。
+   */
+  async copyDocDesign(): Promise<boolean> {
+    this.canvas.commitInlineEdit();
+    const ok = await writeTextToClipboard(serializeDocClipboard(this.store.doc));
+    this._showToast(ok ? '设计稿已复制到剪贴板' : '复制失败，请检查浏览器剪贴板权限');
+    return ok;
+  }
+
+  /** 打开导入设计稿对话框（从剪贴板或手动粘贴 JSON，覆盖当前画布）。 */
+  openImportDocDesign(): void {
+    this.canvas.commitInlineEdit();
+    this._ensureImportDocModal();
+    void this.importDocModal!.open(this.root);
+  }
+
+  /**
+   * 程序化导入设计稿（与对话框「应用」相同逻辑）。
+   * @returns 是否成功解析并应用
+   */
+  importDocDesignFromJson(raw: string): boolean {
+    const parsed = parseDocClipboard(raw);
+    if (!parsed) return false;
+    this._applyImportedDoc(parsed);
+    return true;
+  }
+
   registerBlock<P extends object>(def: BlockDefinition<P>) {
     this.registry.register(def);
     this.leftPanel?.refresh();
@@ -481,6 +516,9 @@ export class MailEditor {
       onClearCanvas: () => this.clearCanvas(),
       showResetContentButton: this.opts.ui?.hideTopbarResetContent !== true,
       onResetContent: () => this.resetToPreset(),
+      showDocClipboardButtons: this.opts.ui?.hideTopbarDocClipboard !== true,
+      onCopyDocDesign: () => void this.copyDocDesign(),
+      onImportDocDesign: () => this.openImportDocDesign(),
       compact: !topbarPrefersLabels(this.opts.ui, this._topbarLayoutContext()),
     });
 
@@ -914,6 +952,28 @@ export class MailEditor {
       this._insertBlockRelativeToSelection(d, sel, block);
     });
     return true;
+  }
+
+  private _ensureImportDocModal() {
+    if (this.importDocModal) return;
+    this.importDocModal = new ImportDocModal({
+      readClipboard: readTextFromClipboard,
+      onApply: (doc) => this._applyImportedDoc(doc),
+    });
+  }
+
+  private _applyImportedDoc(source: EmailDoc) {
+    const current = this.store.doc;
+    let next = regenerateDocIds(source);
+    if (this.opts.ui?.hideMailMeta) {
+      next = {
+        ...next,
+        meta: { ...current.meta },
+      };
+    }
+    this.setValue(next);
+    this.store.setSelection(null);
+    this._showToast('设计稿已导入');
   }
 
   private _showExport() {
