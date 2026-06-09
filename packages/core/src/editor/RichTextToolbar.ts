@@ -16,7 +16,7 @@ import type { InlineEditor, SelectionState } from './InlineEditor';
  *  - 按钮全部 mousedown.preventDefault：不抢焦点；select/color/url 这些
  *    必须 takeFocus 的控件不能 preventDefault，但因为 mousedown 已经存档了选区，
  *    onChange/onClick 时调 exec 即可。
- *  - 定位：贴在当前内联编辑根节点（正文容器）**上沿外**，不跟随选区以免压住文字；
+ *  - 定位：优先贴在当前内联编辑根节点（正文容器）**上沿外**，可覆盖上方块工具区；
  *    滚出中栏画布视口时钳制在 `.sm-canvas-wrap` 可见区域内（按需吸顶）。
  */
 export interface RichTextToolbarOptions {
@@ -453,8 +453,8 @@ export class RichTextToolbar {
   }
 
   /**
-   * 相对 `positionRoot` 定位：默认贴在**正文容器**上沿上方；
-   * 锚点滚出中栏画布视口时钳制在可见区域内（按需吸顶）。
+   * 相对 `positionRoot` 定位：默认贴在**正文容器**上沿上方，可覆盖上方块工具区；
+   * 上方空间不足时吸到中栏画布可见区顶部，此时才可能压进正文。
    */
   private _positionForAnchor(anchor: DOMRect) {
     const rootRect = this.opts.positionRoot.getBoundingClientRect();
@@ -472,12 +472,6 @@ export class RichTextToolbar {
 
     const anchorTop = anchor.top - rootRect.top;
     let top = anchorTop - th - gap;
-
-    if (top < viewTop) {
-      const belowAnchor = anchorTop + gap;
-      if (belowAnchor <= viewBottom) top = belowAnchor;
-    }
-
     top = Math.max(viewTop, Math.min(top, viewBottom));
 
     let left = anchor.left - rootRect.left + anchor.width / 2 - tw / 2;
