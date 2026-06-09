@@ -511,6 +511,16 @@ export class InlineEditor {
     };
 
     const onPaste = (e: ClipboardEvent) => {
+      if (mode === 'rich' && multiline && !e.clipboardData?.getData('text/html')) {
+        e.preventDefault();
+        markEdited();
+        const text = e.clipboardData?.getData('text/plain') ?? '';
+        richTextExecCommand('insertHTML', false, plainTextToRichHtml(text));
+        syncTextPresence();
+        this.saveSelection();
+        this._emitSelection();
+        return;
+      }
       if (mode !== 'plain') return;
       e.preventDefault();
       markEdited();
@@ -901,6 +911,10 @@ function escapeHtml(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
+function plainTextToRichHtml(text: string): string {
+  return escapeHtml(text).replace(/\r\n?/g, '\n').replace(/\n/g, '<br>');
+}
+
 /**
  * 邮件 HTML 必须只用一组保守的标签 + inline style。
  * 这里做一次轻量清理：
@@ -984,12 +998,25 @@ export function sanitizeRichHtml(html: string): string {
         if (/^javascript:/i.test(href)) el.setAttribute('href', '#');
         if (!el.getAttribute('rel')) el.setAttribute('rel', 'noopener');
       }
+      if ((tag === 'p' || /^h[1-6]$/.test(tag)) && !hasMarginStyle(el)) {
+        appendStyle(el, 'margin:0');
+      }
     });
     toRemove.forEach((el) => {
       while (el.firstChild) el.parentNode?.insertBefore(el.firstChild, el);
       el.remove();
     });
   }
+}
+
+function hasMarginStyle(el: Element): boolean {
+  const style = el.getAttribute('style') ?? '';
+  return /(?:^|;)\s*margin(?:-(?:top|right|bottom|left))?\s*:/i.test(style);
+}
+
+function appendStyle(el: Element, style: string) {
+  const raw = (el.getAttribute('style') ?? '').trim();
+  el.setAttribute('style', raw ? `${raw.replace(/;+\s*$/, '')};${style}` : style);
 }
 
 function fontSizeFromLegacy(size: string): string {
