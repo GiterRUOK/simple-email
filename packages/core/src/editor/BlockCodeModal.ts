@@ -11,12 +11,14 @@ import {
   getCodeEditorModalMaximizedSize,
 } from '../utils/modalSize';
 import { Modal } from './Modal';
+import type { SimpleMailT } from '../i18n';
 
 export interface BlockCodeModalOptions {
   store: Store;
   registry: Registry;
   /** 须落在 MailEditor `.sm-root` 子树内，才能继承 `--sm-code-bg` 等变量 */
   mountParent: HTMLElement;
+  t: SimpleMailT;
 }
 
 const MAXIMIZED_PREF_KEY = 'sm-block-code-modal-maximized';
@@ -37,11 +39,12 @@ export class BlockCodeModal {
     this.opts = opts;
     const defaultSize = getCodeEditorModalDefaultSize();
     this.modal = new Modal({
-      title: '编辑组件代码',
+      title: opts.t('blockCode.title'),
       className: 'sm-modal--block-code',
       width: defaultSize.width,
       height: defaultSize.height,
       onClose: () => this._destroyCm(),
+      t: opts.t,
     });
     this.editorHost = h('div', { class: 'sm-export__editor' });
     this.modal.body.append(this.editorHost);
@@ -61,7 +64,7 @@ export class BlockCodeModal {
     const beautifyBtn = h(
       'button',
       { class: 'sm-btn', type: 'button', onclick: () => this._beautify() },
-      ['美化'],
+      [opts.t('common.beautify')],
     );
     const saveBtn = h(
       'button',
@@ -70,7 +73,7 @@ export class BlockCodeModal {
         type: 'button',
         onclick: () => this._saveAndClose(),
       },
-      ['保存'],
+      [opts.t('common.save')],
     );
     this.modal.footer.append(beautifyBtn, saveBtn);
   }
@@ -89,7 +92,7 @@ export class BlockCodeModal {
       (def ? def.toMjml(block.props as Record<string, unknown>, { doc, engine: 'mjml' }) : '');
 
     this.maximized = readMaximizedPref();
-    this.modal.setTitle(`编辑组件代码 · ${componentLabel}`);
+    this.modal.setTitle(this.opts.t('blockCode.titleWithName', { name: componentLabel }));
     this._applyModalSize();
     this.cm = new EditorView({
       parent: this.editorHost,
@@ -131,7 +134,7 @@ export class BlockCodeModal {
   }
 
   private _syncMaximizeButton() {
-    this.maximizeBtn.title = this.maximized ? '还原' : '最大化';
+    this.maximizeBtn.title = this.maximized ? this.opts.t('common.restore') : this.opts.t('common.maximize');
     this.maximizeBtn.setAttribute('aria-pressed', this.maximized ? 'true' : 'false');
     this.maximizeBtn.replaceChildren(this.maximized ? iconRestore() : iconMaximize());
   }

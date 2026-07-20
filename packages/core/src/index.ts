@@ -1,4 +1,15 @@
 export { MailEditor } from './editor/Editor';
+export {
+  createI18nContext,
+  enUSMessages,
+  zhCNMessages,
+  type SimpleMailI18nContext,
+  type SimpleMailI18nOptions,
+  type SimpleMailLocale,
+  type SimpleMailMessages,
+  type SimpleMailMessagesInput,
+  type SimpleMailT,
+} from './i18n';
 export { defineBlock, Registry } from './registry/registry';
 export { appendInlineToRichHtml } from './utils/richHtmlInsert';
 export { isRichHtmlEffectivelyEmpty, normalizeRichHtmlForCommit } from './utils/richHtmlEmpty';

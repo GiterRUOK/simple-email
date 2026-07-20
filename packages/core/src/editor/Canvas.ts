@@ -31,6 +31,7 @@ import { layoutHumanLabel } from '../utils/sectionLayout';
 import { BlockCodeModal } from './BlockCodeModal';
 import { InlineEditor, type SelectionState } from './InlineEditor';
 import type { RichTextToolbar } from './RichTextToolbar';
+import type { SimpleMailT } from '../i18n';
 
 export interface CanvasOptions {
   store: Store;
@@ -51,6 +52,7 @@ export interface CanvasOptions {
   layerRoot: HTMLElement;
   /** 与 MailEditor.opts.ui 对齐 */
   ui?: EditorUiOptions;
+  t: SimpleMailT;
 }
 
 /**
@@ -94,6 +96,7 @@ export class Canvas {
       store: opts.store,
       registry: opts.registry,
       mountParent: opts.layerRoot,
+      t: opts.t,
     });
 
     this._bindDesignModeLinkSuppression();
@@ -298,7 +301,7 @@ export class Canvas {
     if (!doc.sections.length) {
       this.inner.append(
         h('div', { class: 'sm-empty-doc' }, [
-          '从左侧拖入布局开始，或直接双击开始 ✦',
+          this.opts.t('canvas.emptyHint'),
         ]),
       );
     } else {
@@ -335,14 +338,18 @@ export class Canvas {
       a.paddingBottom ?? 0
     }px ${a.paddingLeft ?? 0}px`;
 
-    const layoutShort = layoutHumanLabel(section.layout);
+    const layoutShort =
+      section.layout === '1' ? this.opts.t('rightPanel.layout.oneColumn') : layoutHumanLabel(section.layout);
     const dvKey =
       this.opts.ui?.enableDynamicVariantKey === true
         ? getSectionDynamicVariantKey(section)
         : undefined;
     const sectionChip = dvKey
-      ? `动态变量 ${sectionIndex + 1} · {{${dvKey}}}`
-      : `区块 ${sectionIndex + 1} · ${layoutShort}`;
+      ? this.opts.t('canvas.dynamicSectionLabel', {
+          index: sectionIndex + 1,
+          token: `{{${dvKey}}}`,
+        })
+      : this.opts.t('canvas.sectionLabel', { index: sectionIndex + 1, layout: layoutShort });
 
     const sw = blockButtonWidthCss(a.width);
     const box =
@@ -355,7 +362,7 @@ export class Canvas {
 
     const wrap = h('div', {
       class: `sm-section${dvKey ? ' sm-section--dynamic-variant' : ''}`,
-      title: `${sectionChip}。子组件铺满列内时：按 Esc 或 Alt+点击块可选中本节。`,
+      title: this.opts.t('canvas.sectionTitle', { chip: sectionChip }),
       style: `padding:${padding};${a.backgroundColor ? `background:${a.backgroundColor};` : ''}${box}`,
     });
 
@@ -367,7 +374,7 @@ export class Canvas {
           {
             class: 'sm-tool-btn sm-section__handle',
             type: 'button',
-            title: '拖拽排序',
+            title: this.opts.t('common.dragSort'),
           },
           [iconDrag()],
         ),
@@ -376,7 +383,7 @@ export class Canvas {
           {
             class: 'sm-tool-btn',
             type: 'button',
-            title: '复制',
+            title: this.opts.t('common.copy'),
             onclick: (e: Event) => {
               e.stopPropagation();
               this._duplicateSection(section.id);
@@ -389,7 +396,7 @@ export class Canvas {
           {
             class: 'sm-tool-btn sm-tool-btn--danger',
             type: 'button',
-            title: '删除',
+            title: this.opts.t('common.delete'),
             onclick: (e: Event) => {
               e.stopPropagation();
               this._removeSection(section.id);
@@ -435,6 +442,7 @@ export class Canvas {
       class: `sm-column ${isEmpty ? 'is-empty' : ''}`,
       'data-section-id': section.id,
       'data-column-index': String(columnIndex),
+      'data-empty-hint': this.opts.t('canvas.emptyColumnHint'),
       style: `flex:${layoutFlexValue(section.layout, columnIndex)};${
         column.attrs.backgroundColor ? `background:${column.attrs.backgroundColor};` : ''
       }${column.attrs.verticalAlign ? `align-self:${vaToFlex(column.attrs.verticalAlign)};` : ''}`,
@@ -514,7 +522,9 @@ export class Canvas {
         def.name,
       )}</div>`;
     } else {
-      inner = `<div style="padding:8px;color:#dc2626;">未知组件: ${escapeHtml(block.type)}</div>`;
+      inner = `<div style="padding:8px;color:#dc2626;">${escapeHtml(
+        this.opts.t('canvas.unknownBlock', { type: block.type }),
+      )}</div>`;
     }
 
     const displayName = def?.name ?? block.type;
@@ -524,6 +534,7 @@ export class Canvas {
       'data-id': block.id,
       'data-section-id': section.id,
       'data-column-index': String(columnIndex),
+      'data-locked-label': this.opts.t('canvas.lockedCode'),
     });
 
     // 内容容器：renderPreview 输出放这里，便于精确定位 inlineEditable selector
@@ -538,7 +549,7 @@ export class Canvas {
           {
             class: 'sm-tool-btn sm-block__handle',
             type: 'button',
-            title: '拖拽排序',
+            title: this.opts.t('common.dragSort'),
             onclick: (e: Event) => e.stopPropagation(),
           },
           [iconDrag()],
@@ -549,7 +560,7 @@ export class Canvas {
               {
                 class: 'sm-tool-btn',
                 type: 'button',
-                title: '编辑文本',
+                title: this.opts.t('common.editText'),
                 onclick: (e: Event) => {
                   e.stopPropagation();
                   this._enterEditing(block);
@@ -563,7 +574,7 @@ export class Canvas {
           {
             class: 'sm-tool-btn',
             type: 'button',
-            title: '编辑组件代码',
+            title: this.opts.t('common.editCode'),
             onclick: (e: Event) => {
               e.stopPropagation();
               this.blockCodeModal.open(block.id, displayName);
@@ -576,7 +587,7 @@ export class Canvas {
           {
             class: 'sm-tool-btn',
             type: 'button',
-            title: '复制',
+            title: this.opts.t('common.copy'),
             onclick: (e: Event) => {
               e.stopPropagation();
               this._duplicateBlock(block.id);
@@ -589,7 +600,7 @@ export class Canvas {
           {
             class: 'sm-tool-btn sm-tool-btn--danger',
             type: 'button',
-            title: '删除',
+            title: this.opts.t('common.delete'),
             onclick: (e: Event) => {
               e.stopPropagation();
               this._removeBlock(block.id);
@@ -637,10 +648,12 @@ export class Canvas {
 
   private _renderAddBar(): HTMLElement {
     const layouts: { layout: SectionLayout; label: string }[] = [
-      { layout: '1', label: '一列' },
-      { layout: '1-1', label: '多列' },
+      { layout: '1', label: this.opts.t('leftPanel.oneColumn') },
+      { layout: '1-1', label: this.opts.t('leftPanel.multiColumn') },
     ];
-    const bar = h('div', { class: 'sm-add-section-bar' }, [h('span', {}, ['+ 添加 Section：'])]);
+    const bar = h('div', { class: 'sm-add-section-bar' }, [
+      h('span', {}, [this.opts.t('canvas.addSection')]),
+    ]);
     for (const l of layouts) {
       bar.append(
         h(

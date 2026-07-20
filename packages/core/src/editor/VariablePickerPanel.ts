@@ -1,6 +1,7 @@
 import type { Variable } from '../types';
 import { variablePlaceholder } from '../variables';
 import { h } from '../utils/dom';
+import type { SimpleMailT } from '../i18n';
 
 export interface VariablePickerHandlers {
   onPickKey: (v: Variable) => void;
@@ -11,6 +12,7 @@ export interface VariablePickerHandlers {
 
 export interface VariablePickerHeadOptions {
   pinned: boolean;
+  t: SimpleMailT;
   onClose: () => void;
   /** 切换固定状态，返回切换后的 pinned */
   onTogglePin: () => boolean;
@@ -19,17 +21,18 @@ export interface VariablePickerHeadOptions {
 /** 右栏变量列表头部（标题 + 固定 + 关闭） */
 export function buildVariablePickerHead(options: VariablePickerHeadOptions): HTMLElement {
   let pinned = options.pinned;
+  const t = options.t;
   const syncPinBtn = (btn: HTMLButtonElement) => {
     btn.classList.toggle('is-pinned', pinned);
     btn.setAttribute('aria-pressed', String(pinned));
-    btn.title = pinned ? '取消固定' : '固定面板，连续插入';
+    btn.title = pinned ? t('variablePicker.unpinTitle') : t('variablePicker.pinTitle');
   };
   const pinBtn = h(
     'button',
     {
       class: 'sm-var-picker__pin',
       type: 'button',
-      'aria-label': '固定面板',
+      'aria-label': t('variablePicker.pin'),
       onclick: () => {
         pinned = options.onTogglePin();
         syncPinBtn(pinBtn);
@@ -44,15 +47,15 @@ export function buildVariablePickerHead(options: VariablePickerHeadOptions): HTM
     {
       class: 'sm-modal__close sm-var-picker__close',
       type: 'button',
-      title: '关闭',
-      'aria-label': '关闭变量列表',
+      title: t('common.close'),
+      'aria-label': t('variablePicker.closeTitle'),
       onclick: () => options.onClose(),
     },
     [iconClose()],
   );
 
   return h('div', { class: 'sm-var-picker__head' }, [
-    h('div', { class: 'sm-panel__title sm-var-picker__title' }, ['插入变量']),
+    h('div', { class: 'sm-panel__title sm-var-picker__title' }, [t('variablePicker.title')]),
     h('div', { class: 'sm-var-picker__actions' }, [pinBtn, closeBtn]),
   ]);
 }
@@ -81,11 +84,12 @@ function iconPin(): SVGElement {
 export function buildVariablePickerBody(
   vars: Variable[],
   handlers: VariablePickerHandlers,
+  t: SimpleMailT,
 ): HTMLElement {
   const wrap = h('div', { class: 'sm-var-picker' });
   if (!vars.length) {
     wrap.append(
-      h('div', { class: 'sm-empty-form' }, ['暂无可用变量，请由宿主通过 setVariables 注入。']),
+      h('div', { class: 'sm-empty-form' }, [t('variablePicker.empty')]),
     );
     return wrap;
   }
@@ -105,7 +109,7 @@ export function buildVariablePickerBody(
               handlers.onPickElement(v);
             },
           },
-          ['插入元素'],
+          [t('variablePicker.insertElement')],
         ),
       );
     }
@@ -115,13 +119,13 @@ export function buildVariablePickerBody(
         {
           class: 'sm-popover__action sm-popover__action--copy',
           type: 'button',
-          title: `复制 ${token}`,
+          title: t('variablePicker.copyTitle', { token }),
           onclick: (e: Event) => {
             e.stopPropagation();
             handlers.onCopy(token);
           },
         },
-        ['复制'],
+        [t('common.copy')],
       ),
     );
     row.append(

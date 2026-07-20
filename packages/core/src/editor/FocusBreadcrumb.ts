@@ -2,13 +2,15 @@ import type { Registry } from '../registry/registry';
 import type { Store } from '../store/store';
 import { findBlockLocation, findSection } from '../store/store';
 import { clear, h } from '../utils/dom';
-import { layoutHumanLabel } from '../utils/sectionLayout';
+import type { SectionLayout } from '../types';
+import type { SimpleMailT } from '../i18n';
 
 export interface FocusBreadcrumbOptions {
   store: Store;
   registry: Registry;
   /** 文档级根节点文案（如「邮件」/「版式」） */
   docRootLabel: string;
+  t: SimpleMailT;
   onFocusDocument: () => void;
   onFocusSection: (sectionId: string) => void;
 }
@@ -31,7 +33,7 @@ export class FocusBreadcrumb {
     this.opts = opts;
     this.el = h('nav', {
       class: 'sm-focus-crumb',
-      'aria-label': '当前选中',
+      'aria-label': opts.t('rightPanel.breadcrumb.selected'),
     });
     opts.store.subscribeSelection(() => this.sync());
     opts.store.subscribe(() => this.sync());
@@ -73,7 +75,7 @@ export class FocusBreadcrumb {
             {
               type: 'button',
               class: 'sm-focus-crumb__item',
-              title: `选中：${item.label}`,
+              title: this.opts.t('rightPanel.breadcrumb.selectTitle', { label: item.label }),
               onclick: () => item.onClick!(),
             },
             [item.label],
@@ -97,7 +99,7 @@ export class FocusBreadcrumb {
       if (!sec) return [{ label: docRootLabel, current: true }];
       return [
         { label: docRootLabel, current: false, onClick: onFocusDocument },
-        { label: layoutHumanLabel(sec.layout), current: true },
+        { label: this._layoutLabel(sec.layout), current: true },
       ];
     }
 
@@ -110,11 +112,17 @@ export class FocusBreadcrumb {
     const blockName = registry.get(loc.block.type)?.name ?? loc.block.type;
     return [
       {
-        label: layoutHumanLabel(sec.layout),
+        label: this._layoutLabel(sec.layout),
         current: false,
         onClick: () => onFocusSection(sel.sectionId),
       },
       { label: blockName, current: true },
     ];
+  }
+
+  private _layoutLabel(layout: SectionLayout): string {
+    if (layout === '1') return this.opts.t('rightPanel.layout.oneColumn');
+    if (layout === '1-1') return this.opts.t('rightPanel.layout.columns');
+    return layout;
   }
 }

@@ -34,6 +34,13 @@ import {
   serializeDocClipboard,
 } from '../utils/docClipboard';
 import { ImportDocModal, readTextFromClipboard, writeTextToClipboard } from './ImportDocModal';
+import {
+  createI18nContext,
+  type SimpleMailI18nContext,
+  type SimpleMailLocale,
+  type SimpleMailMessagesInput,
+  type SimpleMailT,
+} from '../i18n';
 
 import './styles.css';
 
@@ -78,6 +85,10 @@ export interface EditorOptions {
   imageAssets?: ImageAssetsHandlers;
   /** 右栏控件形态等可选 UI 偏好。 */
   ui?: EditorUiOptions;
+  /** 编辑器 UI 语言。默认 zh-CN。 */
+  locale?: SimpleMailLocale;
+  /** 覆盖或补充 simple-mail 内置文案。 */
+  messages?: SimpleMailMessagesInput;
   /**
    * 顶栏「重置内容」恢复的目标文档（与 `initialDoc` 独立；编辑已保存邮件时仍应指向业务预置模板）。
    * 未传时与构造时的 `initialDoc` 合并结果一致。
@@ -128,6 +139,7 @@ export class MailEditor {
   private topbarLayoutObserver: ResizeObserver | null = null;
   private topbarLayoutRaf = 0;
   private systemThemeMq: MediaQueryList | null = null;
+  private i18n: SimpleMailI18nContext;
   private readonly _onSystemThemeMqChange = () => {
     if (this.accentColorOverride) this._applyAccentVars();
   };
@@ -213,6 +225,7 @@ export class MailEditor {
 
   constructor(opts: EditorOptions) {
     this.opts = opts;
+    this.i18n = createI18nContext({ locale: opts.locale, messages: opts.messages });
     this.registry = new Registry();
 
     // 注册外部 blocks
@@ -221,9 +234,11 @@ export class MailEditor {
     }
 
     const initialDoc = createDefaultDoc(opts.initialDoc);
-    this.presetContentDoc = structuredClone(
-      createDefaultDoc(opts.presetDoc ?? opts.initialDoc),
-    );
+    applyLocalizedDefaultMeta(initialDoc, opts.initialDoc, this.i18n.t);
+    const presetSource = opts.presetDoc ?? opts.initialDoc;
+    const presetContentDoc = createDefaultDoc(presetSource);
+    applyLocalizedDefaultMeta(presetContentDoc, presetSource, this.i18n.t);
+    this.presetContentDoc = structuredClone(presetContentDoc);
     this.store = new Store(initialDoc);
 
     const initialAccent = normalizeAccentHex(this.opts.accentColor ?? '');
@@ -299,7 +314,9 @@ export class MailEditor {
 
   /** 更新「重置内容」的目标（例如宿主异步加载默认模板后）。 */
   setPresetDoc(partial: Partial<EmailDoc>): void {
-    this.presetContentDoc = structuredClone(createDefaultDoc(partial));
+    const presetDoc = createDefaultDoc(partial);
+    applyLocalizedDefaultMeta(presetDoc, partial, this.i18n.t);
+    this.presetContentDoc = structuredClone(presetDoc);
   }
 
   setVariables(vars: Variable[]) {
@@ -409,7 +426,7 @@ export class MailEditor {
   async copyDocDesign(): Promise<boolean> {
     this.canvas.commitInlineEdit();
     const ok = await writeTextToClipboard(serializeDocClipboard(this.store.doc));
-    this._showToast(ok ? '设计稿已复制到剪贴板' : '复制失败，请检查浏览器剪贴板权限');
+    this._showToast(ok ? this.i18n.t('toast.copyDesignOk') : this.i18n.t('toast.copyDesignFailed'));
     return ok;
   }
 
@@ -502,6 +519,7 @@ export class MailEditor {
   private _buildUI() {
     this.topbar = new Topbar({
       store: this.store,
+      t: this.i18n.t,
       mode: this.mode,
       theme: this.theme,
       accentPickerRoot: this.root,
@@ -535,10 +553,11 @@ export class MailEditor {
       compact: !topbarPrefersLabels(this.opts.ui, this._topbarLayoutContext()),
     });
 
-    this.toolbar = new RichTextToolbar({ positionRoot: this.root });
+    this.toolbar = new RichTextToolbar({ positionRoot: this.root, t: this.i18n.t });
     const ui = this.opts.ui;
     this.leftPanel = new LeftPanel({
       registry: this.registry,
+      t: this.i18n.t,
       blockGroupTitle:
         ui?.paletteBlockGroupTitle ?? ui?.blockCategoryLabels?.content,
       customPaletteTooltipSuffix: ui?.customPaletteTooltipSuffix,
@@ -554,11 +573,14 @@ export class MailEditor {
       clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin === true,
       layerRoot: this.root,
       ui: this.opts.ui,
+      t: this.i18n.t,
     });
     this.rightPanel = new RightPanel({
       store: this.store,
       registry: this.registry,
-      docRootLabel: this.opts.ui?.hideMailMeta ? '版式' : '邮件',
+      docRootLabel: this.opts.ui?.hideMailMeta
+        ? this.i18n.t('rightPanel.docRoot.layout')
+        : this.i18n.t('rightPanel.docRoot.mail'),
       onFocusSection: (sectionId) => {
         this.canvas.commitInlineEdit();
         this.store.setSelection({ kind: 'section', sectionId });
@@ -566,8 +588,13 @@ export class MailEditor {
       onFocusDocument: () => this._focusMailSettings(),
       imageAssets: this.opts.imageAssets,
       ui: this.opts.ui,
+      t: this.i18n.t,
     });
-    this.sourceView = new SourceView({ store: this.store, registry: this.registry });
+    this.sourceView = new SourceView({
+      store: this.store,
+      registry: this.registry,
+      t: this.i18n.t,
+    });
 
     this.body.append(this.leftPanel.el, this.canvas.el, this.rightPanel.el);
     this.overlayLayer = h('div', { class: 'sm-overlay-layer' });
@@ -685,7 +712,7 @@ export class MailEditor {
 
     const vars = this.getVariables();
     if (!vars.length) {
-      this._showToast('暂无可用变量');
+      this._showToast(this.i18n.t('toast.noVariables'));
       return;
     }
 
@@ -708,7 +735,7 @@ export class MailEditor {
         onCopy: (token) => {
           void copyVariableToken(token).then((ok) => {
             if (!ok) return;
-            this._showToast('已复制变量');
+            this._showToast(this.i18n.t('toast.variableCopied'));
           });
         },
         onClose: () => this._closeVariablePicker(),
@@ -759,7 +786,7 @@ export class MailEditor {
                 dismissPopover();
               },
             },
-            ['插入元素'],
+            [this.i18n.t('variablePicker.insertElement')],
           ),
         );
       }
@@ -769,17 +796,17 @@ export class MailEditor {
           {
             class: 'sm-popover__action sm-popover__action--copy',
             type: 'button',
-            title: `复制 ${token}`,
+            title: this.i18n.t('variablePicker.copyTitle', { token }),
             onclick: (e: Event) => {
               e.stopPropagation();
               void copyVariableToken(token).then((ok) => {
                 if (!ok) return;
                 dismissPopover();
-                this._showToast('已复制变量');
+                this._showToast(this.i18n.t('toast.variableCopied'));
               });
             },
           },
-          ['复制'],
+          [this.i18n.t('common.copy')],
         ),
       );
       row.append(
@@ -998,6 +1025,7 @@ export class MailEditor {
     this.importDocModal = new ImportDocModal({
       readClipboard: readTextFromClipboard,
       onApply: (doc) => this._applyImportedDoc(doc),
+      t: this.i18n.t,
     });
   }
 
@@ -1012,7 +1040,7 @@ export class MailEditor {
     }
     this.setValue(next);
     this.store.setSelection(null);
-    this._showToast('设计稿已导入');
+    this._showToast(this.i18n.t('toast.importDesignOk'));
   }
 
   private _showExport() {
@@ -1021,6 +1049,7 @@ export class MailEditor {
     const modal = new ExportModal({
       store: this.store,
       registry: this.registry,
+      t: this.i18n.t,
       withSampleVariables: false,
     });
     modal.open(this.root);
@@ -1031,6 +1060,7 @@ export class MailEditor {
     const modal = new PreviewModal({
       store: this.store,
       registry: this.registry,
+      t: this.i18n.t,
     });
     modal.open(this.root);
   }
@@ -1185,6 +1215,14 @@ async function smExitFullscreen(): Promise<void> {
 }
 
 /* ----------------------------- 默认空文档 ------------------------------- */
+
+function applyLocalizedDefaultMeta(
+  doc: EmailDoc,
+  source: Partial<EmailDoc> | undefined,
+  t: SimpleMailT,
+): void {
+  if (source?.meta?.subject == null) doc.meta.subject = t('doc.defaultSubject');
+}
 
 function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
   const mergedStyles = {

@@ -2,9 +2,11 @@ import Sortable from 'sortablejs';
 import type { Registry } from '../registry/registry';
 import type { BlockDefinition, SectionLayout } from '../types';
 import { clear, h } from '../utils/dom';
+import type { SimpleMailT } from '../i18n';
 
 export interface LeftPanelOptions {
   registry: Registry;
+  t: SimpleMailT;
   /** 合并后的组件分组标题 */
   blockGroupTitle?: string;
   /** custom 类块默认 tooltip 后缀（无 paletteTooltip 时） */
@@ -13,24 +15,21 @@ export interface LeftPanelOptions {
   hiddenPaletteBlockTypes?: string[];
 }
 
-const DEFAULT_BLOCK_GROUP_TITLE = '组件';
-const DEFAULT_CUSTOM_TOOLTIP_SUFFIX = 'Navimow 定制组件，拖入列内使用';
-
 interface LayoutCard {
   layout: SectionLayout;
-  name: string;
+  nameKey: string;
   icon: string;
-  title?: string;
+  titleKey?: string;
 }
 
 const LAYOUT_CARDS: LayoutCard[] = [
-  { layout: '1', name: '一列', icon: layoutSvg([1]) },
+  { layout: '1', nameKey: 'leftPanel.oneColumn', icon: layoutSvg([1]) },
   /** 默认 1:1；1:2 / 2:1 / 1:1:1 在选中 Section 后于右栏「列布局」切换 */
   {
     layout: '1-1',
-    name: '多列',
+    nameKey: 'leftPanel.multiColumn',
     icon: layoutSvg([1, 1]),
-    title: '多列（右栏可调 2/3 列比例）',
+    titleKey: 'leftPanel.multiColumnTitle',
   },
 ];
 
@@ -73,7 +72,7 @@ export class LeftPanel {
     if (paletteBlocks.length) {
       wrap.append(
         this._renderBlockGroup(
-          this.opts.blockGroupTitle ?? DEFAULT_BLOCK_GROUP_TITLE,
+          this.opts.blockGroupTitle ?? this.opts.t('leftPanel.components'),
           paletteBlocks,
         ),
       );
@@ -85,6 +84,7 @@ export class LeftPanel {
   private _renderLayoutGroup(): HTMLElement {
     const grid = h('div', { class: 'sm-blocks__grid' });
     for (const c of LAYOUT_CARDS) {
+      const name = this.opts.t(c.nameKey);
       grid.append(
         h(
           'div',
@@ -92,11 +92,11 @@ export class LeftPanel {
             class: 'sm-block-card',
             'data-source-group': 'sections',
             'data-layout': c.layout,
-            title: c.title ?? c.name,
+            title: c.titleKey ? this.opts.t(c.titleKey) : name,
           },
           [
             h('span', { class: 'sm-block-card__icon', html: c.icon }),
-            h('span', { class: 'sm-block-card__name' }, [c.name]),
+            h('span', { class: 'sm-block-card__name' }, [name]),
           ],
         ),
       );
@@ -110,7 +110,7 @@ export class LeftPanel {
       dragClass: 'sm-drag',
     });
     return h('section', { class: 'sm-blocks__group' }, [
-      h('div', { class: 'sm-panel__title' }, ['布局']),
+      h('div', { class: 'sm-panel__title' }, [this.opts.t('leftPanel.layout')]),
       grid,
     ]);
   }
@@ -119,7 +119,7 @@ export class LeftPanel {
     if (def.paletteTooltip?.trim()) return def.paletteTooltip.trim();
     if (def.category === 'custom') {
       const suffix =
-        this.opts.customPaletteTooltipSuffix ?? DEFAULT_CUSTOM_TOOLTIP_SUFFIX;
+        this.opts.customPaletteTooltipSuffix ?? this.opts.t('leftPanel.customTooltipSuffix');
       return `${def.name} — ${suffix}`;
     }
     return def.name;

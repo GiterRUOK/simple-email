@@ -1,10 +1,12 @@
 import type { GalleryItem, ImageGalleryAdapter } from './imageAssets';
 import { Modal } from './Modal';
 import { clear, h } from '../utils/dom';
+import { createI18nContext, type SimpleMailT } from '../i18n';
 
 export interface OpenImageGalleryModalOptions {
   adapter: ImageGalleryAdapter;
   onPick: (url: string) => void;
+  t?: SimpleMailT;
   /** 挂载父节点，默认 `document.body` */
   parent?: HTMLElement;
   onClose?: () => void;
@@ -15,13 +17,15 @@ export interface OpenImageGalleryModalOptions {
  */
 export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void {
   const { adapter, onPick, parent = document.body, onClose } = opts;
+  const t = opts.t ?? createI18nContext().t;
 
   const modal = new Modal({
-    title: '图库',
+    title: t('gallery.title'),
     width: 'min(760px, 94vw)',
     height: 'min(580px, 88vh)',
     className: 'sm-modal--gallery',
     onClose,
+    t,
   });
 
   const wrap = h('div', { class: 'sm-gallery-modal' });
@@ -41,8 +45,8 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
   const searchInp = h('input', {
     class: 'sm-input sm-gallery-modal__search',
     type: 'search',
-    placeholder: '搜索…',
-    'aria-label': '搜索图片',
+    placeholder: t('gallery.searchPlaceholder'),
+    'aria-label': t('gallery.searchAria'),
   });
 
   let debounceId: ReturnType<typeof setTimeout> | null = null;
@@ -67,7 +71,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
         void loadPage(page + 1, true);
       },
     },
-    ['加载更多'],
+    [t('gallery.loadMore')],
   ) as HTMLButtonElement;
 
   const confirmBtn = h(
@@ -78,7 +82,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
       disabled: true,
       onclick: () => finishPick(),
     },
-    ['插入'],
+    [t('common.insert')],
   ) as HTMLButtonElement;
 
   function setError(msg: string | null) {
@@ -104,7 +108,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
     if (items.length === 0 && !append) {
       gridEl.append(
         h('div', { class: 'sm-gallery-modal__empty' }, [
-          '暂无图片，可上传、添加链接或更换搜索条件',
+          t('gallery.empty'),
         ]),
       );
       loadMoreBtn.style.display = hasMore ? '' : 'none';
@@ -144,7 +148,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
         img.style.opacity = '0.72';
       };
       const cap = h('div', { class: 'sm-gallery-modal__caption' }, [
-        it.title?.trim() ? it.title : '图片',
+        it.title?.trim() ? it.title : t('common.image'),
       ]);
       cell.append(img, cap);
       cellWrap.append(cell);
@@ -155,11 +159,11 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
           {
             type: 'button',
             class: 'sm-gallery-modal__cell-delete',
-            title: '从图库删除',
+            title: t('gallery.deleteTitle'),
             onclick: async (e: Event) => {
               e.preventDefault();
               e.stopPropagation();
-              if (!window.confirm('确定从图库中删除这张图片？')) return;
+              if (!window.confirm(t('gallery.deleteConfirm'))) return;
               try {
                 await adapter.deleteItem!(it.id);
                 if (selected?.id === it.id) {
@@ -168,7 +172,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
                 }
                 await loadFirst();
               } catch (err) {
-                setError(err instanceof Error ? err.message : '删除失败');
+                setError(err instanceof Error ? err.message : t('gallery.deleteFailed'));
               }
             },
           },
@@ -193,7 +197,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
       page = p;
       renderCells(res.items, append);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败');
+      setError(e instanceof Error ? e.message : t('gallery.loadFailed'));
     } finally {
       loading = false;
       loadMoreBtn.disabled = false;
@@ -224,7 +228,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
     const urlInp = h('input', {
       class: 'sm-input sm-gallery-modal__addurl-input',
       type: 'url',
-      placeholder: '图片链接 https://…',
+      placeholder: t('gallery.addUrlPlaceholder'),
     }) as HTMLInputElement;
     const addBtn = h(
       'button',
@@ -239,11 +243,11 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
             urlInp.value = '';
             await loadFirst();
           } catch (e) {
-            setError(e instanceof Error ? e.message : '添加失败');
+            setError(e instanceof Error ? e.message : t('gallery.addFailed'));
           }
         },
       },
-      ['添加'],
+      [t('common.add')],
     );
     toolRow.append(urlInp, addBtn);
   }
@@ -262,7 +266,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
         await adapter.uploadFile!(f);
         await loadFirst();
       } catch (e) {
-        setError(e instanceof Error ? e.message : '上传失败');
+        setError(e instanceof Error ? e.message : t('gallery.uploadFailed'));
       }
     });
     const upBtn = h(
@@ -272,7 +276,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
         type: 'button',
         onclick: () => fileInp.click(),
       },
-      ['上传'],
+      [t('common.upload')],
     );
     toolRow.append(upBtn, fileInp);
   }
@@ -292,7 +296,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
         type: 'button',
         onclick: () => modal.close(),
       },
-      ['取消'],
+      [t('common.cancel')],
     ),
     confirmBtn,
   );

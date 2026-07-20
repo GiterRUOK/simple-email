@@ -6,10 +6,12 @@ import { renderDoc } from '../renderer';
 import type { Store } from '../store/store';
 import { clear, h } from '../utils/dom';
 import { richTextExecCommand } from '../utils/richTextCommand';
+import type { SimpleMailT } from '../i18n';
 
 export interface SourceViewOptions {
   store: Store;
   registry: Registry;
+  t: SimpleMailT;
 }
 
 type SourceTab = 'mjml' | 'html';
@@ -54,7 +56,7 @@ export class SourceView {
     clear(this.el);
     const bar = h('div', { class: 'sm-doc-source__bar' }, [
       this._tabBtn('mjml', 'MJML'),
-      this._tabBtn('html', 'HTML（编译产物）'),
+      this._tabBtn('html', this.opts.t('source.compiledHtml')),
       h('div', { class: 'sm-topbar__spacer' }),
       h(
         'button',
@@ -63,7 +65,7 @@ export class SourceView {
           type: 'button',
           onclick: () => this._copy(),
         },
-        ['复制'],
+        [this.opts.t('common.copy')],
       ),
     ]);
     this.el.append(bar, this.body);

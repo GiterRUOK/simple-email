@@ -40,6 +40,7 @@ import {
   buildVariablePickerHead,
   type VariablePickerHandlers,
 } from './VariablePickerPanel';
+import type { SimpleMailT } from '../i18n';
 
 /** 与社交组 block 中每行元素结构一致（core 不依赖 blocks） */
 type SocialLinkRow = {
@@ -72,6 +73,7 @@ function layoutWidthNumeric(raw: string, mode: 'px' | '%'): number {
 export interface RightPanelOptions {
   store: Store;
   registry: Registry;
+  t: SimpleMailT;
   /** 聚焦路径根节点文案（文档级），默认「邮件」 */
   docRootLabel?: string;
   /** 点击路径中的 Section 层级 */
@@ -118,7 +120,8 @@ export class RightPanel {
     this.focusCrumb = new FocusBreadcrumb({
       store: opts.store,
       registry: opts.registry,
-      docRootLabel: opts.docRootLabel ?? '邮件',
+      docRootLabel: opts.docRootLabel ?? opts.t('rightPanel.docRoot.mail'),
+      t: opts.t,
       onFocusDocument: () => opts.onFocusDocument(),
       onFocusSection: (id) => opts.onFocusSection(id),
     });
@@ -200,11 +203,12 @@ export class RightPanel {
     this.headEl.append(
       buildVariablePickerHead({
         pinned: this.variablePickerPinned,
+        t: this.opts.t,
         onClose: () => handlers.onClose(),
         onTogglePin: () => this.toggleVariablePickerPin(),
       }),
     );
-    this.contentEl.append(buildVariablePickerBody(vars, handlers));
+    this.contentEl.append(buildVariablePickerBody(vars, handlers, this.opts.t));
   }
 
   /** 焦点在右栏可编辑控件上时不要整栏重渲染（避免输入/CodeMirror 失焦） */
@@ -275,20 +279,20 @@ export class RightPanel {
     const loc = findBlockLocation(doc, sel.blockId);
     if (!loc) {
       const tabs = h('div', { class: 'sm-tabs' }, [
-        this._tabBtn('props', '属性'),
-        this._tabBtn('code', '代码'),
+        this._tabBtn('props', this.opts.t('rightPanel.tabs.props')),
+        this._tabBtn('code', this.opts.t('rightPanel.tabs.code')),
       ]);
       this.contentEl.append(tabs);
       this.contentEl.append(
-        h('div', { class: 'sm-empty-form' }, ['该组件可能已被删除，请重新选中画布中的块。']),
+        h('div', { class: 'sm-empty-form' }, [this.opts.t('rightPanel.block.deleted')]),
       );
       return;
     }
     const def = this.opts.registry.get(loc.block.type);
 
     const tabs = h('div', { class: 'sm-tabs' }, [
-      this._tabBtn('props', '属性'),
-      this._tabBtn('code', '代码'),
+      this._tabBtn('props', this.opts.t('rightPanel.tabs.props')),
+      this._tabBtn('code', this.opts.t('rightPanel.tabs.code')),
     ]);
     this.contentEl.append(tabs);
 
@@ -296,7 +300,7 @@ export class RightPanel {
       if (loc.block.lockedMjml) {
         this.contentEl.append(
           h('div', { class: 'sm-empty-form' }, [
-            '该组件已被代码模式锁定。',
+            this.opts.t('rightPanel.block.locked'),
             h('div', { style: 'margin-top:8px;' }, [
               h(
                 'button',
@@ -310,7 +314,7 @@ export class RightPanel {
                     });
                   },
                 },
-                ['恢复为属性模式'],
+                [this.opts.t('rightPanel.block.restoreProps')],
               ),
             ]),
           ]),
@@ -319,7 +323,9 @@ export class RightPanel {
         this.contentEl.append(this._renderBlockForm(loc.block, def.schema));
       } else {
         this.contentEl.append(
-          h('div', { class: 'sm-empty-form' }, [`未注册的组件: ${loc.block.type}`]),
+          h('div', { class: 'sm-empty-form' }, [
+            this.opts.t('rightPanel.block.unregistered', { type: loc.block.type }),
+          ]),
         );
       }
     } else {
@@ -349,15 +355,15 @@ export class RightPanel {
     const rows: HTMLElement[] = [];
     if (!hideMeta) {
       rows.push(
-        h('div', { class: 'sm-panel__title' }, ['邮件设置']),
-        this._textField('主题', doc.meta.subject, (v) =>
+        h('div', { class: 'sm-panel__title' }, [this.opts.t('rightPanel.doc.title')]),
+        this._textField(this.opts.t('rightPanel.doc.subject'), doc.meta.subject, (v) =>
           this.opts.store.update((d) => {
             d.meta.subject = v;
           }),
           '',
           'doc:meta.subject',
         ),
-        this._textField('Preheader', doc.meta.preheader ?? '', (v) =>
+        this._textField(this.opts.t('rightPanel.doc.preheader'), doc.meta.preheader ?? '', (v) =>
           this.opts.store.update((d) => {
             d.meta.preheader = v;
           }),
@@ -366,22 +372,22 @@ export class RightPanel {
         ),
       );
     } else {
-      rows.push(h('div', { class: 'sm-panel__title' }, ['版式']));
+      rows.push(h('div', { class: 'sm-panel__title' }, [this.opts.t('rightPanel.doc.layoutTitle')]));
     }
     rows.push(
       this._textField(
-        '内容宽度',
+        this.opts.t('rightPanel.doc.contentWidth'),
         metaWidthInputString(doc.meta.width),
         (v) =>
           this.opts.store.update((d) => {
             d.meta.width = parseMetaWidthFromUserInput(v);
           }),
-        '如 600、600px、100%',
+        this.opts.t('rightPanel.doc.contentWidthPlaceholder'),
         'doc:meta.width',
       ),
-      h('div', { class: 'sm-panel__title' }, ['全局样式']),
+      h('div', { class: 'sm-panel__title' }, [this.opts.t('rightPanel.doc.globalStyles')]),
       this._colorField(
-        '页面背景',
+        this.opts.t('rightPanel.doc.pageBackground'),
         doc.styles.backgroundColor,
         (v) =>
           this.opts.store.update((d) => {
@@ -390,7 +396,7 @@ export class RightPanel {
         'doc:styles.backgroundColor',
       ),
       this._colorField(
-        '内容背景',
+        this.opts.t('rightPanel.doc.contentBackground'),
         doc.styles.contentBackgroundColor,
         (v) =>
           this.opts.store.update((d) => {
@@ -399,7 +405,7 @@ export class RightPanel {
         'doc:styles.contentBackgroundColor',
       ),
       this._textField(
-        '字体',
+        this.opts.t('rightPanel.doc.fontFamily'),
         doc.styles.fontFamily,
         (v) =>
           this.opts.store.update((d) => {
@@ -425,17 +431,17 @@ export class RightPanel {
         'doc:styles.fontWeight',
       ),
       this._textField(
-        '行高',
+        this.opts.t('rightPanel.doc.lineHeight'),
         doc.styles.lineHeight ?? '1.25',
         (v) =>
           this.opts.store.update((d) => {
             d.styles.lineHeight = v;
           }),
-        '如 1.25 或 24px',
+        this.opts.t('rightPanel.doc.lineHeightPlaceholder'),
         'doc:styles.lineHeight',
       ),
       this._colorField(
-        '正文颜色',
+        this.opts.t('rightPanel.doc.textColor'),
         doc.styles.color,
         (v) =>
           this.opts.store.update((d) => {
@@ -444,7 +450,7 @@ export class RightPanel {
         'doc:styles.color',
       ),
       this._colorField(
-        '链接颜色',
+        this.opts.t('rightPanel.doc.linkColor'),
         doc.styles.linkColor,
         (v) =>
           this.opts.store.update((d) => {
@@ -466,7 +472,7 @@ export class RightPanel {
     const dynamicVariantKeyField = dvUiEnabled
       ? (() => {
           const field = this._textField(
-            '动态变量名',
+            this.opts.t('rightPanel.section.dynamicKey'),
             a.dynamicVariantKey ?? '',
             (v) =>
               this.opts.store.update((d) => {
@@ -475,18 +481,20 @@ export class RightPanel {
                 const trimmed = v.trim();
                 s.attrs.dynamicVariantKey = trimmed || undefined;
               }),
-            '谨慎填写，需确认业务场景是否支持',
+            this.opts.t('rightPanel.section.dynamicKeyPlaceholder'),
             `section:${section.id}:attrs.dynamicVariantKey`,
           );
           field.append(
-            h('div', { class: 'sm-field__help' }, ['本段内容将整体替换成该动态变量名']),
+            h('div', { class: 'sm-field__help' }, [
+              this.opts.t('rightPanel.section.dynamicKeyHelp'),
+            ]),
           );
           return field;
         })()
       : null;
     return h('form', { class: 'sm-form', onsubmit: (e: Event) => e.preventDefault() }, [
       h('div', { class: 'sm-panel__title' }, [
-        dvKey ? '动态变量 Section' : 'Section 设置',
+        this.opts.t(dvKey ? 'rightPanel.section.dynamicTitle' : 'rightPanel.section.title'),
       ]),
       ...(dynamicVariantKeyField ? [dynamicVariantKeyField] : []),
       ...(isMultiColumnLayout(section.layout)
@@ -503,29 +511,29 @@ export class RightPanel {
           ]
         : []),
       this._colorField(
-        '背景色',
+        this.opts.t('rightPanel.section.backgroundColor'),
         a.backgroundColor ?? '',
         (v) =>
           this.opts.store.update((d) => {
             const s = findSection(d, section.id);
             if (s) s.attrs.backgroundColor = v || undefined;
-          }),
+        }),
         `section:${section.id}:attrs.bg`,
-        '留空=透明',
+        this.opts.t('rightPanel.section.transparentPlaceholder'),
       ),
       this._layoutWidthField(
-        '区域宽度',
+        this.opts.t('rightPanel.section.width'),
         sectionWidthInputString(a.width),
         (v) =>
           this.opts.store.update((d) => {
             const s = findSection(d, section.id);
             if (s) s.attrs.width = parseSectionWidthFromUserInput(v);
-          }),
+        }),
         `section:${section.id}:attrs.width`,
-        '留空=与邮件同宽；自适应等价于清空宽度',
+        this.opts.t('rightPanel.section.widthHelp'),
       ),
       this._spacingField(
-        '内边距',
+        this.opts.t('rightPanel.section.padding'),
         [a.paddingTop, a.paddingRight, a.paddingBottom, a.paddingLeft],
         (vals) =>
           this.opts.store.update((d) => {
@@ -539,7 +547,7 @@ export class RightPanel {
       ),
       section.layout !== '1'
         ? this._numberField(
-            '列间距 (px)',
+            this.opts.t('rightPanel.section.columnGap'),
             a.columnGap ?? 0,
             0,
             64,
@@ -556,14 +564,14 @@ export class RightPanel {
         : null,
       section.layout !== '1'
         ? this._switchField(
-            '小屏仍并排显示多列（可能字很窄）',
+            this.opts.t('rightPanel.section.preserveMobile'),
             !!a.preserveColumnsOnMobile,
             (checked) =>
               this.opts.store.update((d) => {
                 const s = findSection(d, section.id);
                 if (s) s.attrs.preserveColumnsOnMobile = checked || undefined;
               }),
-            '开启后 MJML 会生成 mj-group，移动端预览/导出与默认「小屏堆叠列」行为不同。',
+            this.opts.t('rightPanel.section.preserveMobileHelp'),
             `section:${section.id}:attrs.preserveMobile`,
           )
         : null,
@@ -609,7 +617,7 @@ export class RightPanel {
             fp,
             (v) =>
               htmlContainsMjmlTags(v)
-                ? '检测到 MJML 标签（如 <mj-text>）。此处应只写 HTML，否则预览会显示源码。简单链接请用「文本」块。'
+                ? this.opts.t('rightPanel.block.mjmlWarning')
                 : null,
           );
         }
@@ -834,10 +842,10 @@ export class RightPanel {
       });
       const rm = h(
         'button',
-        {
-          class: 'sm-social-link-list__remove',
-          type: 'button',
-          title: '删除',
+          {
+            class: 'sm-social-link-list__remove',
+            type: 'button',
+          title: this.opts.t('common.delete'),
           onclick: () => removeAt(i),
         },
         ['×'],
@@ -854,7 +862,7 @@ export class RightPanel {
         h('input', {
           class: 'sm-input sm-social-link-list__label',
           type: 'text',
-          placeholder: '标签文字（可选）',
+          placeholder: this.opts.t('rightPanel.social.labelPlaceholder'),
           value: rowData.label ?? '',
           ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:label` } : {}),
           oninput: (e: Event) => syncItem(i, { label: (e.target as HTMLInputElement).value }),
@@ -862,7 +870,7 @@ export class RightPanel {
         h('input', {
           class: 'sm-input sm-social-link-list__iconsrc',
           type: 'url',
-          placeholder: '图标 URL（可选）',
+          placeholder: this.opts.t('rightPanel.social.iconUrlPlaceholder'),
           value: rowData.iconSrc ?? '',
           ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:icon` } : {}),
           oninput: (e: Event) => syncItem(i, { iconSrc: (e.target as HTMLInputElement).value }),
@@ -876,6 +884,7 @@ export class RightPanel {
       }) as HTMLInputElement;
       bindColorPickerInput(bgPick, {
         liveCommit: true,
+        t: this.opts.t,
         onCommit: (hex) => syncItem(i, { backgroundColor: hex }),
       });
       extras.append(bgPick);
@@ -900,7 +909,7 @@ export class RightPanel {
             },
           ]),
       },
-      ['+ 添加社交链接'],
+      [this.opts.t('rightPanel.social.add')],
     );
 
     wrap.append(listEl, addBtn);
@@ -1002,10 +1011,10 @@ export class RightPanel {
           {
             class: 'sm-btn sm-btn--secondary sm-image-field__btn',
             type: 'button',
-            title: '上传本地图片',
+            title: this.opts.t('rightPanel.image.uploadTitle'),
             onclick: () => fileInp.click(),
           },
-          ['上传'],
+          [this.opts.t('rightPanel.image.upload')],
         ),
       );
       row.append(fileInp);
@@ -1018,12 +1027,14 @@ export class RightPanel {
           {
             class: 'sm-btn sm-btn--secondary sm-image-field__btn',
             type: 'button',
-            title: '从图库选择',
+            title: this.opts.t('rightPanel.image.galleryTitle'),
             onclick: () => {
               if (assets.imageGallery) {
                 openImageGalleryModal({
                   adapter: assets.imageGallery,
                   onPick: (url) => applyUrl(url),
+                  t: this.opts.t,
+                  parent: this.el.closest('.sm-root') as HTMLElement | undefined,
                 });
                 return;
               }
@@ -1037,23 +1048,23 @@ export class RightPanel {
               }
             },
           },
-          ['图床'],
+          [this.opts.t('rightPanel.image.gallery')],
         ),
       );
     }
 
     let helpBody: string;
     if (hasAnyPickerBtn) {
-      const bits: string[] = ['可手输 URL'];
-      if (showUploadBtn) bits.push('或使用「上传」');
-      if (showGalleryBtn) bits.push('或使用「图床」');
-      helpBody = `${bits.join('；')}。`;
+      const bits: string[] = [this.opts.t('rightPanel.image.helpManual')];
+      if (showUploadBtn) bits.push(this.opts.t('rightPanel.image.helpUpload'));
+      if (showGalleryBtn) bits.push(this.opts.t('rightPanel.image.helpGallery'));
+      helpBody = `${bits.join(this.opts.t('rightPanel.image.helpSeparator'))}${this.opts.t(
+        'rightPanel.image.helpEnd',
+      )}`;
     } else if (hasAssetCallbacks) {
-      helpBody =
-        '已传入 imageAssets：上传默认显示（提供 uploadImage 且未设 showUpload:false）；图库需 showGallery:true，可使用内置 imageGallery 或自管 pickImageFromGallery。仍可手输 URL。';
+      helpBody = this.opts.t('rightPanel.image.helpAssetsConfigured');
     } else {
-      helpBody =
-        '在 MailEditor 的 imageAssets 中配置 uploadImage、内置 imageGallery 或 pickImageFromGallery 等；未配置时仅支持手输 URL。';
+      helpBody = this.opts.t('rightPanel.image.helpNoAssets');
     }
 
     return h('div', { class: 'sm-field' }, [
@@ -1257,7 +1268,7 @@ export class RightPanel {
     const applyPickInherit = () => {
       pick.value = '#808080';
       pick.classList.add('sm-color-row__pick--inherit');
-      pick.title = placeholder || '未设置';
+      pick.title = placeholder || this.opts.t('rightPanel.color.unset');
     };
 
     const applyStored = (stored: string) => {
@@ -1292,6 +1303,7 @@ export class RightPanel {
       getValue: () => text.value.trim() || pick.value,
       placeholder,
       allowClear: true,
+      t: this.opts.t,
       onPreview: previewPick,
       onCommit: commitPick,
       onClear: () => {
@@ -1373,10 +1385,10 @@ export class RightPanel {
       value: String(px),
     }));
     const help = h('div', { class: 'sm-field__help' }, [
-      '未单独设置缩进的列表使用此值。',
+      this.opts.t('rightPanel.doc.listIndentHelp'),
     ]);
     const field = this._segmentedSelectField(
-      '列表默认缩进',
+      this.opts.t('rightPanel.doc.listIndent'),
       current,
       options,
       (v) =>
@@ -1460,7 +1472,12 @@ export class RightPanel {
     focusPrefix?: string,
     resetQuad?: [number, number, number, number],
   ) {
-    const titles = ['上', '右', '下', '左'];
+    const titles = [
+      this.opts.t('rightPanel.spacing.top'),
+      this.opts.t('rightPanel.spacing.right'),
+      this.opts.t('rightPanel.spacing.bottom'),
+      this.opts.t('rightPanel.spacing.left'),
+    ];
     const clampPad = (n: number) => Math.max(0, Math.min(200, Math.round(n)));
 
     /** 右栏聚焦时会跳过整栏重绘，闭包里的 t/r/b/l 会过时；用同一数组累积四边，避免改一边再改另一边时覆盖。 */
@@ -1575,7 +1592,7 @@ export class RightPanel {
 
     return h('div', { class: 'sm-field' }, [
       h('div', { class: 'sm-spacing-field__label-row' }, [
-        h('label', { class: 'sm-field__label' }, [`${label}（上/右/下/左）`]),
+        h('label', { class: 'sm-field__label' }, [`${label}${this.opts.t('rightPanel.spacing.suffix')}`]),
         resetQuad
           ? h(
               'button',
@@ -1588,7 +1605,7 @@ export class RightPanel {
                   onChange([...current]);
                 },
               },
-              ['恢复默认'],
+              [this.opts.t('rightPanel.spacing.reset')],
             )
           : null,
       ]),
@@ -1627,7 +1644,7 @@ export class RightPanel {
     const el = h('div', { class: 'sm-inherit-switch' }, [
       h('label', { class: 'sm-inherit-switch__label' }, [
         input,
-        h('span', { class: 'sm-inherit-switch__text' }, ['继承全局']),
+        h('span', { class: 'sm-inherit-switch__text' }, [this.opts.t('rightPanel.inheritGlobal')]),
       ]),
       valueEl,
     ]);
@@ -1736,7 +1753,7 @@ export class RightPanel {
     const syncInput = () => {
       input.disabled = inheriting;
       input.value = inheriting ? '' : stored;
-      input.placeholder = inheriting ? '' : '如 16px';
+      input.placeholder = inheriting ? '' : this.opts.t('rightPanel.fontSize.placeholder');
       input.classList.toggle('sm-input--inherit-disabled', inheriting);
     };
 
@@ -1930,11 +1947,11 @@ export class RightPanel {
 
   private _docFontSizeField(value: string, onChange: (v: string) => void, focusToken: string) {
     return this._fontSizeSliderField(
-      '字号',
+      this.opts.t('rightPanel.doc.fontSize'),
       value,
       onChange,
       focusToken,
-      '滑块与数字均以 px 写入（如 16px）',
+      this.opts.t('rightPanel.doc.fontSizeHelp'),
     );
   }
 
@@ -1957,7 +1974,7 @@ export class RightPanel {
       wrap.append(h('label', { class: 'sm-field__label' }, [label]));
       wrap.append(
         h('div', { class: 'sm-field__help' }, [
-          '当前值为自定义写法，请直接编辑；清空后可选「自适应」再用滑块。',
+          this.opts.t('rightPanel.width.customHelp'),
         ]),
       );
       wrap.append(
@@ -1965,7 +1982,7 @@ export class RightPanel {
           class: 'sm-input',
           type: 'text',
           value: raw,
-          placeholder: '如 480px、90%',
+          placeholder: this.opts.t('rightPanel.width.customPlaceholder'),
           'data-sm-focus': focusToken,
           oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
         }),
@@ -2063,7 +2080,7 @@ export class RightPanel {
         ),
       );
     };
-    addModeBtn('auto', '自适应');
+    addModeBtn('auto', this.opts.t('rightPanel.width.auto'));
     addModeBtn('px', 'px');
     addModeBtn('%', '%');
 
@@ -2078,7 +2095,7 @@ export class RightPanel {
 
   private _docFontWeightField(value: string, onChange: (v: string) => void, focusToken: string) {
     const cur = normalizeFontWeightStep(value);
-    return this._segmentedSelectField('字重', cur, FONT_WEIGHT_STEP_OPTIONS, onChange, focusToken);
+    return this._segmentedSelectField(this.opts.t('rightPanel.doc.fontWeight'), cur, FONT_WEIGHT_STEP_OPTIONS, onChange, focusToken);
   }
 
   private _multiColumnLayoutField(
@@ -2087,7 +2104,7 @@ export class RightPanel {
     focusToken: string,
   ) {
     return this._segmentedSelectField(
-      '列布局',
+      this.opts.t('rightPanel.section.columnLayout'),
       layout,
       [
         { label: '1:1', value: '1-1' },
@@ -2109,7 +2126,7 @@ export class RightPanel {
     const wrap = h('div', { class: 'sm-code-pane' });
 
     const header = h('div', { class: 'sm-code-pane__header' }, [
-      h('div', { class: 'sm-code-pane__title' }, ['编辑组件 MJML 源码']),
+      h('div', { class: 'sm-code-pane__title' }, [this.opts.t('rightPanel.code.title')]),
     ]);
 
     const editorHost = h('div', { class: 'sm-code' });
@@ -2136,7 +2153,7 @@ export class RightPanel {
             });
           },
         },
-        ['恢复默认'],
+        [this.opts.t('rightPanel.code.restoreDefault')],
       ),
       h(
         'button',
@@ -2151,16 +2168,14 @@ export class RightPanel {
             });
           },
         },
-        ['保存为锁定 MJML'],
+        [this.opts.t('rightPanel.code.saveLocked')],
       ),
     ]);
 
     wrap.append(
       header,
       editorHost,
-      h('div', { class: 'sm-field__help' }, [
-        '保存后该组件将以这段 MJML 直接输出，属性面板会被禁用，可点"恢复默认"取消锁定。',
-      ]),
+      h('div', { class: 'sm-field__help' }, [this.opts.t('rightPanel.code.help')]),
       actions,
     );
     return wrap;

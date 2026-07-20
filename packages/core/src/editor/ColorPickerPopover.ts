@@ -1,5 +1,6 @@
 import { normalizeAccentHex } from '../utils/accentColor';
 import { h } from '../utils/dom';
+import { createI18nContext, type SimpleMailT } from '../i18n';
 
 /** 邮件常用预设色 */
 export const COLOR_PICKER_PALETTE = [
@@ -36,6 +37,7 @@ export interface ColorPickerPopoverOptions {
   placeholder?: string;
   /** 显示「清除」并允许提交空值 */
   allowClear?: boolean;
+  t?: SimpleMailT;
   /** 每次改色立即 onCommit（富文本/顶栏） */
   liveCommit?: boolean;
   onPreview?: (hex: string) => void;
@@ -98,6 +100,7 @@ function syncNativeInput(native: HTMLInputElement, hex: string) {
 export function openColorPickerPopover(opts: ColorPickerPopoverOptions): void {
   closeActiveColorPicker();
   opts.onBeforeOpen?.();
+  const t = opts.t ?? createI18nContext().t;
 
   const initialHex = normalizeAccentHex(opts.value);
   let draft = initialHex ?? '#4F46E5';
@@ -110,7 +113,7 @@ export function openColorPickerPopover(opts: ColorPickerPopoverOptions): void {
   const panel = h('div', {
     class: 'sm-color-picker',
     role: 'dialog',
-    'aria-label': '选择颜色',
+    'aria-label': t('colorPicker.title'),
   });
 
   const closeBtn = h(
@@ -118,21 +121,21 @@ export function openColorPickerPopover(opts: ColorPickerPopoverOptions): void {
     {
       class: 'sm-color-picker__close',
       type: 'button',
-      title: '关闭',
-      'aria-label': '关闭',
+      title: t('common.close'),
+      'aria-label': t('common.close'),
     },
     ['×'],
   );
 
   const head = h('div', { class: 'sm-color-picker__head' }, [
-    h('span', { class: 'sm-color-picker__title' }, ['选择颜色']),
+    h('span', { class: 'sm-color-picker__title' }, [t('colorPicker.title')]),
     closeBtn,
   ]);
 
   const native = h('input', {
     class: 'sm-color-picker__native',
     type: 'color',
-    'aria-label': '自定义颜色',
+    'aria-label': t('colorPicker.custom'),
   }) as HTMLInputElement;
 
   const hexInput = h('input', {
@@ -173,7 +176,7 @@ export function openColorPickerPopover(opts: ColorPickerPopoverOptions): void {
     const btn = h('button', {
       class: 'sm-color-picker__swatch',
       type: 'button',
-      title: `${hex}（双击确认）`,
+      title: t('colorPicker.doubleClickConfirm', { hex }),
       style: `background:${hex}`,
       'aria-label': hex,
     });
@@ -217,7 +220,7 @@ export function openColorPickerPopover(opts: ColorPickerPopoverOptions): void {
             teardown(false);
           },
         },
-        ['清除'],
+        [t('common.clear')],
       ),
     );
   }
@@ -268,7 +271,8 @@ export function bindColorPickerInput(
   pick: HTMLInputElement,
   opts: BindColorPickerInputOptions,
 ): void {
-  if (!pick.title) pick.title = '点击打开色板；预设色块可双击快速确认';
+  const t = opts.t ?? createI18nContext().t;
+  if (!pick.title) pick.title = t('colorPicker.openTitle');
 
   pick.addEventListener('mousedown', (e) => {
     e.preventDefault();

@@ -5,20 +5,30 @@ import {
   type ImageGalleryListResult,
 } from '@simple-mail/core';
 import '@simple-mail/core/style.css';
-import { allBlocks } from '@simple-mail/blocks';
+import { createAllBlocks } from '@simple-mail/blocks';
+import type { SimpleMailLocale } from '@simple-mail/core';
+
+// http://localhost:5173/?locale=zh-CN or http://localhost:5173/?locale=en-US
+function getDemoLocale(): SimpleMailLocale {
+  const raw = new URLSearchParams(window.location.search).get('locale');
+  return raw === 'zh-CN' ? 'zh-CN' : 'en-US';
+}
+
+const locale = getDemoLocale();
+const isEn = locale === 'en-US';
 
 const demoItems: GalleryItem[] = [
   {
     id: 'demo-1',
     url: 'https://picsum.photos/seed/simplemail-a/640/320',
     thumbnailUrl: 'https://picsum.photos/seed/simplemail-a/240/160',
-    title: '示例素材 A',
+    title: isEn ? 'Demo asset A' : '示例素材 A',
   },
   {
     id: 'demo-2',
     url: 'https://picsum.photos/seed/simplemail-b/640/320',
     thumbnailUrl: 'https://picsum.photos/seed/simplemail-b/240/160',
-    title: '示例素材 B',
+    title: isEn ? 'Demo asset B' : '示例素材 B',
   },
 ];
 
@@ -58,12 +68,14 @@ const demoGalleryAdapter: ImageGalleryAdapter = {
   },
   async addByUrl(raw: string): Promise<void> {
     const u = raw.trim();
-    if (!/^https?:\/\/.+/i.test(u)) throw new Error('请输入有效的 http(s) 链接');
+    if (!/^https?:\/\/.+/i.test(u)) {
+      throw new Error(isEn ? 'Enter a valid http(s) URL' : '请输入有效的 http(s) 链接');
+    }
     demoItems.unshift({
       id: `url-${demoNextId++}`,
       url: u,
       thumbnailUrl: u,
-      title: '外链图片',
+      title: isEn ? 'Linked image' : '外链图片',
     });
   },
   async deleteItem(id: string): Promise<void> {
@@ -76,33 +88,38 @@ const container = document.getElementById('app')!;
 
 const editor = new MailEditor({
   container,
-  blocks: allBlocks,
+  locale,
+  blocks: createAllBlocks({ locale }),
   initialDoc: {
-    meta: { subject: '欢迎加入 Simple Mail！', preheader: '一封示例邮件', width: 600 },
+    meta: {
+      subject: isEn ? 'Welcome to Simple Mail!' : '欢迎加入 Simple Mail！',
+      preheader: isEn ? 'A sample email' : '一封示例邮件',
+      width: 600,
+    },
     variables: [
-      { key: 'user.name', label: '用户名', sample: '张三' },
-      { key: 'user.email', label: '邮箱', sample: 'zhangsan@example.com' },
+      { key: 'user.name', label: isEn ? 'User name' : '用户名', sample: isEn ? 'Alex' : '张三' },
+      { key: 'user.email', label: isEn ? 'Email' : '邮箱', sample: 'alex@example.com' },
       {
         key: 'unsubscribeUrl',
-        label: '退订地址',
+        label: isEn ? 'Unsubscribe URL' : '退订地址',
         kind: 'link',
         sample: 'https://example.com/unsubscribe',
       },
       {
         key: 'couponLink',
-        label: '优惠券链接',
+        label: isEn ? 'Coupon link' : '优惠券链接',
         kind: 'link',
         sample: 'https://example.com/shop',
       },
       {
         key: 'couponImage',
-        label: '优惠券图片',
+        label: isEn ? 'Coupon image' : '优惠券图片',
         kind: 'image',
         sample: 'https://picsum.photos/seed/simplemail-coupon/320/160',
       },
       {
         key: 'productImage',
-        label: '产品图片',
+        label: isEn ? 'Product image' : '产品图片',
         kind: 'image',
         sample: 'https://picsum.photos/seed/simplemail-product/400/240',
       },

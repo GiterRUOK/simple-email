@@ -3,11 +3,13 @@ import { h, clear } from '../utils/dom';
 import { parseDocClipboard } from '../utils/docClipboard';
 import { richTextExecCommand } from '../utils/richTextCommand';
 import { Modal } from './Modal';
+import type { SimpleMailT } from '../i18n';
 
 export interface ImportDocModalOptions {
   /** 读取剪贴板初始内容（失败时返回空字符串） */
   readClipboard?: () => Promise<string>;
   onApply: (doc: EmailDoc) => void;
+  t: SimpleMailT;
 }
 
 /**
@@ -21,23 +23,25 @@ export class ImportDocModal {
 
   constructor(opts: ImportDocModalOptions) {
     this.opts = opts;
+    const t = opts.t;
     this.modal = new Modal({
-      title: '导入设计稿',
+      title: t('importDoc.title'),
       className: 'sm-modal--import-doc',
       width: 'min(720px, 96vw)',
       height: 'auto',
+      t,
     });
 
     this.hintEl = h('p', { class: 'sm-import-doc__hint' }, [
-      '将覆盖当前画布上的所有 Section 与组件（全局样式会一并替换）。',
-      '若宿主管理邮件主题/宽度，这些字段可能保持不变。',
-      '粘贴由「复制设计稿」生成的 JSON，或裸 EmailDoc（version: "1"）。',
+      t('importDoc.hint1'),
+      t('importDoc.hint2'),
+      t('importDoc.hint3'),
     ]);
 
     this.textarea = h('textarea', {
       class: 'sm-import-doc__input',
       spellcheck: 'false',
-      placeholder: '在此粘贴设计稿 JSON…',
+      placeholder: t('importDoc.placeholder'),
       rows: '14',
     }) as HTMLTextAreaElement;
 
@@ -46,12 +50,12 @@ export class ImportDocModal {
     const cancelBtn = h(
       'button',
       { class: 'sm-btn', type: 'button', onclick: () => this.modal.close() },
-      ['取消'],
+      [t('common.cancel')],
     );
     const pasteBtn = h(
       'button',
       { class: 'sm-btn', type: 'button', onclick: () => void this._fillFromClipboard() },
-      ['从剪贴板填入'],
+      [t('importDoc.pasteFromClipboard')],
     );
     const applyBtn = h(
       'button',
@@ -60,7 +64,7 @@ export class ImportDocModal {
         type: 'button',
         onclick: () => this._apply(),
       },
-      ['应用并覆盖画布'],
+      [t('importDoc.apply')],
     );
     this.modal.footer.append(cancelBtn, pasteBtn, applyBtn);
   }
@@ -76,22 +80,22 @@ export class ImportDocModal {
   private async _fillFromClipboard() {
     const text = (await this.opts.readClipboard?.()) ?? '';
     if (!text.trim()) {
-      this._setHint('剪贴板为空或无法读取，请手动粘贴 JSON。', true);
+      this._setHint(this.opts.t('importDoc.clipboardEmpty'), true);
       return;
     }
     this.textarea.value = text;
-    this._setHint('已从剪贴板填入，请确认后点击「应用并覆盖画布」。', false);
+    this._setHint(this.opts.t('importDoc.clipboardFilled'), false);
   }
 
   private _apply() {
     const raw = this.textarea.value.trim();
     if (!raw) {
-      this._setHint('请先粘贴设计稿 JSON。', true);
+      this._setHint(this.opts.t('importDoc.empty'), true);
       return;
     }
     const doc = parseDocClipboard(raw);
     if (!doc) {
-      this._setHint('JSON 无效或不是 simple-mail 设计稿格式。', true);
+      this._setHint(this.opts.t('importDoc.invalid'), true);
       return;
     }
     this.opts.onApply(doc);

@@ -1,4 +1,5 @@
 import { h } from '../utils/dom';
+import type { SimpleMailT } from '../i18n';
 
 /**
  * 极简 Modal：遮罩 + 居中卡片 + header/body/footer 三段。
@@ -15,6 +16,7 @@ export interface ModalOptions {
   className?: string;
   /** 关闭回调；用户取消、Esc、点遮罩时触发 */
   onClose?: () => void;
+  t?: SimpleMailT;
 }
 
 export class Modal {
@@ -121,7 +123,8 @@ export class Modal {
       {
         class: 'sm-modal__close',
         type: 'button',
-        title: '关闭 Esc',
+        title: this.opts.t?.('common.closeEsc') ?? '关闭 Esc',
+        'aria-label': this.opts.t?.('common.close') ?? '关闭',
         onclick: () => this._handleClose(),
       },
       [iconClose()],

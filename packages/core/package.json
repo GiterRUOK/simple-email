@@ -1,6 +1,6 @@
 {
   "name": "@simple-mail/core",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "邮件可视化编辑器核心引擎（框架无关）",
   "type": "module",
   "main": "./dist/index.js",

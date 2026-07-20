@@ -3,6 +3,7 @@ import { renderDoc } from '../renderer';
 import type { Store } from '../store/store';
 import { h } from '../utils/dom';
 import { Modal } from './Modal';
+import type { SimpleMailT } from '../i18n';
 
 export type PreviewDevice = 'pc' | 'pad' | 'phone';
 
@@ -20,6 +21,7 @@ const DEVICES: Record<PreviewDevice, DeviceSpec> = {
 export interface PreviewModalOptions {
   store: Store;
   registry: Registry;
+  t: SimpleMailT;
 }
 
 /**
@@ -41,11 +43,12 @@ export class PreviewModal {
   constructor(opts: PreviewModalOptions) {
     this.opts = opts;
     this.modal = new Modal({
-      title: '预览邮件',
+      title: opts.t('preview.title'),
       className: 'sm-modal--preview',
       width: 'min(960px, calc(100vw - 32px))',
       /** 高度随 iframe 内容测量，见 _fitPreviewHeight；不超过屏高由 CSS max-height 约束 */
       onClose: () => this._teardownLayoutHooks(),
+      t: opts.t,
     });
 
     this.iframe = h('iframe', {

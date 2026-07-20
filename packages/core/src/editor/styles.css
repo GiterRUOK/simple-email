@@ -940,7 +940,7 @@
   min-height: 60px;
 }
 .sm-column.is-empty::after {
-  content: '拖入组件 · 双击插入文本';
+  content: attr(data-empty-hint);
   position: absolute;
   inset: 0;
   display: flex;
@@ -1062,7 +1062,7 @@
 .sm-block__handle:active { cursor: grabbing; }
 
 .sm-block.is-locked::before {
-  content: '已锁定为代码';
+  content: attr(data-locked-label);
   position: absolute;
   top: 4px;
   right: 4px;

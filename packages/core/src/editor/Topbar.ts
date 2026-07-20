@@ -3,11 +3,13 @@ import { bindColorPickerInput } from './ColorPickerPopover';
 import { normalizeAccentHex, rgbCssToHex } from '../utils/accentColor';
 import { h, clear } from '../utils/dom';
 import type { EditorTheme } from './theme';
+import type { SimpleMailT } from '../i18n';
 
 export type EditorMode = 'design' | 'source';
 
 export interface TopbarOptions {
   store: Store;
+  t: SimpleMailT;
   mode: EditorMode;
   theme: EditorTheme;
   /** 顶栏仅图标（tooltip 说明），适合窄屏嵌入 */
@@ -109,8 +111,9 @@ export class Topbar {
     const btn = this.fullscreenBtn;
     if (!btn) return;
     btn.replaceChildren(active ? iconFullscreenExit() : iconFullscreenEnter());
-    btn.title = active ? '退出全屏' : '全屏';
-    btn.setAttribute('aria-label', active ? '退出全屏' : '全屏');
+    const title = active ? this.opts.t('topbar.exitFullscreen') : this.opts.t('topbar.fullscreen');
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   }
 
@@ -119,8 +122,9 @@ export class Topbar {
     const btn = this.layoutBordersBtn;
     if (!btn) return;
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    btn.title = active ? '隐藏 Section / Block 边框' : '显示 Section / Block 边框';
-    btn.setAttribute('aria-label', active ? '隐藏 Section / Block 边框' : '显示 Section / Block 边框');
+    const title = active ? this.opts.t('topbar.hideLayoutBorders') : this.opts.t('topbar.showLayoutBorders');
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
   }
 
   /** 变量列表在右栏打开（设计态）或浮层打开（源码态）时高亮顶栏按钮 */
@@ -133,20 +137,21 @@ export class Topbar {
 
   private _render() {
     clear(this.el);
+    const t = this.opts.t;
 
-    const segmented = h('div', { class: 'sm-segmented sm-topbar__mode-seg', role: 'group', 'aria-label': '编辑模式' });
+    const segmented = h('div', { class: 'sm-segmented sm-topbar__mode-seg', role: 'group', 'aria-label': t('topbar.mode') });
     const designBtn = modeSegBtn({
       active: this.opts.mode === 'design',
-      title: '设计',
+      title: t('topbar.design'),
       icon: iconDesign(),
-      label: '设计',
+      label: t('topbar.design'),
       onclick: () => this.opts.onModeChange('design'),
     });
     const sourceBtn = modeSegBtn({
       active: this.opts.mode === 'source',
-      title: '源码',
+      title: t('topbar.source'),
       icon: iconSource(),
-      label: '源码',
+      label: t('topbar.source'),
       onclick: () => this.opts.onModeChange('source'),
     });
     segmented.append(designBtn, sourceBtn);
@@ -155,7 +160,7 @@ export class Topbar {
     const themeSeg = h('div', {
       class: 'sm-segmented sm-topbar__theme-seg',
       role: 'group',
-      'aria-label': '界面主题',
+      'aria-label': t('topbar.theme'),
     });
     const themeBtn = (theme: EditorTheme, title: string, icon: SVGElement) =>
       h(
@@ -171,9 +176,9 @@ export class Topbar {
         [icon],
       ) as HTMLButtonElement;
     this.themeButtons = {
-      light: themeBtn('light', '浅色', iconSun()),
-      dark: themeBtn('dark', '深色', iconMoon()),
-      system: themeBtn('system', '跟随系统', iconThemeAuto()),
+      light: themeBtn('light', t('topbar.light'), iconSun()),
+      dark: themeBtn('dark', t('topbar.dark'), iconMoon()),
+      system: themeBtn('system', t('topbar.system'), iconThemeAuto()),
     };
     themeSeg.append(this.themeButtons.light, this.themeButtons.dark, this.themeButtons.system);
 
@@ -182,13 +187,14 @@ export class Topbar {
       const inputEl = h('input', {
         type: 'color',
         class: 'sm-topbar__accent-input',
-        'aria-label': '主题色',
-        title: '主题色',
+        'aria-label': t('topbar.accentColor'),
+        title: t('topbar.accentColor'),
         value: '#4f46e5',
       }) as HTMLInputElement;
       bindColorPickerInput(inputEl, {
         layerRoot: this.opts.accentPickerRoot,
         liveCommit: true,
+        t,
         onCommit: (hex) => this.opts.onAccentChange!(hex),
       });
       this.accentInput = inputEl;
@@ -199,16 +205,16 @@ export class Topbar {
 
     this.undoBtn = actionBtn({
       class: 'sm-btn--ghost',
-      title: '撤销 ⌘Z',
+      title: t('topbar.undoTitle'),
       icon: iconUndo(),
-      label: '撤销',
+      label: t('topbar.undo'),
       onclick: this.opts.onUndo,
     });
     this.redoBtn = actionBtn({
       class: 'sm-btn--ghost',
-      title: '重做 ⌘⇧Z',
+      title: t('topbar.redoTitle'),
       icon: iconRedo(),
-      label: '重做',
+      label: t('topbar.redo'),
       onclick: this.opts.onRedo,
     });
 
@@ -217,9 +223,9 @@ export class Topbar {
       contentActionKids.push(
         actionBtn({
           class: 'sm-btn--ghost',
-          title: '清空画布：移除画布上所有 Section 与组件',
+          title: t('topbar.clearCanvasTitle'),
           icon: iconClearCanvas(),
-          label: '清空画布',
+          label: t('topbar.clearCanvas'),
           onclick: () => this.opts.onClearCanvas!(),
         }),
       );
@@ -231,9 +237,9 @@ export class Topbar {
       contentActionKids.push(
         actionBtn({
           class: 'sm-btn--ghost',
-          title: '重置内容：恢复为预置邮件结构',
+          title: t('topbar.resetContentTitle'),
           icon: iconResetContent(),
-          label: '重置内容',
+          label: t('topbar.resetContent'),
           onclick: () => this.opts.onResetContent!(),
         }),
       );
@@ -243,9 +249,9 @@ export class Topbar {
         contentActionKids.push(
           actionBtn({
             class: 'sm-btn--ghost',
-            title: '复制设计稿：将画布 JSON 写入剪贴板，可在另一封邮件中导入',
+            title: t('topbar.copyDesignTitle'),
             icon: iconCopyDoc(),
-            label: '复制设计稿',
+            label: t('topbar.copyDesign'),
             onclick: () => this.opts.onCopyDocDesign!(),
           }),
         );
@@ -254,9 +260,9 @@ export class Topbar {
         contentActionKids.push(
           actionBtn({
             class: 'sm-btn--ghost',
-            title: '导入设计稿：从剪贴板或粘贴 JSON 覆盖当前画布',
+            title: t('topbar.importDesignTitle'),
             icon: iconImportDoc(),
-            label: '导入设计稿',
+            label: t('topbar.importDesign'),
             onclick: () => this.opts.onImportDocDesign!(),
           }),
         );
@@ -266,17 +272,17 @@ export class Topbar {
       contentActionKids.length > 0 && h('div', { class: 'sm-topbar__group' }, contentActionKids);
 
     const previewBtn = actionBtn({
-      title: '预览',
+      title: t('topbar.preview'),
       icon: iconEye(),
-      label: '预览',
+      label: t('topbar.preview'),
       onclick: this.opts.onPreview,
     });
 
     const exportBtn = actionBtn({
       class: 'sm-btn--primary',
-      title: '导出 HTML',
+      title: t('topbar.exportHtml'),
       icon: iconExport(),
-      label: '导出 HTML',
+      label: t('topbar.exportHtml'),
       onclick: this.opts.onExport,
     });
 
@@ -286,9 +292,9 @@ export class Topbar {
       trailingGroup.push(
         actionBtn({
           class: 'sm-btn--ghost',
-          title: '邮件设置：主题、宽度与全局样式',
+          title: t('topbar.mailSettingsTitle'),
           icon: iconSettings(),
-          label: '邮件设置',
+          label: t('topbar.mailSettings'),
           onclick: () => this.opts.onMailSettings(),
         }),
       );
@@ -297,9 +303,9 @@ export class Topbar {
       trailingGroup.push(
         (this.insertVariableBtn = actionBtn({
           class: 'sm-topbar__insert-var',
-          title: '插入变量',
+          title: t('topbar.insertVariable'),
           icon: iconVariable(),
-          label: '插入变量',
+          label: t('topbar.insertVariable'),
           onclick: (e: Event) => this.opts.onInsertVariable(e.currentTarget as HTMLElement),
         })),
       );
@@ -314,7 +320,7 @@ export class Topbar {
       canvasToolKids.push(
         (this.layoutBordersBtn = iconOnlyBtn({
           class: 'sm-btn--ghost sm-topbar__toggle-btn',
-          title: '显示 Section / Block 边框',
+          title: t('topbar.showLayoutBorders'),
           icon: iconLayoutBorders(),
           pressed: false,
           onclick: () => this.opts.onLayoutBordersToggle!(),
@@ -331,7 +337,7 @@ export class Topbar {
       canvasToolKids.push(
         (this.fullscreenBtn = iconOnlyBtn({
           class: 'sm-btn--ghost sm-topbar__toggle-btn',
-          title: '全屏',
+          title: t('topbar.fullscreen'),
           icon: iconFullscreenEnter(),
           pressed: false,
           onclick: () => this.opts.onFullscreenToggle!(),

@@ -1,6 +1,6 @@
 {
   "name": "@simple-mail/blocks",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "邮件编辑器内置组件集合",
   "type": "module",
   "main": "./dist/index.js",

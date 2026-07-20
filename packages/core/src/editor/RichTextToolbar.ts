@@ -3,6 +3,7 @@ import { h } from '../utils/dom';
 import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import { LIST_INDENT_PRESETS_PX, type ListIndentValue } from '../utils/emailListStyles';
 import type { InlineEditor, SelectionState } from './InlineEditor';
+import type { SimpleMailT } from '../i18n';
 
 /**
  * 富文本浮动工具条。
@@ -24,14 +25,15 @@ export interface RichTextToolbarOptions {
   positionRoot: HTMLElement;
   /** 中栏画布滚动容器；省略时从 positionRoot 内查找 `.sm-canvas-wrap` */
   scrollRoot?: HTMLElement;
+  t: SimpleMailT;
 }
 
 const FONT_FAMILIES = [
-  { label: '默认', value: '' },
+  { labelKey: 'toolbar.fontDefault', label: 'Default', value: '' },
   { label: 'Inter', value: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
-  { label: '苹方/PingFang', value: '"PingFang SC", "Helvetica Neue", Arial, sans-serif' },
-  { label: '微软雅黑', value: '"Microsoft YaHei", "Segoe UI", sans-serif' },
-  { label: '宋体', value: 'SimSun, "Songti SC", serif' },
+  { labelKey: 'toolbar.fontPingFang', label: 'PingFang SC', value: '"PingFang SC", "Helvetica Neue", Arial, sans-serif' },
+  { labelKey: 'toolbar.fontMicrosoftYaHei', label: 'Microsoft YaHei', value: '"Microsoft YaHei", "Segoe UI", sans-serif' },
+  { labelKey: 'toolbar.fontSimSun', label: 'SimSun', value: 'SimSun, "Songti SC", serif' },
   { label: 'Helvetica', value: '"Helvetica Neue", Arial, sans-serif' },
   { label: 'Arial', value: 'Arial, sans-serif' },
   { label: 'Georgia', value: 'Georgia, serif' },
@@ -150,16 +152,17 @@ export class RichTextToolbar {
 
   private _build() {
     const sep = () => h('div', { class: 'sm-floating-toolbar__sep' });
+    const t = this.opts.t;
 
     // 这些按钮 mousedown.preventDefault 阻止抢焦点；点击时直接 exec
     const exec = (cmd: string, val?: string) => () => this.editor?.exec(cmd, val);
 
-    this.btns.bold = this._btn('B', '加粗 ⌘B', exec('bold'), { fontWeight: '700' });
-    this.btns.italic = this._btn('I', '斜体 ⌘I', exec('italic'), { fontStyle: 'italic' });
-    this.btns.underline = this._btn('U', '下划线 ⌘U', exec('underline'), {
+    this.btns.bold = this._btn('B', t('toolbar.bold'), exec('bold'), { fontWeight: '700' });
+    this.btns.italic = this._btn('I', t('toolbar.italic'), exec('italic'), { fontStyle: 'italic' });
+    this.btns.underline = this._btn('U', t('toolbar.underline'), exec('underline'), {
       textDecoration: 'underline',
     });
-    this.btns.strikethrough = this._btn('S', '删除线', exec('strikeThrough'), {
+    this.btns.strikethrough = this._btn('S', t('toolbar.strikethrough'), exec('strikeThrough'), {
       textDecoration: 'line-through',
     });
 
@@ -167,21 +170,21 @@ export class RichTextToolbar {
       svgIcon(
         '<path d="M3 5h14M3 9h10M3 13h14M3 17h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
       ),
-      '左对齐',
+      t('toolbar.alignLeft'),
       exec('justifyLeft'),
     );
     this.btns.alignCenter = this._iconBtn(
       svgIcon(
         '<path d="M3 5h14M5 9h10M3 13h14M5 17h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
       ),
-      '居中',
+      t('toolbar.alignCenter'),
       exec('justifyCenter'),
     );
     this.btns.alignRight = this._iconBtn(
       svgIcon(
         '<path d="M3 5h14M7 9h10M3 13h14M7 17h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
       ),
-      '右对齐',
+      t('toolbar.alignRight'),
       exec('justifyRight'),
     );
 
@@ -189,20 +192,20 @@ export class RichTextToolbar {
       svgIcon(
         '<circle cx="4" cy="6" r="1.2" fill="currentColor"/><circle cx="4" cy="10" r="1.2" fill="currentColor"/><circle cx="4" cy="14" r="1.2" fill="currentColor"/><path d="M8 6h9M8 10h9M8 14h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
       ),
-      '无序列表',
+      t('toolbar.unorderedList'),
       exec('insertUnorderedList'),
     );
     this.btns.ol = this._iconBtn(
       svgIcon(
         '<text x="2" y="8" font-size="6" font-weight="600" fill="currentColor">1</text><text x="2" y="14" font-size="6" font-weight="600" fill="currentColor">2</text><path d="M8 6h9M8 12h9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
       ),
-      '有序列表',
+      t('toolbar.orderedList'),
       exec('insertOrderedList'),
     );
 
     this.selectListIndent = h('select', {
       class: 'sm-floating-toolbar__select sm-floating-toolbar__select--list-indent',
-      title: '列表缩进',
+      title: t('toolbar.listIndent'),
       onchange: (e: Event) => {
         if (this.syncingListIndentUi) return;
         const raw = (e.target as HTMLSelectElement).value;
@@ -213,7 +216,7 @@ export class RichTextToolbar {
     {
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.textContent = '缩进';
+      placeholder.textContent = t('toolbar.indent');
       this.selectListIndent.append(placeholder);
       for (const px of LIST_INDENT_PRESETS_PX) {
         const opt = document.createElement('option');
@@ -228,7 +231,7 @@ export class RichTextToolbar {
     // 字体：select 不能 preventDefault（否则下拉打不开）；mousedown(capture) 已存档选区
     this.selectFontFamily = h('select', {
       class: 'sm-floating-toolbar__select',
-      title: '字体',
+      title: t('toolbar.fontFamily'),
       onchange: (e: Event) => {
         const v = (e.target as HTMLSelectElement).value;
         if (v) this.editor?.exec('fontName', v);
@@ -238,14 +241,14 @@ export class RichTextToolbar {
     for (const f of FONT_FAMILIES) {
       const opt = document.createElement('option');
       opt.value = f.value;
-      opt.textContent = f.label;
+      opt.textContent = f.labelKey ? t(f.labelKey) : f.label;
       this.selectFontFamily.append(opt);
     }
 
     // 字号
     this.selectFontSize = h('select', {
       class: 'sm-floating-toolbar__select',
-      title: '字号',
+      title: t('toolbar.fontSize'),
       onchange: (e: Event) => {
         const v = (e.target as HTMLSelectElement).value;
         if (v) this.editor?.applyFontSize(v);
@@ -254,7 +257,7 @@ export class RichTextToolbar {
     {
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.textContent = '字号';
+      placeholder.textContent = t('toolbar.fontSize');
       this.selectFontSize.append(placeholder);
     }
     for (const px of FONT_SIZES) {
@@ -267,7 +270,7 @@ export class RichTextToolbar {
     // 字重
     this.selectFontWeight = h('select', {
       class: 'sm-floating-toolbar__select',
-      title: '字重',
+      title: t('toolbar.fontWeight'),
       onchange: (e: Event) => {
         const v = (e.target as HTMLSelectElement).value;
         if (v) this.editor?.applyFontWeight(v);
@@ -276,7 +279,7 @@ export class RichTextToolbar {
     {
       const placeholder = document.createElement('option');
       placeholder.value = '';
-      placeholder.textContent = '字重';
+      placeholder.textContent = t('toolbar.fontWeight');
       this.selectFontWeight.append(placeholder);
     }
     for (const w of FONT_WEIGHT_STEP_OPTIONS) {
@@ -290,13 +293,14 @@ export class RichTextToolbar {
     this.inputColor = h('input', {
       class: 'sm-floating-toolbar__color',
       type: 'color',
-      title: '文字颜色',
+      title: t('toolbar.textColor'),
       value: '#433f3f',
     }) as HTMLInputElement;
     bindColorPickerInput(this.inputColor, {
       layerRoot: this.opts.positionRoot,
       liveCommit: true,
       autoFocusHex: false,
+      t,
       onBeforeOpen: () => this.editor?.saveSelection(),
       onCommit: (hex) => this.editor?.exec('foreColor', hex),
       onClosed: () => this.editor?.refocus(),
@@ -306,13 +310,14 @@ export class RichTextToolbar {
     this.inputBgColor = h('input', {
       class: 'sm-floating-toolbar__color',
       type: 'color',
-      title: '文字背景色',
+      title: t('toolbar.textBackground'),
       value: '#fff7e6',
     }) as HTMLInputElement;
     bindColorPickerInput(this.inputBgColor, {
       layerRoot: this.opts.positionRoot,
       liveCommit: true,
       autoFocusHex: false,
+      t,
       onBeforeOpen: () => this.editor?.saveSelection(),
       onCommit: (hex) => this.editor?.exec('hiliteColor', hex),
       onClosed: () => this.editor?.refocus(),
@@ -323,7 +328,7 @@ export class RichTextToolbar {
       svgIcon(
         '<path d="M9 11.5l1.5 1.5a3.5 3.5 0 005-5l-2-2a3.5 3.5 0 00-5 0M11 8.5L9.5 7a3.5 3.5 0 00-5 5l2 2a3.5 3.5 0 005 0" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
       ),
-      '插入或编辑链接',
+      t('toolbar.insertLink'),
       () => this._toggleLinkPanel(),
     );
 
@@ -332,7 +337,7 @@ export class RichTextToolbar {
       svgIcon(
         '<path d="M9 11.5l1.5 1.5a3.5 3.5 0 005-5l-2-2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M3 3l14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
       ),
-      '取消链接',
+      t('toolbar.unlink'),
       exec('unlink'),
     );
 
@@ -341,7 +346,7 @@ export class RichTextToolbar {
       svgIcon(
         '<text x="2" y="14" font-size="11" font-weight="700" fill="currentColor">T</text><text x="11" y="9" font-size="7" font-weight="700" fill="currentColor">x</text><path d="M11 11l5 5M16 11l-5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>',
       ),
-      '清除格式',
+      t('toolbar.clearFormat'),
       exec('removeFormat'),
     );
 
@@ -370,7 +375,7 @@ export class RichTextToolbar {
         onmousedown: (e: Event) => e.preventDefault(),
         onclick: () => this._applyLink(),
       },
-      ['确定'],
+      [t('toolbar.apply')],
     );
     this.linkPanel.append(this.inputLink, applyLinkBtn);
 

@@ -8,10 +8,12 @@ import { prettyHtml } from '../utils/html';
 import { h } from '../utils/dom';
 import { richTextExecCommand } from '../utils/richTextCommand';
 import { Modal } from './Modal';
+import type { SimpleMailT } from '../i18n';
 
 export interface ExportModalOptions {
   store: Store;
   registry: Registry;
+  t: SimpleMailT;
   /** 替换 {{var}} 为 sample 值 */
   withSampleVariables?: boolean;
 }
@@ -30,11 +32,12 @@ export class ExportModal {
   constructor(opts: ExportModalOptions) {
     this.opts = opts;
     this.modal = new Modal({
-      title: '导出 HTML',
+      title: opts.t('export.title'),
       className: 'sm-modal--export',
       width: 'min(960px, 96vw)',
       height: 'min(720px, 88vh)',
       onClose: () => this._destroyCm(),
+      t: opts.t,
     });
 
     const editorHost = h('div', { class: 'sm-export__editor' });
@@ -43,12 +46,12 @@ export class ExportModal {
     const copyBtn = h(
       'button',
       { class: 'sm-btn', type: 'button', onclick: () => this._copy() },
-      ['复制 HTML'],
+      [this.opts.t('export.copyHtml')],
     );
     const beautifyBtn = h(
       'button',
       { class: 'sm-btn', type: 'button', onclick: () => this._beautify() },
-      ['美化'],
+      [this.opts.t('common.beautify')],
     );
     const downloadBtn = h(
       'button',
@@ -57,7 +60,7 @@ export class ExportModal {
         type: 'button',
         onclick: () => this._download(),
       },
-      ['下载 .html'],
+      [this.opts.t('export.downloadHtml')],
     );
     this.modal.footer.append(copyBtn, beautifyBtn, downloadBtn);
 
@@ -94,7 +97,7 @@ export class ExportModal {
   private async _copy() {
     try {
       await navigator.clipboard.writeText(this.current);
-      this._toast('已复制到剪贴板');
+      this._toast(this.opts.t('toast.copiedToClipboard'));
     } catch {
       const ta = document.createElement('textarea');
       ta.value = this.current;
@@ -102,7 +105,7 @@ export class ExportModal {
       ta.select();
       richTextExecCommand('copy');
       document.body.removeChild(ta);
-      this._toast('已复制');
+      this._toast(this.opts.t('toast.copied'));
     }
   }
 
