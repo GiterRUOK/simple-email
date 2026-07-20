@@ -18,6 +18,7 @@ Doc → Section → Column → Block    // 仅四层，Block 不可再嵌套子�
 - [MailEditor API 速览](#maileditor-api-速览)
 - [画布清空与重置](#画布清空与重置)
 - [界面主题与品牌色](#界面主题与品牌色)
+- [国际化 i18n](#国际化-i18n)
 - [UI 选项 `ui`](#ui-选项-ui)
 - [构造选项（画布行为）](#构造选项画布行为)
 - [变量系统](#变量系统)
@@ -43,7 +44,7 @@ Doc → Section → Column → Block    // 仅四层，Block 不可再嵌套子�
 | 包名 | 内容 |
 |------|------|
 | `@simple-mail/core` | 编辑器引擎、`MailEditor`、类型与工具函数；样式入口 `@simple-mail/core/style.css` |
-| `@simple-mail/blocks` | 内置组件与示例自定义块（`builtinBlocks`、`allBlocks`） |
+| `@simple-mail/blocks` | 内置组件与示例自定义块（`builtinBlocks`、`allBlocks`、`createBuiltinBlocks`、`createAllBlocks`） |
 
 本仓库在 Git 中目录名为 `simple-mail`；npm 上 monorepo 根包名为 `mail-editor-pancake`（因无 scope 的 `simple-mail` 已被占用）。**集成时请只安装并 import `@simple-mail/*`**，不要依赖 `mail-editor-pancake/packages/...` 这类深路径。
 
@@ -52,7 +53,7 @@ Doc → Section → Column → Block    // 仅四层，Block 不可再嵌套子�
 ```ts
 import { MailEditor } from '@simple-mail/core';
 import '@simple-mail/core/style.css';
-import { allBlocks } from '@simple-mail/blocks';
+import { createAllBlocks } from '@simple-mail/blocks';
 ```
 
 仓库目录结构：
@@ -79,6 +80,7 @@ simple-mail/
 - 撤销/重做、键盘删除、复制 Section/Block；**复制/导入设计稿**（JSON 信封）
 - **界面主题**：浅色 / 深色 / 跟随系统；画布仍为白纸贴近成品
 - **品牌色**：`accentColor` / `setAccentColor`；可选顶栏拾色器
+- **国际化**：内置 `zh-CN` / `en-US`；支持 `locale`、`messages` 覆盖；blocks 可按语言生成
 - **仅搭正文**：`ui.hideMailMeta` 隐藏主题、Preheader 与顶栏「邮件设置」
 - **清空 / 重置**：`presetDoc` 与 `initialDoc` 分离
 - **变量系统**：`setVariables`；`kind: link | image`；顶栏 `{{ }}` 弹层
@@ -119,6 +121,13 @@ pnpm --filter @simple-mail/playground-vanilla build
 
 若你正在本地修改本仓库源码，请在 monorepo 根执行 `pnpm build` 后再刷新引用方项目，以保证 `dist` 与类型声明一致。
 
+Playground 支持通过 URL 验证语言：
+
+```text
+http://localhost:5173/?locale=zh-CN
+http://localhost:5173/?locale=en-US
+```
+
 ---
 
 ## 安装与集成
@@ -135,10 +144,16 @@ pnpm add codemirror mjml-browser sortablejs
 ```ts
 import { MailEditor } from '@simple-mail/core';
 import '@simple-mail/core/style.css';
-import { builtinBlocks, allBlocks } from '@simple-mail/blocks';
+import {
+  builtinBlocks,
+  allBlocks,
+  createBuiltinBlocks,
+  createAllBlocks,
+} from '@simple-mail/blocks';
 ```
 
 - 仅需内置块时用 `builtinBlocks`；需要 Logo/页脚等示例时用 `allBlocks`，或与业务 `defineBlock` 合并。
+- 需要英文或动态语言时，用 `createBuiltinBlocks({ locale })` / `createAllBlocks({ locale })` 生成块定义。
 - `@simple-mail/blocks` 依赖 `@simple-mail/core`，版本宜对齐。
 
 ### 本地 link（参与本仓库开发时）
@@ -203,11 +218,14 @@ npm 上仅发布 `@simple-mail/core` 与 `@simple-mail/blocks`。根包 `mail-ed
 ```ts
 import { MailEditor } from '@simple-mail/core';
 import '@simple-mail/core/style.css';
-import { allBlocks } from '@simple-mail/blocks';
+import { createAllBlocks } from '@simple-mail/blocks';
+
+const locale = 'zh-CN';
 
 const editor = new MailEditor({
   container: document.getElementById('app')!,
-  blocks: allBlocks,
+  locale,
+  blocks: createAllBlocks({ locale }),
   initialDoc: {
     meta: { subject: '欢迎', width: 600 },
     variables: [{ key: 'user.name', label: '用户名', sample: '张三' }],
@@ -268,7 +286,8 @@ editor.setVariables([
 ```ts
 const editor = new MailEditor({
   container: el,
-  blocks: allBlocks,
+  locale: 'zh-CN',
+  blocks: createAllBlocks({ locale: 'zh-CN' }),
   initialDoc: loadedFromApi,
   presetDoc: businessDefaultTemplate,
   onChange: (doc) => save(doc),
@@ -294,6 +313,128 @@ editor.getTheme();
 | `showAccentColorPicker?: boolean` | 顶栏原生颜色控件，默认 `false` |
 | `setAccentColor(hex \| null \| '')` | 运行时覆盖；空则恢复默认 |
 | `getAccentColor()` | 仅显式覆盖；未设返回 `undefined` |
+
+---
+
+## 国际化 i18n
+
+编辑器内置 `zh-CN` 与 `en-US`，默认 `zh-CN`。国际化覆盖范围包括编辑器 UI、弹窗、图库、富文本工具条、内置 blocks 与示例自定义 blocks 的名称、属性、默认文案。
+
+### 基础用法
+
+```ts
+import { MailEditor, type SimpleMailLocale } from '@simple-mail/core';
+import { createAllBlocks } from '@simple-mail/blocks';
+
+const locale: SimpleMailLocale = appLanguage === 'en' ? 'en-US' : 'zh-CN';
+
+const editor = new MailEditor({
+  container,
+  locale,
+  blocks: createAllBlocks({ locale }),
+});
+```
+
+仅使用内置块：
+
+```ts
+import { createBuiltinBlocks } from '@simple-mail/blocks';
+
+new MailEditor({
+  container,
+  locale: 'en-US',
+  blocks: createBuiltinBlocks({ locale: 'en-US' }),
+});
+```
+
+`builtinBlocks` / `allBlocks` 仍保留，默认中文，主要用于兼容旧集成；新项目建议使用 `createBuiltinBlocks` / `createAllBlocks`。
+
+### 覆盖文案
+
+可用 `messages` 覆盖内置文案。只需传入要覆盖的 key，未传的 key 会回退到对应语言，再回退到中文。
+
+```ts
+new MailEditor({
+  container,
+  locale: 'en-US',
+  blocks: createAllBlocks({ locale: 'en-US' }),
+  messages: {
+    'topbar.exportHtml': 'Export final HTML',
+    'leftPanel.components': 'Content blocks',
+  },
+});
+```
+
+可导入类型与内置字典：
+
+```ts
+import {
+  createI18nContext,
+  enUSMessages,
+  zhCNMessages,
+  type SimpleMailLocale,
+  type SimpleMailMessagesInput,
+  type SimpleMailT,
+} from '@simple-mail/core';
+```
+
+### 宿主语言切换
+
+`MailEditor` 构造后不会热更新 `locale` / `blocks`。宿主应用切换语言时，建议保存当前文档、销毁旧实例、用新语言重建。
+
+```ts
+let editor: MailEditor | null = null;
+
+function mount(locale: SimpleMailLocale, initialDoc?: Partial<EmailDoc>) {
+  editor = new MailEditor({
+    container,
+    locale,
+    blocks: createAllBlocks({ locale }),
+    initialDoc,
+    onChange: save,
+  });
+}
+
+function changeLocale(nextLocale: SimpleMailLocale) {
+  const currentDoc = editor?.getValue();
+  editor?.destroy();
+  mount(nextLocale, currentDoc);
+}
+```
+
+### 自定义组件国际化
+
+自定义组件的 `name`、`paletteTooltip`、`schema.label`、`schema.placeholder`、`schema.help`、`inlineEditable.placeholder` 由业务侧维护。推荐暴露一个工厂函数，按语言返回组件定义：
+
+```ts
+import { defineBlock, type BlockDefinition, type SimpleMailLocale } from '@simple-mail/core';
+import { createBuiltinBlocks } from '@simple-mail/blocks';
+
+function couponBlock(locale: SimpleMailLocale): BlockDefinition<any> {
+  const en = locale === 'en-US';
+  return defineBlock({
+    type: 'custom:coupon',
+    name: en ? 'Coupon' : '优惠券',
+    category: 'custom',
+    defaultProps: { title: en ? 'Exclusive offer' : '专属优惠' },
+    schema: [
+      { key: 'title', label: en ? 'Title' : '标题', type: 'text' },
+      { key: 'code', label: en ? 'Code' : '券码', type: 'text' },
+    ],
+    toMjml: (p) => `<mj-text>${p.title}</mj-text>`,
+    renderPreview: (p) => `<div>${p.title}</div>`,
+  });
+}
+
+function createBlocks(locale: SimpleMailLocale) {
+  return [
+    ...createBuiltinBlocks({ locale }),
+    couponBlock(locale),
+  ];
+}
+```
+
+如果需要在保持同一份 block 实现的同时只替换显示文案，也可以在宿主侧对 `BlockDefinition` 做浅拷贝并替换 `name`、`schema` 等字段。
 
 ---
 
@@ -327,6 +468,8 @@ editor.getTheme();
 |------|------|
 | `container` | 挂载 DOM（必填） |
 | `blocks?` | 块定义列表 |
+| `locale?` | `zh-CN` \| `en-US`，默认 `zh-CN` |
+| `messages?` | 覆盖内置 i18n 文案 |
 | `engine?` | 目前仅 `'mjml'`；预留 `'table'` |
 | `initialDoc?` | 首次进入画布 |
 | `presetDoc?` | 「重置内容」目标 |
@@ -473,31 +616,34 @@ import { openImageGalleryModal } from '@simple-mail/core';
 
 ```tsx
 import { useEffect, useRef } from 'react';
-import { MailEditor, type EmailDoc } from '@simple-mail/core';
+import { MailEditor, type EmailDoc, type SimpleMailLocale } from '@simple-mail/core';
 import '@simple-mail/core/style.css';
-import { allBlocks } from '@simple-mail/blocks';
+import { createAllBlocks } from '@simple-mail/blocks';
 
 export function MailEditorView({
   value,
   presetDoc,
   onChange,
+  locale = 'zh-CN',
 }: {
   value?: Partial<EmailDoc>;
   presetDoc?: Partial<EmailDoc>;
+  locale?: SimpleMailLocale;
   onChange?: (d: EmailDoc) => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const editor = new MailEditor({
       container: ref.current!,
-      blocks: allBlocks,
+      locale,
+      blocks: createAllBlocks({ locale }),
       initialDoc: value,
       presetDoc,
       ui: { hideTopbarTitle: true },
       onChange,
     });
     return () => editor.destroy();
-  }, []);
+  }, [locale]);
   return <div ref={ref} style={{ height: '100vh' }} />;
 }
 ```
@@ -507,13 +653,19 @@ export function MailEditorView({
 ```vue
 <script setup lang="ts">
 import { markRaw, onMounted, onBeforeUnmount, ref } from 'vue';
-import { MailEditor, type BlockDefinition, type EmailDoc } from '@simple-mail/core';
+import {
+  MailEditor,
+  type BlockDefinition,
+  type EmailDoc,
+  type SimpleMailLocale,
+} from '@simple-mail/core';
 import '@simple-mail/core/style.css';
-import { allBlocks } from '@simple-mail/blocks';
+import { createAllBlocks } from '@simple-mail/blocks';
 
 const props = defineProps<{
   modelValue?: Partial<EmailDoc>;
   presetDoc?: Partial<EmailDoc>;
+  locale?: SimpleMailLocale;
   blocks?: BlockDefinition<any>[];
 }>();
 const emit = defineEmits<{ 'update:modelValue': [EmailDoc] }>();
@@ -521,10 +673,12 @@ const el = ref<HTMLDivElement>();
 let editor: MailEditor | null = null;
 
 onMounted(() => {
-  const defs = props.blocks ?? allBlocks;
+  const locale = props.locale ?? 'zh-CN';
+  const defs = props.blocks ?? createAllBlocks({ locale });
   const stable = defs.map((d) => markRaw(d));
   editor = new MailEditor({
     container: el.value!,
+    locale,
     blocks: stable,
     initialDoc: props.modelValue,
     presetDoc: props.presetDoc,
@@ -548,7 +702,8 @@ onBeforeUnmount(() => editor?.destroy());
 ## 自定义组件
 
 ```ts
-import { defineBlock } from '@simple-mail/core';
+import { defineBlock, MailEditor } from '@simple-mail/core';
+import { createAllBlocks } from '@simple-mail/blocks';
 
 export const couponBlock = defineBlock<{ title: string; code: string }>({
   type: 'custom:coupon',
@@ -571,7 +726,12 @@ export const couponBlock = defineBlock<{ title: string; code: string }>({
   renderPreview: (p) => `<div class="coupon-title">…</div>`,
 });
 
-new MailEditor({ container, blocks: [...allBlocks, couponBlock] });
+const locale = 'zh-CN';
+new MailEditor({
+  container,
+  locale,
+  blocks: [...createAllBlocks({ locale }), couponBlock],
+});
 ```
 
 ### `schema` 字段类型
