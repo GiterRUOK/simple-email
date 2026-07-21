@@ -132,15 +132,17 @@ export function localizeBlockDefinition(block: AnyBlock, t: SimpleMailT): AnyBlo
   const blockKey = blockMessageId(block.type);
   const nameKey = `blocks.${blockKey}.name`;
   const translatedName = t(nameKey);
+  const inlinePlaceholderText = inlinePlaceholder(blockKey, block, t);
   return {
     ...block,
     name: translatedName === nameKey ? block.name : translatedName,
     defaultProps: localizeDefaultProps(block, t),
     schema: block.schema.map((field) => localizeField(blockKey, field, t)),
+    renderPreview: localizeRenderPreview(block, inlinePlaceholderText),
     inlineEditable: block.inlineEditable
       ? {
           ...block.inlineEditable,
-          placeholder: inlinePlaceholder(blockKey, block, t),
+          placeholder: inlinePlaceholderText,
         }
       : undefined,
   };
@@ -188,6 +190,34 @@ function localizeOptionLabel(
 function inlinePlaceholder(blockType: string, block: AnyBlock, t: SimpleMailT): string | undefined {
   const key = INLINE_PLACEHOLDER_KEYS[blockType];
   return key ? t(key) : block.inlineEditable?.placeholder;
+}
+
+function localizeRenderPreview(
+  block: AnyBlock,
+  inlinePlaceholderText: string | undefined,
+): AnyBlock['renderPreview'] {
+  if (!block.renderPreview || !block.inlineEditable?.placeholder || !inlinePlaceholderText) {
+    return block.renderPreview;
+  }
+
+  const sourcePlaceholder = escapeAttr(block.inlineEditable.placeholder);
+  const localizedPlaceholder = escapeAttr(inlinePlaceholderText);
+
+  return (props, ctx) =>
+    block
+      .renderPreview!(props, ctx)
+      .replaceAll(
+        `data-placeholder="${sourcePlaceholder}"`,
+        `data-placeholder="${localizedPlaceholder}"`,
+      );
+}
+
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 function blockMessageId(type: string): string {
