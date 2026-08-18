@@ -76,7 +76,7 @@ simple-mail/
 - **MJML 管线**：内部 `EmailDoc` JSON → MJML → 邮件客户端可用 HTML
 - 双模式：设计态 + 源码态（文档级只读 MJML/HTML；组件级可锁定 `lockedMjml`）
 - 内置块：文本、HTML(raw)、图片、按钮、分隔线、间距、Hero、社交组，以及 1/2/3 列布局；示例自定义：Logo、单链社交、页脚
-- **图片字段**：手输 URL；可选上传（`uploadImage`）、内置图库（`imageGallery`）、自管图床（`pickImageFromGallery`）
+- **图片字段**：手输 URL；可选上传（`uploadImage`）、内置图库（`imageGallery`）、自管图库（`pickImageFromGallery`）
 - 撤销/重做、键盘删除、复制 Section/Block；**复制/导入设计稿**（JSON 信封）
 - **界面主题**：浅色 / 深色 / 跟随系统；画布仍为白纸贴近成品
 - **品牌色**：`accentColor` / `setAccentColor`；可选顶栏拾色器
@@ -594,7 +594,7 @@ import {
 |------|------|
 | `uploadImage?(file, ctx)` | 右栏「上传」→ HTTPS URL |
 | `imageGallery?` | 内置图库弹层（`showGallery: true`） |
-| `pickImageFromGallery?(ctx)` | 自管图床；与 `imageGallery` 并存时**优先内置图库** |
+| `pickImageFromGallery?(ctx)` | 自管图库；与 `imageGallery` 并存时**优先内置图库** |
 | `showUpload?` | 默认 `true`（有 `uploadImage` 时） |
 | `showGallery?` | 默认 `false` |
 

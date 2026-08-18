@@ -32,7 +32,7 @@ import {
   resolveGlobalListIndentPx,
 } from '../utils/emailListStyles';
 import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
-import type { ImageAssetsHandlers, ImageFieldContext } from './imageAssets';
+import { resolveAssetPermission, type ImageAssetsHandlers, type ImageFieldContext } from './imageAssets';
 import { FocusBreadcrumb } from './FocusBreadcrumb';
 import { openImageGalleryModal } from './ImageGalleryModal';
 import {
@@ -81,7 +81,7 @@ export interface RightPanelOptions {
   /** 点击路径中的文档级层级（等同 Esc 从 Section 上浮） */
   onFocusDocument: () => void;
   /**
-   * 可选。配置后，schema 中 `type: 'image'` 的字段会显示「上传 / 图床」按钮并调用对应回调。
+   * 可选。配置后，schema 中 `type: 'image'` 的字段会显示「上传 / 图库」按钮并调用对应回调。
    */
   imageAssets?: ImageAssetsHandlers;
   /** 与 MailEditor.opts.ui 对齐 */
@@ -939,7 +939,7 @@ export class RightPanel {
     ]);
   }
 
-  /** `type: 'image'`：URL 输入 + 可选上传、图床（由 `imageAssets` 注入） */
+  /** `type: 'image'`：URL 输入 + 可选上传、图库（由 `imageAssets` 注入） */
   private _imageField(
     label: string,
     value: string,
@@ -1005,19 +1005,33 @@ export class RightPanel {
           );
         },
       });
-      row.append(
-        h(
-          'button',
-          {
-            class: 'sm-btn sm-btn--secondary sm-image-field__btn',
-            type: 'button',
-            title: this.opts.t('rightPanel.image.uploadTitle'),
-            onclick: () => fileInp.click(),
-          },
-          [this.opts.t('rightPanel.image.upload')],
-        ),
+      const uploadPerm = resolveAssetPermission(
+        assets?.permissions,
+        'upload',
+        this.opts.t('common.noPermissionUpload'),
       );
-      row.append(fileInp);
+      if (!uploadPerm.allowed && uploadPerm.mode === 'hide') {
+        // 无权限且配置为隐藏：不渲染上传按钮（fileInp 同样不渲染）
+      } else {
+        row.append(
+          h(
+            'button',
+            {
+              class: 'sm-btn sm-btn--secondary sm-image-field__btn',
+              type: 'button',
+              title: uploadPerm.allowed
+                ? this.opts.t('rightPanel.image.uploadTitle')
+                : uploadPerm.tip,
+              disabled: !uploadPerm.allowed,
+              ...(uploadPerm.allowed
+                ? { onclick: () => fileInp.click() }
+                : {}),
+            },
+            [this.opts.t('rightPanel.image.upload')],
+          ),
+        );
+        row.append(fileInp);
+      }
     }
 
     if (showGalleryBtn) {
@@ -1032,6 +1046,7 @@ export class RightPanel {
               if (assets.imageGallery) {
                 openImageGalleryModal({
                   adapter: assets.imageGallery,
+                  permissions: assets?.permissions,
                   onPick: (url) => applyUrl(url),
                   t: this.opts.t,
                   parent: this.el.closest('.sm-root') as HTMLElement | undefined,

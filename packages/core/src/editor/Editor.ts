@@ -80,7 +80,7 @@ export interface EditorOptions {
    */
   theme?: EditorTheme;
   /**
-   * 可选。为 `type: 'image'` 提供上传 / 图床；`showUpload` 默认 true（有 uploadImage 时），`showGallery` 默认 false。
+   * 可选。为 `type: 'image'` 提供上传 / 图库；`showUpload` 默认 true（有 uploadImage 时），`showGallery` 默认 false。
    */
   imageAssets?: ImageAssetsHandlers;
   /** 右栏控件形态等可选 UI 偏好。 */

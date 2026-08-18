@@ -1294,6 +1294,14 @@
   border-color: var(--sm-primary);
 }
 
+.sm-input[disabled],
+.sm-textarea[disabled],
+.sm-select[disabled] {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: var(--sm-surface-disabled, #f3f4f6);
+}
+
 .sm-spacing-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2147,6 +2155,13 @@
 }
 .sm-gallery-modal__cell-delete:hover {
   background: var(--sm-danger, #dc2626);
+}
+.sm-gallery-modal__cell-delete[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sm-gallery-modal__cell-delete[disabled]:hover {
+  background: rgba(15, 23, 42, 0.82);
 }
 
 .sm-gallery-modal__cell {

@@ -1,7 +1,13 @@
-import type { GalleryItem, ImageGalleryAdapter } from './imageAssets';
-import { Modal } from './Modal';
+import { type SimpleMailT, createI18nContext } from '../i18n';
 import { clear, h } from '../utils/dom';
-import { createI18nContext, type SimpleMailT } from '../i18n';
+import { Modal } from './Modal';
+import {
+  type AssetPermissionAction,
+  type GalleryItem,
+  type ImageAssetPermissions,
+  type ImageGalleryAdapter,
+  resolveAssetPermission,
+} from './imageAssets';
 
 export interface OpenImageGalleryModalOptions {
   adapter: ImageGalleryAdapter;
@@ -10,14 +16,35 @@ export interface OpenImageGalleryModalOptions {
   /** 挂载父节点，默认 `document.body` */
   parent?: HTMLElement;
   onClose?: () => void;
+  /**
+   * 资源动作权限管控。未配置或未提供 `check` 时弹层内按钮不做管控；
+   * 配置后「添加 / 上传 / 删除」按 `check` 结果禁用（默认）或隐藏，禁用时 hover 提示无权限。
+   */
+  permissions?: ImageAssetPermissions;
 }
 
 /**
  * 打开内置图库弹层：搜索、分页、选图插入；可选「链接添加」「上传到图库」「删除」由 adapter 决定。
  */
 export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void {
-  const { adapter, onPick, parent = document.body, onClose } = opts;
+  const { adapter, onPick, parent = document.body, onClose, permissions } = opts;
   const t = opts.t ?? createI18nContext().t;
+
+  /** 默认无权限提示文案（i18n），按动作取对应文案 */
+  const noPermissionTip = (action: AssetPermissionAction): string => {
+    switch (action) {
+      case 'upload':
+        return t('common.noPermissionUpload');
+      case 'addUrl':
+        return t('common.noPermissionAdd');
+      case 'delete':
+        return t('common.noPermissionDelete');
+      default:
+        return t('common.noPermission');
+    }
+  };
+  const perm = (action: AssetPermissionAction) =>
+    resolveAssetPermission(permissions, action, noPermissionTip(action));
 
   const modal = new Modal({
     title: t('gallery.title'),
@@ -106,11 +133,7 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
   function renderCells(items: GalleryItem[], append: boolean) {
     if (!append) clear(gridEl);
     if (items.length === 0 && !append) {
-      gridEl.append(
-        h('div', { class: 'sm-gallery-modal__empty' }, [
-          t('gallery.empty'),
-        ]),
-      );
+      gridEl.append(h('div', { class: 'sm-gallery-modal__empty' }, [t('gallery.empty')]));
       loadMoreBtn.style.display = hasMore ? '' : 'none';
       return;
     }
@@ -154,31 +177,41 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
       cellWrap.append(cell);
 
       if (adapter.deleteItem) {
-        const delBtn = h(
-          'button',
-          {
-            type: 'button',
-            class: 'sm-gallery-modal__cell-delete',
-            title: t('gallery.deleteTitle'),
-            onclick: async (e: Event) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (!window.confirm(t('gallery.deleteConfirm'))) return;
-              try {
-                await adapter.deleteItem!(it.id);
-                if (selected?.id === it.id) {
-                  selected = null;
-                  confirmBtn.disabled = true;
-                }
-                await loadFirst();
-              } catch (err) {
-                setError(err instanceof Error ? err.message : t('gallery.deleteFailed'));
-              }
+        const deletePerm = perm('delete');
+        if (!deletePerm.allowed && deletePerm.mode === 'hide') {
+          // 无删除权限且配置为隐藏：不渲染删除按钮
+        } else {
+          const delBtn = h(
+            'button',
+            {
+              type: 'button',
+              class: 'sm-gallery-modal__cell-delete',
+              title: deletePerm.allowed ? t('gallery.deleteTitle') : deletePerm.tip,
+              disabled: !deletePerm.allowed,
+              ...(deletePerm.allowed
+                ? {
+                    onclick: async (e: Event) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (!window.confirm(t('gallery.deleteConfirm'))) return;
+                      try {
+                        await adapter.deleteItem!(it.id);
+                        if (selected?.id === it.id) {
+                          selected = null;
+                          confirmBtn.disabled = true;
+                        }
+                        await loadFirst();
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : t('gallery.deleteFailed'));
+                      }
+                    },
+                  }
+                : {}),
             },
-          },
-          ['×'],
-        );
-        cellWrap.append(delBtn);
+            ['×'],
+          );
+          cellWrap.append(delBtn);
+        }
       }
 
       gridEl.append(cellWrap);
@@ -225,60 +258,79 @@ export function openImageGalleryModal(opts: OpenImageGalleryModalOptions): void 
   toolRow.append(searchInp);
 
   if (adapter.addByUrl) {
-    const urlInp = h('input', {
-      class: 'sm-input sm-gallery-modal__addurl-input',
-      type: 'url',
-      placeholder: t('gallery.addUrlPlaceholder'),
-    }) as HTMLInputElement;
-    const addBtn = h(
-      'button',
-      {
-        class: 'sm-btn sm-btn--secondary sm-gallery-modal__toolbar-action',
-        type: 'button',
-        onclick: async () => {
-          const u = urlInp.value.trim();
-          if (!u) return;
-          try {
-            await adapter.addByUrl!(u);
-            urlInp.value = '';
-            await loadFirst();
-          } catch (e) {
-            setError(e instanceof Error ? e.message : t('gallery.addFailed'));
-          }
+    const addPerm = perm('addUrl');
+    if (!addPerm.allowed && addPerm.mode === 'hide') {
+      // 无添加权限且配置为隐藏：不渲染添加链接输入框与按钮
+    } else {
+      const urlInp = h('input', {
+        class: 'sm-input sm-gallery-modal__addurl-input',
+        type: 'url',
+        placeholder: t('gallery.addUrlPlaceholder'),
+        disabled: !addPerm.allowed,
+      }) as HTMLInputElement;
+      const addBtn = h(
+        'button',
+        {
+          class: 'sm-btn sm-btn--secondary sm-gallery-modal__toolbar-action',
+          type: 'button',
+          title: addPerm.allowed ? '' : addPerm.tip,
+          disabled: !addPerm.allowed,
+          ...(addPerm.allowed
+            ? {
+                onclick: async () => {
+                  const u = urlInp.value.trim();
+                  if (!u) return;
+                  try {
+                    await adapter.addByUrl!(u);
+                    urlInp.value = '';
+                    await loadFirst();
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : t('gallery.addFailed'));
+                  }
+                },
+              }
+            : {}),
         },
-      },
-      [t('common.add')],
-    );
-    toolRow.append(urlInp, addBtn);
+        [t('common.add')],
+      );
+      toolRow.append(urlInp, addBtn);
+    }
   }
 
   if (adapter.uploadFile) {
-    const fileInp = h('input', {
-      type: 'file',
-      accept: 'image/*',
-      class: 'sm-gallery-modal__file',
-    });
-    fileInp.addEventListener('change', async () => {
-      const f = (fileInp as HTMLInputElement).files?.[0];
-      (fileInp as HTMLInputElement).value = '';
-      if (!f) return;
-      try {
-        await adapter.uploadFile!(f);
-        await loadFirst();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : t('gallery.uploadFailed'));
-      }
-    });
-    const upBtn = h(
-      'button',
-      {
-        class: 'sm-btn sm-btn--secondary sm-gallery-modal__toolbar-action',
-        type: 'button',
-        onclick: () => fileInp.click(),
-      },
-      [t('common.upload')],
-    );
-    toolRow.append(upBtn, fileInp);
+    const uploadPerm = perm('upload');
+    if (!uploadPerm.allowed && uploadPerm.mode === 'hide') {
+      // 无上传权限且配置为隐藏：不渲染上传按钮
+    } else {
+      const fileInp = h('input', {
+        type: 'file',
+        accept: 'image/*',
+        class: 'sm-gallery-modal__file',
+      });
+      fileInp.addEventListener('change', async () => {
+        const f = (fileInp as HTMLInputElement).files?.[0];
+        (fileInp as HTMLInputElement).value = '';
+        if (!f) return;
+        try {
+          await adapter.uploadFile!(f);
+          await loadFirst();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : t('gallery.uploadFailed'));
+        }
+      });
+      const upBtn = h(
+        'button',
+        {
+          class: 'sm-btn sm-btn--secondary sm-gallery-modal__toolbar-action',
+          type: 'button',
+          title: uploadPerm.allowed ? '' : uploadPerm.tip,
+          disabled: !uploadPerm.allowed,
+          ...(uploadPerm.allowed ? { onclick: () => fileInp.click() } : {}),
+        },
+        [t('common.upload')],
+      );
+      toolRow.append(upBtn, fileInp);
+    }
   }
 
   toolbar.append(toolRow);

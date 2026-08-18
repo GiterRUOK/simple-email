@@ -1,5 +1,5 @@
 /**
- * 右侧「图片地址」类字段：宿主可选手输 URL、本地上传、内置图库弹层或完全自管图床回调。
+ * 右侧「图片地址」类字段：宿主可选手输 URL、本地上传、内置图库弹层或完全自管图库回调。
  * 编辑器最终只把 URL 写入 props。
  */
 
@@ -27,6 +27,62 @@ export interface ImageGalleryListResult {
 }
 
 /**
+ * 资源动作权限的语义标识。宿主在 `ImageAssetPermissions.check` 中据此返回是否有权限：
+ * - `'upload'`：右栏「上传」按钮、图库弹层「上传」按钮（对应创建/上传权限）
+ * - `'addUrl'`：图库弹层「添加链接」按钮（对应创建权限）
+ * - `'delete'`：图库弹层缩略图删除按钮（对应删除权限）
+ */
+export type AssetPermissionAction = 'upload' | 'addUrl' | 'delete';
+
+/**
+ * 图片资源动作的权限管控配置。未配置 `check` 时视为全部有权限（不做管控）。
+ */
+export interface ImageAssetPermissions {
+  /**
+   * 权限校验：返回 `false` 表示该动作无权限。
+   * 未配置时视为全部有权限。
+   */
+  check?: (action: AssetPermissionAction) => boolean;
+  /**
+   * 无权限时的表现：
+   * - `'disable'`（默认）：按钮置灰禁用，hover 提示无权限。
+   * - `'hide'`：直接隐藏对应按钮。
+   */
+  noPermissionMode?: 'disable' | 'hide';
+  /**
+   * 无权限禁用时 hover 提示文案；未配置或为空时使用编辑器默认文案（`common.noPermission`）。
+   */
+  noPermissionTip?: string;
+}
+
+/** `resolveAssetPermission` 的结果。 */
+export interface ResolvedAssetPermission {
+  /** `true` 表示有权限 */
+  allowed: boolean;
+  /** 无权限时的表现（仅在 `allowed === false` 时有意义） */
+  mode: 'disable' | 'hide';
+  /** 无权限禁用时的 hover 提示文案（仅在 `allowed === false` 且 `mode === 'disable'` 时有意义） */
+  tip: string;
+}
+
+/**
+ * 解析某个动作的权限状态。未配置 `permissions` 或 `check` 时视为有权限。
+ * @param defaultNoPermissionTip 编辑器默认的无权限提示文案（由调用方从 i18n 传入）
+ */
+export function resolveAssetPermission(
+  permissions: ImageAssetPermissions | undefined,
+  action: AssetPermissionAction,
+  defaultNoPermissionTip: string,
+): ResolvedAssetPermission {
+  if (!permissions?.check) return { allowed: true, mode: 'disable', tip: '' };
+  const allowed = permissions.check(action);
+  if (allowed) return { allowed: true, mode: 'disable', tip: '' };
+  const mode: 'disable' | 'hide' = permissions.noPermissionMode === 'hide' ? 'hide' : 'disable';
+  const tip = (permissions.noPermissionTip ?? '').trim() || defaultNoPermissionTip;
+  return { allowed: false, mode, tip };
+}
+
+/**
  * 内置图库弹层的数据与扩展能力。实现 `listItems` 即可；上传、链接添加、删除等仅在提供对应方法时显示。
  */
 export interface ImageGalleryAdapter {
@@ -47,7 +103,7 @@ export interface ImageAssetsHandlers {
   uploadImage?: (file: File, ctx: ImageFieldContext) => Promise<string>;
 
   /**
-   * 完全自管图床：与内置 `imageGallery` 可并存；
+   * 完全自管图库：与内置 `imageGallery` 可并存；
    * **同时配置时优先使用内置 `imageGallery` 弹层**。
    */
   pickImageFromGallery?: (ctx: ImageFieldContext) => Promise<string | null>;
@@ -65,8 +121,14 @@ export interface ImageAssetsHandlers {
   showUpload?: boolean;
 
   /**
-   * 是否显示「图床」按钮。在配置了 `pickImageFromGallery` 或 `imageGallery` 时有效。
+   * 是否显示「图库」按钮。在配置了 `pickImageFromGallery` 或 `imageGallery` 时有效。
    * 默认 `false`；需显式设为 `true` 才展示入口。
    */
   showGallery?: boolean;
+
+  /**
+   * 资源动作权限管控。配置后，「上传 / 添加链接 / 删除」按钮将按 `check` 结果禁用或隐藏。
+   * 默认无权限时禁用并 hover 提示。右栏「上传」与图库弹层内按钮共用同一份配置。
+   */
+  permissions?: ImageAssetPermissions;
 }

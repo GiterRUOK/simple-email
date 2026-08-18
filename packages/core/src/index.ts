@@ -86,12 +86,16 @@ export type {
 } from './types';
 export type { EditorTheme } from './editor/theme';
 export type {
+  AssetPermissionAction,
   GalleryItem,
   ImageAssetsHandlers,
+  ImageAssetPermissions,
   ImageFieldContext,
   ImageGalleryAdapter,
   ImageGalleryListResult,
+  ResolvedAssetPermission,
 } from './editor/imageAssets';
+export { resolveAssetPermission } from './editor/imageAssets';
 export type { OpenImageGalleryModalOptions } from './editor/ImageGalleryModal';
 export { openImageGalleryModal } from './editor/ImageGalleryModal';
 export {
