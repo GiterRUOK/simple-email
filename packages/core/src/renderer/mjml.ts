@@ -34,6 +34,7 @@ export function docToMjml(doc: EmailDoc, registry: Registry): string {
     <mj-style>
       a { color: ${escapeAttr(attrs.linkColor)}; }
 ${sectionWidthConstraintCss(doc)}
+${columnGapMobileCss(doc)}
     </mj-style>
   </mj-head>
   <mj-body background-color="${escapeAttr(attrs.backgroundColor)}" width="${escapeAttr(docContentWidthCss(doc.meta.width))}">
@@ -55,6 +56,65 @@ function sectionWidthConstraintCss(doc: EmailDoc): string {
     .join('\n');
 }
 
+/**
+ * 列间距相关的小屏规则。
+ *
+ * 1) 水平间距（columnGap）用 mj-column 对称 padding 实现，小屏堆叠后 padding 不消失会导致
+ *    相邻列内容纵向错位（首列右缩、次列左缩），需要在堆叠时清零。
+ * 2) 堆叠纵向间距（columnStackedGap）只挂在非末列上，作为堆叠后相邻列之间的额外间距。
+ *
+ * 共同注意点：mj-column 的 padding 不落在带 css-class 的外层 div 上，编译结果是
+ * `div[class] > table > tbody > tr > td{padding:...}`，所以规则必须命中这一层 td，
+ * 用直接子代链避免波及块自身的 padding。
+ * 断点取 MJML 默认堆叠断点 480px；!important 用于覆盖行内样式。
+ * 仅对会小屏堆叠的列生效；mj-group（preserveColumnsOnMobile）不堆叠，不注入。
+ */
+const COLUMN_GAP_MOBILE_BREAKPOINT = 480;
+
+function columnGapClassName(sectionId: string): string {
+  return `${sectionMjClassName(sectionId)}-cg`;
+}
+
+function columnStackedGapClassName(sectionId: string): string {
+  return `${sectionMjClassName(sectionId)}-svg`;
+}
+
+/** 该 Section 的列是否会在小屏堆叠（未包 mj-group 的多列） */
+function stacksOnMobile(section: Section): boolean {
+  return section.columns.length > 1 && section.attrs.preserveColumnsOnMobile !== true;
+}
+
+function columnGapMobileCss(doc: EmailDoc): string {
+  const lines: string[] = [];
+
+  for (const s of doc.sections) {
+    if (!stacksOnMobile(s)) continue;
+    const gap = Math.max(0, s.attrs.columnGap ?? 0);
+    const stackedGap = Math.max(0, Math.round(s.attrs.columnStackedGap ?? 0));
+    if (gap <= 0 && stackedGap <= 0) continue;
+
+    if (gap > 0) {
+      const cls = columnGapClassName(s.id);
+      lines.push(
+        `        .${cls},`,
+        `        .${cls} > table > tbody > tr > td { padding-left: 0 !important; padding-right: 0 !important; }`,
+      );
+    }
+    if (stackedGap > 0) {
+      lines.push(
+        `        .${columnStackedGapClassName(
+          s.id,
+        )} > table > tbody > tr > td { padding-bottom: ${stackedGap}px !important; }`,
+      );
+    }
+  }
+
+  if (!lines.length) return '';
+  return `      @media only screen and (max-width:${COLUMN_GAP_MOBILE_BREAKPOINT}px) {
+${lines.join('\n')}
+      }`;
+}
+
 function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext): string {
   const a = section.attrs;
   const padding = [a.paddingTop, a.paddingRight, a.paddingBottom, a.paddingLeft]
@@ -67,10 +127,27 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
     secW || dvKey ? ` css-class="${escapeAttr(sectionMjClassName(section.id))}"` : '';
   const widths = layoutWidths(section.layout);
   const gapPx = Math.max(0, section.attrs.columnGap ?? 0);
+  /** 仅小屏堆叠时才有水平复位与纵向间距；与下方 grouped 判定保持一致 */
+  const stacked = stacksOnMobile(section);
+  const hCls = stacked && gapPx > 0 ? columnGapClassName(section.id) : '';
+  const vCls =
+    stacked && Math.max(0, Math.round(section.attrs.columnStackedGap ?? 0)) > 0
+      ? columnStackedGapClassName(section.id)
+      : '';
+  const lastIndex = section.columns.length - 1;
 
   const columns = section.columns
     .map((col, i) =>
-      columnToMjml(col, widths[i], i, section.columns.length, gapPx, registry, ctx),
+      columnToMjml(
+        col,
+        widths[i],
+        i,
+        section.columns.length,
+        gapPx,
+        [hCls, vCls && i < lastIndex ? vCls : ''].filter(Boolean).join(' '),
+        registry,
+        ctx,
+      ),
     )
     .join('\n');
 
@@ -92,6 +169,7 @@ function columnToMjml(
   columnIndex: number,
   columnCount: number,
   columnGapPx: number,
+  gapClassNames: string,
   registry: Registry,
   ctx: RenderContext,
 ): string {
@@ -106,6 +184,7 @@ function columnToMjml(
     const pr = columnIndex < columnCount - 1 ? `${half}px` : '0px';
     gapPad = ` padding="0px ${pr} 0px ${pl}"`;
   }
+  const clsAttr = gapClassNames ? ` css-class="${escapeAttr(gapClassNames)}"` : '';
 
   const rawTypo = mjRawCellTypographyFromStyles(ctx.doc.styles);
   const blocks = column.blocks
@@ -129,7 +208,7 @@ function columnToMjml(
     })
     .join('\n');
 
-  return `      <mj-column width="${width}"${va}${bg}${gapPad}>
+  return `      <mj-column width="${width}"${va}${bg}${gapPad}${clsAttr}>
 ${blocks || '        <!-- empty column -->'}
       </mj-column>`;
 }
