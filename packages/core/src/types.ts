@@ -78,6 +78,13 @@ export interface SectionAttrs {
    */
   columnGap?: number;
   /**
+   * 多列在小屏堆叠为单列后，相邻列之间的纵向间距（px）。
+   * 仅在多列且未开启 `preserveColumnsOnMobile` 时生效；未设置/0 表示不额外加间距
+   * （沿用块自身 padding 形成的间距），避免改变已有邮件的移动端排版。
+   * 通过小屏媒体查询实现，不会影响桌面端行高。
+   */
+  columnStackedGap?: number;
+  /**
    * 本节内容区最大宽度（窄于邮件 `meta.width` 时居中）。支持 `480`、`480px`、`90%`；留空则与邮件同宽。
    */
   width?: string | number;

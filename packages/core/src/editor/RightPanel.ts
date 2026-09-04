@@ -562,6 +562,24 @@ export class RightPanel {
             `section:${section.id}:attrs.columnGap`,
           )
         : null,
+      section.layout !== '1' && !a.preserveColumnsOnMobile
+        ? this._numberField(
+            this.opts.t('rightPanel.section.stackedGap'),
+            a.columnStackedGap ?? 0,
+            0,
+            64,
+            (v) => {
+              const g = Math.max(0, Math.min(64, Math.round(v)));
+              this.opts.store.update((d) => {
+                const s = findSection(d, section.id);
+                if (s) s.attrs.columnStackedGap = g > 0 ? g : undefined;
+              });
+            },
+            1,
+            `section:${section.id}:attrs.stackedGap`,
+            this.opts.t('rightPanel.section.stackedGapHelp'),
+          )
+        : null,
       section.layout !== '1'
         ? this._switchField(
             this.opts.t('rightPanel.section.preserveMobile'),
@@ -1130,6 +1148,24 @@ export class RightPanel {
     );
   }
   private _numberField(
+    label: string,
+    value: number,
+    min: number,
+    max: number,
+    onChange: (v: number) => void,
+    step = 1,
+    focusToken?: string,
+    help?: string,
+  ): HTMLElement {
+    const field = this._buildNumberField(label, value, min, max, onChange, step, focusToken);
+    if (!help) return field;
+    return h('div', { class: 'sm-field', style: 'flex-direction:column;align-items:flex-start;gap:6px;' }, [
+      field,
+      h('div', { class: 'sm-field__help' }, [help]),
+    ]);
+  }
+
+  private _buildNumberField(
     label: string,
     value: number,
     min: number,
