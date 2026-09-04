@@ -849,6 +849,35 @@ export class Canvas {
     return Object.keys(rest).length ? rest : undefined;
   }
 
+  /** 组合 palette 可一次创建原生多列 Section，并将 Block 放入指定列。 */
+  private _createSectionFromPaletteDrop(drop: PaletteDropResult): Section {
+    const section = createSection(drop.sectionLayout ?? '1');
+    this._applySectionAttrs(section, this._paletteSectionAttrsForDrop(drop.sectionAttrs));
+    if (drop.columnBlocks?.length) {
+      drop.columnBlocks.forEach((blocks, columnIndex) => {
+        section.columns[columnIndex]?.blocks.push(...blocks);
+      });
+    } else {
+      section.columns[0]?.blocks.push(...drop.blocks);
+    }
+    return section;
+  }
+
+  private _paletteDropNeedsDedicatedSection(drop: PaletteDropResult): boolean {
+    if (drop.sectionLayout && drop.sectionLayout !== '1') return true;
+    if ((drop.columnBlocks?.length ?? 0) > 1) return true;
+    const attrs = this._paletteSectionAttrsForDrop(drop.sectionAttrs);
+    return !!attrs?.dynamicVariantKey;
+  }
+
+  private _firstBlockInSection(section: Section): { block: Block; columnIndex: number } | undefined {
+    for (let columnIndex = 0; columnIndex < section.columns.length; columnIndex += 1) {
+      const block = section.columns[columnIndex]?.blocks[0];
+      if (block) return { block, columnIndex };
+    }
+    return undefined;
+  }
+
   private _handleSectionAdd(e: Sortable.SortableEvent) {
     this._commitEditingBeforeStructureChange();
     const item = e.item;
@@ -870,20 +899,18 @@ export class Canvas {
     // 路径 B：左栏内容/自定义卡片拖到 sections 之间 → 自动裹一列 Section
     if (sourceGroup === 'blocks' && blockType) {
       item.parentElement?.removeChild(item);
-      const { blocks, sectionAttrs } = this._resolvePaletteDrop(blockType);
-      const newSection = createSection('1');
-      this._applySectionAttrs(newSection, this._paletteSectionAttrsForDrop(sectionAttrs));
-      newSection.columns[0].blocks.splice(newIndex, 0, ...blocks);
+      const drop = this._resolvePaletteDrop(blockType);
+      const newSection = this._createSectionFromPaletteDrop(drop);
       this.opts.store.update((d) => {
         d.sections.splice(newIndex, 0, newSection);
       });
-      const head = blocks[0];
+      const head = this._firstBlockInSection(newSection);
       if (head) {
         this.opts.store.setSelection({
           kind: 'block',
           sectionId: newSection.id,
-          columnIndex: 0,
-          blockId: head.id,
+          columnIndex: head.columnIndex,
+          blockId: head.block.id,
         });
       }
       return;
@@ -938,23 +965,20 @@ export class Canvas {
     if (sourceGroup === 'blocks' && blockType) {
       item.parentElement?.removeChild(item);
       const drop = this._resolvePaletteDrop(blockType);
-      const paletteSectionAttrs = this._paletteSectionAttrsForDrop(drop.sectionAttrs);
-      if (paletteSectionAttrs?.dynamicVariantKey) {
-        const newSection = createSection('1');
-        this._applySectionAttrs(newSection, paletteSectionAttrs);
-        newSection.columns[0].blocks.push(...drop.blocks);
+      if (this._paletteDropNeedsDedicatedSection(drop)) {
+        const newSection = this._createSectionFromPaletteDrop(drop);
         this.opts.store.update((d) => {
           const secIdx = d.sections.findIndex((s) => s.id === sectionId);
           const insertAt = secIdx >= 0 ? secIdx + 1 : d.sections.length;
           d.sections.splice(insertAt, 0, newSection);
         });
-        const head = drop.blocks[0];
+        const head = this._firstBlockInSection(newSection);
         if (head) {
           this.opts.store.setSelection({
             kind: 'block',
             sectionId: newSection.id,
-            columnIndex: 0,
-            blockId: head.id,
+            columnIndex: head.columnIndex,
+            blockId: head.block.id,
           });
         }
         return;

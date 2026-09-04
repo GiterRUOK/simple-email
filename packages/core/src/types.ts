@@ -195,10 +195,21 @@ export interface BlockDefinition<P extends object = Record<string, unknown>> {
   ) => Block[] | PaletteDropResult;
 }
 
-/** 左栏组合拖入：可附带新建 Section 的 attrs（如 meta 扩展袋） */
+/** 左栏组合拖入：可附带新建 Section 的 attrs、布局和按列分发的 Block。 */
 export interface PaletteDropResult {
+  /** 单列组合或落入既有列时插入的 Block。 */
   blocks: Block[];
   sectionAttrs?: Partial<SectionAttrs>;
+  /**
+   * 组合入口可声明要新建的 Section 布局；多列布局会始终创建独立 Section，
+   * 不会被插入到用户当前选中的单列中。
+   */
+  sectionLayout?: SectionLayout;
+  /**
+   * 仅创建新 Section 时使用；每个数组对应一个 Column，索引与 Section 列顺序一致。
+   * 超出布局列数的数组会被忽略，缺少的列保持为空。
+   */
+  columnBlocks?: Block[][];
 }
 
 export interface InlineEditableConfig<P extends object = Record<string, unknown>> {
