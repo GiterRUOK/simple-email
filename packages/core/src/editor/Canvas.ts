@@ -286,7 +286,7 @@ export class Canvas {
 
     const { doc } = this.opts.store;
     this.inner.style.maxWidth = docContentWidthCss(doc.meta.width);
-    this.inner.style.background = doc.styles.contentBackgroundColor;
+    this.inner.style.background = doc.styles.backgroundColor;
     this.inner.style.fontFamily = doc.styles.fontFamily;
     this.inner.style.fontSize = doc.styles.fontSize;
     this.inner.style.fontWeight = normalizeFontWeightStep(doc.styles.fontWeight);

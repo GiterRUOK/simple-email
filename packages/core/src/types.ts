@@ -24,8 +24,12 @@ export interface EmailMeta {
 }
 
 export interface GlobalStyles {
+  /**
+   * 邮件背景色：导出时写入 `<mj-body background-color>`，画布内容纸取同一值。
+   * 旧字段 `contentBackgroundColor`（内容背景）已废弃并合并到此处，
+   * 由 `createDefaultDoc` 在读入旧文档时迁移。
+   */
   backgroundColor: string;
-  contentBackgroundColor: string;
   fontFamily: string;
   fontSize: string;
   /** 全局字重：数值档 300 | 400 | 500 | 600 | 700（兼容读写 normal / bold 等别名） */

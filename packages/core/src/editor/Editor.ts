@@ -6,6 +6,7 @@ import type {
   BlockDefinition,
   EditorUiOptions,
   EmailDoc,
+  GlobalStyles,
   RenderEngine,
   Selection,
   Variable,
@@ -273,7 +274,11 @@ export class MailEditor {
 
   setValue(doc: EmailDoc) {
     this._blurRightPanelIfFocused();
-    this.store.replace(doc);
+    // 兼容旧文档：剥离/合并已废弃的 styles.contentBackgroundColor
+    this.store.replace({
+      ...doc,
+      styles: { ...doc.styles, ...migrateLegacyStyles(doc.styles) },
+    });
     this._applyConfiguredVariables();
   }
 
@@ -1224,17 +1229,31 @@ function applyLocalizedDefaultMeta(
   if (source?.meta?.subject == null) doc.meta.subject = t('doc.defaultSubject');
 }
 
+/**
+ * 迁移旧字段 `styles.contentBackgroundColor`（内容背景）→ `backgroundColor`。
+ * 导出产物历史上只认 `backgroundColor`（内容背景从未写进 MJML），因此优先保留它，
+ * 保证已导出/已发送邮件的背景不变；仅在其为空时用内容背景兜底，并丢弃废弃字段，
+ * 避免它随文档回写到宿主持久化存储。
+ */
+function migrateLegacyStyles(styles: Partial<GlobalStyles>): Partial<GlobalStyles> {
+  const legacy = styles as Partial<GlobalStyles> & { contentBackgroundColor?: string };
+  const legacyBg = legacy.contentBackgroundColor;
+  if (legacyBg === undefined) return styles;
+  const { contentBackgroundColor, ...rest } = legacy;
+  const bg = rest.backgroundColor || contentBackgroundColor;
+  return bg ? { ...rest, backgroundColor: bg } : rest;
+}
+
 function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
   const mergedStyles = {
     backgroundColor: '#ffffff',
-    contentBackgroundColor: '#ffffff',
     fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
     fontSize: '16px',
     fontWeight: '400',
     color: '#433f3f',
     linkColor: '#ff5a00',
     lineHeight: '1.25',
-    ...(partial?.styles ?? {}),
+    ...migrateLegacyStyles(partial?.styles ?? {}),
   };
   return {
     version: '1',

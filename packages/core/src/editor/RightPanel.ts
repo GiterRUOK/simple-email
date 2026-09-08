@@ -395,15 +395,6 @@ export class RightPanel {
           }),
         'doc:styles.backgroundColor',
       ),
-      this._colorField(
-        this.opts.t('rightPanel.doc.contentBackground'),
-        doc.styles.contentBackgroundColor,
-        (v) =>
-          this.opts.store.update((d) => {
-            d.styles.contentBackgroundColor = v;
-          }),
-        'doc:styles.contentBackgroundColor',
-      ),
       this._textField(
         this.opts.t('rightPanel.doc.fontFamily'),
         doc.styles.fontFamily,
