@@ -306,9 +306,15 @@ export class InlineEditor {
     this._restoreSelection();
   }
 
-  /** 字号：走原生 fontSize 命令（styleWithCSS 下浏览器会写 span），与 foreColor 同类 */
+  /**
+   * 字号：直接写精确 px。
+   * 不能用 `execCommand('fontSize')`——它只接受 1–7 的 legacy 档位，
+   * 浏览器按自己的档位表渲染（如 5→24px、6→32px），回读时 20px 会变成 24px、28px 会变成 32px。
+   */
   applyFontSize(px: string) {
-    this.exec('fontSize', pxToLegacyFontSize(px));
+    const css = normalizeFontSizeCss(px);
+    if (!css) return;
+    this._wrapInlineStyle(`font-size:${css};`);
   }
 
   /**
@@ -316,6 +322,14 @@ export class InlineEditor {
    * 有选区包裹内容；折叠光标插入 typing span，后续输入沿用。
    */
   applyFontWeight(weight: string) {
+    this._wrapInlineStyle(`font-weight:${weight};`);
+  }
+
+  /**
+   * 用 `<span style="...">` 包裹选区写入内联样式。
+   * 有选区则包裹内容并重新选中；折叠光标则插入零宽占位 span，后续输入沿用。
+   */
+  private _wrapInlineStyle(style: string) {
     this.edited = true;
     this._ensureFocus();
     this._restoreSelection();
@@ -324,29 +338,29 @@ export class InlineEditor {
     const range = sel.getRangeAt(0);
     if (!this.el.contains(range.startContainer) || !this.el.contains(range.endContainer)) return;
 
-    if (!range.collapsed) {
-      const span = document.createElement('span');
-      span.setAttribute('style', `font-weight:${weight};`);
-      try {
+    const span = document.createElement('span');
+    span.setAttribute('style', style);
+    try {
+      if (!range.collapsed) {
         span.appendChild(range.extractContents());
         range.insertNode(span);
         const newRange = document.createRange();
         newRange.selectNodeContents(span);
         sel.removeAllRanges();
         sel.addRange(newRange);
-      } catch {
-        return;
+      } else {
+        // 标记 typing 占位：只设了样式却没输入内容时，提交前由 sanitizeRichHtml 拆掉空壳
+        span.setAttribute('data-sm-typing', '1');
+        span.appendChild(document.createTextNode('\u200b'));
+        range.insertNode(span);
+        const caret = document.createRange();
+        caret.setStart(span.firstChild!, 1);
+        caret.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(caret);
       }
-    } else {
-      const span = document.createElement('span');
-      span.setAttribute('style', `font-weight:${weight};`);
-      span.appendChild(document.createTextNode('\u200b'));
-      range.insertNode(span);
-      const caret = document.createRange();
-      caret.setStart(span.firstChild!, 1);
-      caret.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(caret);
+    } catch {
+      return;
     }
 
     this.saveSelection();
@@ -851,44 +865,13 @@ function selectionAnchorKey(range: Range): string {
   return `${range.startContainer.nodeType}:${range.startOffset}:${range.endContainer.nodeType}:${range.endOffset}`;
 }
 
-/** execCommand fontSize 只认 1–7，与工具条 px 互转 */
-function pxToLegacyFontSize(px: string): string {
-  const map: Record<string, string> = {
-    '10px': '1',
-    '12px': '2',
-    '13px': '3',
-    '14px': '3',
-    '15px': '4',
-    '16px': '4',
-    '18px': '4',
-    '20px': '5',
-    '24px': '6',
-    '28px': '6',
-    '32px': '7',
-  };
-  const key = px.trim().toLowerCase();
-  if (map[key]) return map[key];
-  const num = parseFloat(key);
-  if (Number.isNaN(num)) return '4';
-  const steps: [number, string][] = [
-    [10, '1'],
-    [12, '2'],
-    [14, '3'],
-    [16, '4'],
-    [20, '5'],
-    [24, '6'],
-    [32, '7'],
-  ];
-  let best = '4';
-  let bestD = Infinity;
-  for (const [size, legacy] of steps) {
-    const d = Math.abs(size - num);
-    if (d < bestD) {
-      bestD = d;
-      best = legacy;
-    }
-  }
-  return best;
+/** 工具条传入的 `28px` / `28` 规范成 CSS 值；非法返回 ''（调用方忽略） */
+function normalizeFontSizeCss(px: string): string {
+  const m = /^(\d+(?:\.\d+)?)(px)?$/i.exec((px ?? '').trim());
+  if (!m) return '';
+  const n = Number.parseFloat(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return '';
+  return `${Math.min(96, Math.max(8, n))}px`;
 }
 
 function isTransparentColor(c: string): boolean {
@@ -926,6 +909,7 @@ export function sanitizeRichHtml(html: string): string {
   const tpl = document.createElement('template');
   tpl.innerHTML = html;
   walk(tpl.content);
+  mergeRedundantSpans(tpl.content);
   return tpl.innerHTML.replace(/\u200b/g, '');
 
   function walk(root: Node) {
@@ -937,6 +921,15 @@ export function sanitizeRichHtml(html: string): string {
         while (el.firstChild) el.parentNode?.insertBefore(el.firstChild, el);
         el.remove();
         return;
+      }
+      // 只改了字号/字重却没输入内容的 typing 占位 span：零宽字符剥掉后是空壳，拆掉避免进邮件
+      if (tag === 'span' && el.getAttribute('data-sm-typing') === '1') {
+        const text = (el.textContent ?? '').replace(/\u200b/g, '');
+        if (text.length === 0 && !el.querySelector('br, img')) {
+          while (el.firstChild) el.parentNode?.insertBefore(el.firstChild, el);
+          el.remove();
+          return;
+        }
       }
       // <font color="..." size="..." face="..."> → 转成 span style
       if (tag === 'font') {
@@ -1009,6 +1002,35 @@ export function sanitizeRichHtml(html: string): string {
   }
 }
 
+/**
+ * 合并 style/class 完全相同的父子 span：反复改字号/字重会套出多层同义 span，
+ * 渲染结果一样但 HTML 变胖（逼近 Gmail 102KB 截断）。合并后内层子节点上提。
+ */
+function mergeRedundantSpans(root: ParentNode): void {
+  for (let pass = 0; pass < 5; pass++) {
+    let changed = false;
+    for (const el of Array.from(root.querySelectorAll('span'))) {
+      const parent = el.parentElement;
+      if (!parent || parent.tagName.toLowerCase() !== 'span') continue;
+      if (spanIdentity(parent) !== spanIdentity(el)) continue;
+      while (el.firstChild) parent.insertBefore(el.firstChild, el);
+      el.remove();
+      changed = true;
+    }
+    if (!changed) break;
+  }
+}
+
+/** span 的样式身份：class + 规范化后的 style，用于判断是否可合并 */
+function spanIdentity(el: Element): string {
+  const style = (el.getAttribute('style') ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+    .replace(/;+$/, '');
+  return `${(el.getAttribute('class') ?? '').trim()} ${style}`;
+}
+
 function hasMarginStyle(el: Element): boolean {
   const style = el.getAttribute('style') ?? '';
   return /(?:^|;)\s*margin(?:-(?:top|right|bottom|left))?\s*:/i.test(style);
@@ -1020,15 +1042,17 @@ function appendStyle(el: Element, style: string) {
 }
 
 function fontSizeFromLegacy(size: string): string {
-  // 旧 <font size="1..7"> → px 近似
+  // 旧 <font size="1..7"> → px。必须用浏览器实际渲染 legacy 档位的那张表
+  // （与 HTML 规范建议值一致：1=10, 2=13, 3=16, 4=18, 5=24, 6=32, 7=48），
+  // 否则编辑器里看到的字号与提交进邮件的字号不一致（如 size=5 显示 24px 却存成 20px）。
   const map: Record<string, string> = {
     '1': '10px',
-    '2': '12px',
-    '3': '14px',
-    '4': '16px',
-    '5': '20px',
-    '6': '24px',
-    '7': '32px',
+    '2': '13px',
+    '3': '16px',
+    '4': '18px',
+    '5': '24px',
+    '6': '32px',
+    '7': '48px',
   };
   return map[size] ?? size;
 }

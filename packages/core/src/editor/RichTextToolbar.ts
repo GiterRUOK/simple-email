@@ -40,7 +40,20 @@ const FONT_FAMILIES = [
   { label: 'Courier', value: '"Courier New", monospace' },
 ];
 
-const FONT_SIZES = ['12px', '13px', '14px', '15px', '16px', '18px', '20px', '24px', '28px', '32px'];
+/** 末位 48px 对应遗留 `<font size="7">`，见 InlineEditor.fontSizeFromLegacy */
+const FONT_SIZES = [
+  '12px',
+  '13px',
+  '14px',
+  '15px',
+  '16px',
+  '18px',
+  '20px',
+  '24px',
+  '28px',
+  '32px',
+  '48px',
+];
 
 export class RichTextToolbar {
   el: HTMLElement;
