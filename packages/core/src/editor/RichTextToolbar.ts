@@ -172,7 +172,8 @@ export class RichTextToolbar {
 
     this.btns.bold = this._btn('B', t('toolbar.bold'), exec('bold'), { fontWeight: '700' });
     this.btns.italic = this._btn('I', t('toolbar.italic'), exec('italic'), { fontStyle: 'italic' });
-    this.btns.underline = this._btn('U', t('toolbar.underline'), exec('underline'), {
+    // 链接内的下划线归 <a> 管，走专用实现；非链接文本回落到 execCommand
+    this.btns.underline = this._btn('U', t('toolbar.underline'), () => this.editor?.toggleUnderline(), {
       textDecoration: 'underline',
     });
     this.btns.strikethrough = this._btn('S', t('toolbar.strikethrough'), exec('strikeThrough'), {

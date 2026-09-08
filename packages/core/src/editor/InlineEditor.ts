@@ -229,6 +229,8 @@ export class InlineEditor {
       richTextExecCommand('styleWithCSS', false, isListCmd ? 'false' : 'true');
       richTextExecCommand(command, false, value);
     }
+    // 链接内改文字色时同步到 <a> 自身：下划线由 <a> 绘制，不同步会出现「线与字异色」
+    if (command === 'foreColor' && value) this._syncAnchorColor(value);
     if (command === 'hiliteColor') {
       this.pendingHiliteColor = value ?? null;
       this.pendingHiliteAnchor = hiliteAnchor;
@@ -365,6 +367,55 @@ export class InlineEditor {
 
     this.saveSelection();
     this._emitSelection();
+  }
+
+  /**
+   * 下划线：链接内的下划线来自 <a> 自身的（UA 默认）样式。
+   * CSS 里 text-decoration 由祖先向后代传播，**后代无法用 `text-decoration:none` 取消**，
+   * 而 execCommand('underline') 只能写后代 → 链接文字的下划线永远点不掉。
+   * 所以选区在链接内时直接改写 <a> 自己的 text-decoration。
+   */
+  toggleUnderline() {
+    this.edited = true;
+    this._ensureFocus();
+    this._restoreSelection();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (!this.el.contains(range.startContainer) || !this.el.contains(range.endContainer)) return;
+
+    const anchors = collectAnchorsInRange(range, this.el);
+    if (!anchors.length) {
+      this.exec('underline');
+      return;
+    }
+    // 全部已有下划线则整体关闭，否则整体打开
+    const turnOn = !anchors.every(hasComputedUnderline);
+    for (const a of anchors) {
+      setStyleDecl(a, TEXT_DECORATION_RE, `text-decoration:${turnOn ? 'underline' : 'none'}`);
+    }
+
+    this.saveSelection();
+    this._emitSelection();
+  }
+
+  /** 选区内（或折叠光标所在）的 <a> 元素 */
+  private _anchorsAtSelection(): HTMLAnchorElement[] {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return [];
+    const range = sel.getRangeAt(0);
+    if (!this.el.contains(range.startContainer) || !this.el.contains(range.endContainer)) return [];
+    return collectAnchorsInRange(range, this.el);
+  }
+
+  /**
+   * 把文字色同步到选区所在的 <a>：下划线颜色取 <a> 的 color，
+   * 若内嵌 span 另设 color，会出现「字是 A 色、线是 B 色」且 B 无法通过工具条修改。
+   */
+  private _syncAnchorColor(color: string): void {
+    for (const a of this._anchorsAtSelection()) {
+      setStyleDecl(a, COLOR_RE, `color:${color}`);
+    }
   }
 
   /** 内联编辑根节点（如 `.sm-text-content`）的盒模型矩形，供富文本条贴在正文区域外沿定位 */
@@ -689,7 +740,7 @@ export class InlineEditor {
       formats: {
         bold: richTextQueryCommandState('bold'),
         italic: richTextQueryCommandState('italic'),
-        underline: richTextQueryCommandState('underline'),
+        underline: resolveUnderlineAtSelection(this.el, sel),
         strikethrough: richTextQueryCommandState('strikeThrough'),
         unorderedList:
           listFormats.unorderedList || richTextQueryCommandState('insertUnorderedList'),
@@ -806,6 +857,53 @@ function resolveInlineFormatsAtSelection(
   }
 
   return { fontSize, fontWeight, foreColor, backColor };
+}
+
+const TEXT_DECORATION_RE = /^text-decoration(-line)?\s*:/i;
+const COLOR_RE = /^color\s*:/i;
+
+/** 选区内（折叠光标则取其所在）的 <a> 元素 */
+function collectAnchorsInRange(range: Range, root: HTMLElement): HTMLAnchorElement[] {
+  const found = new Set<HTMLAnchorElement>();
+  if (range.collapsed) {
+    const node = range.startContainer;
+    const el = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
+    const a = el?.closest('a') ?? null;
+    if (a && root.contains(a)) found.add(a);
+  } else {
+    for (const a of Array.from(root.querySelectorAll('a'))) {
+      if (range.intersectsNode(a)) found.add(a);
+    }
+  }
+  return [...found];
+}
+
+/** 元素当前是否真的有下划线（含 UA 默认、CSS 规则、inline style） */
+function hasComputedUnderline(el: HTMLElement): boolean {
+  const line = window.getComputedStyle(el).textDecorationLine || '';
+  return /(^|\s)underline(\s|$)/.test(line);
+}
+
+/** 替换（无则追加）style 中匹配 propRe 的那条声明 */
+function setStyleDecl(el: HTMLElement, propRe: RegExp, decl: string): void {
+  const raw = (el.getAttribute('style') ?? '').trim();
+  const kept = raw
+    .split(';')
+    .map((s) => s.trim())
+    .filter((s) => s && !propRe.test(s))
+    .join(';');
+  el.setAttribute('style', kept ? `${kept};${decl}` : decl);
+}
+
+/**
+ * 下划线状态：链接内的下划线由 <a> 决定，execCommand 的状态查询读不到它，
+ * 会出现「看着有线、按钮却是未激活」→ 点了没反应。故链接内以 <a> 的 computed 为准。
+ */
+function resolveUnderlineAtSelection(root: HTMLElement, sel: Selection): boolean {
+  const host = selectionHostElement(sel, root);
+  const a = host?.closest('a') ?? null;
+  if (a && root.contains(a)) return hasComputedUnderline(a);
+  return richTextQueryCommandState('underline');
 }
 
 /** 光标处文字色（foreColor / 链接局部 color；queryCommandValue 在 <a> 内常不准） */
