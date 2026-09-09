@@ -69,7 +69,7 @@ function sectionWidthConstraintCss(doc: EmailDoc): string {
  * 断点取 MJML 默认堆叠断点 480px；!important 用于覆盖行内样式。
  * 仅对会小屏堆叠的列生效；mj-group（preserveColumnsOnMobile）不堆叠，不注入。
  */
-const COLUMN_GAP_MOBILE_BREAKPOINT = 480;
+const COLUMN_GAP_MOBILE_BREAKPOINT = 479;
 
 function columnGapClassName(sectionId: string): string {
   return `${sectionMjClassName(sectionId)}-cg`;
