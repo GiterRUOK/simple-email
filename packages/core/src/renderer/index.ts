@@ -6,6 +6,7 @@ import {
   normalizeEmailListsInHtml,
   resolveGlobalListIndentPx,
 } from '../utils/emailListStyles';
+import { inlineColumnWidthsInHtml } from '../utils/columnWidths';
 import { docToMjml } from './mjml';
 
 export interface RenderResult {
@@ -45,6 +46,7 @@ export function renderDoc(
 
   let html = compiled.html;
   html = annotateDynamicVariantHtmlAttributes(html, doc);
+  html = inlineColumnWidthsInHtml(html);
   html = normalizeEmailListsInHtml(html, resolveGlobalListIndentPx(doc.styles));
   if (opts.withSampleVariables) {
     html = replaceVariables(html, doc.variables);

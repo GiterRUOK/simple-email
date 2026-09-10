@@ -1,3 +1,34 @@
+import { escapeAttr } from './dom';
+
+function openTagOf(el: Element | null): string {
+  if (!el) return '';
+  const tag = el.tagName.toLowerCase();
+  const attrs = Array.from(el.attributes)
+    .map((a) => ` ${a.name}="${escapeAttr(a.value)}"`)
+    .join('');
+  return `<${tag}${attrs}>`;
+}
+
+/**
+ * 把解析后的文档还原成字符串，尽量保留原文档的 DOCTYPE、`<html>` 与 `<body>` 开标签属性
+ * （`head.innerHTML + body.innerHTML` 会丢掉这三者）。
+ * 原文档是片段（没有 html / body 标签）时退化为片段拼接。
+ */
+export function serializeParsedHtmlDocument(doc: Document, original: string): string {
+  const head = doc.head?.innerHTML || '';
+  const bodyInner = doc.body?.innerHTML || '';
+
+  const hasHtml = /<html[\s>]/i.test(original);
+  const hasBody = /<body[\s>]/i.test(original);
+
+  if (!hasHtml) {
+    return hasBody ? `${openTagOf(doc.body)}${bodyInner}</body>` : `${head}${bodyInner}`;
+  }
+
+  const doctype = /^[\s\S]*?<!DOCTYPE[^>]*>/i.exec(original)?.[0] ?? '';
+  return `${doctype}${openTagOf(doc.documentElement)}${head}${openTagOf(doc.body)}${bodyInner}</body></html>`;
+}
+
 /**
  * 极轻量 HTML 格式化器（约 50 行）。
  *

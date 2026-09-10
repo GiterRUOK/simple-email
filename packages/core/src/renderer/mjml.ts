@@ -2,6 +2,7 @@ import type { Registry } from '../registry/registry';
 import type { Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
 import { getSectionDynamicVariantKey, sectionMjClassName } from '../utils/dynamicVariantKey';
 import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
+import { COLUMN_NO_STACK_CLASS } from '../utils/columnWidths';
 import { escapeAttr } from '../utils/dom';
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import {
@@ -136,6 +137,10 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
       : '';
   const lastIndex = section.columns.length - 1;
 
+  const multiCol = section.columns.length > 1;
+  /** 多列 + 显式开启「移动端保留列」时包 mj-group，其列任何宽度下都不堆叠 */
+  const preserveColumns = multiCol && section.attrs.preserveColumnsOnMobile === true;
+
   const columns = section.columns
     .map((col, i) =>
       columnToMjml(
@@ -144,7 +149,13 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
         i,
         section.columns.length,
         gapPx,
-        [hCls, vCls && i < lastIndex ? vCls : ''].filter(Boolean).join(' '),
+        [
+          hCls,
+          vCls && i < lastIndex ? vCls : '',
+          preserveColumns ? COLUMN_NO_STACK_CLASS : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
         registry,
         ctx,
       ),
@@ -152,11 +163,9 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
     .join('\n');
 
   /** 多列 + 显式开启时包 mj-group，阻止小屏列堆叠（MJML 官方语义） */
-  const multiCol = section.columns.length > 1;
-  const grouped =
-    multiCol && section.attrs.preserveColumnsOnMobile === true
-      ? `      <mj-group>\n${indent(columns, 2)}\n      </mj-group>`
-      : columns;
+  const grouped = preserveColumns
+    ? `      <mj-group>\n${indent(columns, 2)}\n      </mj-group>`
+    : columns;
 
   return `    <mj-section padding="${padding}"${bg}${secCls}>
 ${grouped}

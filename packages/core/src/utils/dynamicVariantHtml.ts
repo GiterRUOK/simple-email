@@ -1,16 +1,11 @@
 import type { EmailDoc } from '../types';
+import { serializeParsedHtmlDocument } from './html';
 import {
   DYNAMIC_VARIANT_HTML_ATTR,
   getSectionDynamicVariantKey,
   isDynamicVariantSection,
   sectionMjClassName,
 } from './dynamicVariantKey';
-
-function serializeParsedHtml(doc: Document): string {
-  const head = doc.head?.innerHTML || '';
-  const body = doc.body?.innerHTML || '';
-  return `${head}${body}`;
-}
 
 /**
  * 编译后为带 `dynamicVariantKey` 的 Section 根节点写入 `data-dv="{key}"`，供宿主 DOM 抽取。
@@ -38,7 +33,7 @@ export function annotateDynamicVariantHtmlAttributes(html: string, doc: EmailDoc
       if (!target && candidates.length) target = candidates[0];
       if (target) target.setAttribute(DYNAMIC_VARIANT_HTML_ATTR, key);
     }
-    return serializeParsedHtml(parsed);
+    return serializeParsedHtmlDocument(parsed, html);
   } catch {
     return html;
   }
