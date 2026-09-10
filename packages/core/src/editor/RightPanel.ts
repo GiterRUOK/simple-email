@@ -3,6 +3,7 @@ import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
 import type { Registry } from '../registry/registry';
 import { htmlContainsMjmlTags } from '../utils/lockedMjml';
+import { invalidHrefMessage } from '../utils/link';
 import {
   findBlockLocation,
   findSection,
@@ -723,6 +724,8 @@ export class RightPanel {
           onChange,
           field.placeholder ?? '',
           fp,
+          field.validate ??
+            (field.type === 'url' ? (v: string) => invalidHrefMessage(v, this.opts.t) : undefined),
         );
         if (field.help) row.append(h('div', { class: 'sm-field__help' }, [field.help]));
         return row;
@@ -841,14 +844,25 @@ export class RightPanel {
         opt.selected = true;
         sel.insertBefore(opt, sel.firstChild);
       }
+      const hrefWarnEl = h('div', { class: 'sm-field__warn', style: 'display:none' });
+      const syncHrefWarn = (v: string) => {
+        const msg = invalidHrefMessage(v, this.opts.t);
+        hrefWarnEl.textContent = msg ?? '';
+        hrefWarnEl.style.display = msg ? '' : 'none';
+      };
       const inp = h('input', {
         class: 'sm-input sm-social-link-list__href',
         type: 'url',
         placeholder: 'https://',
         value: rowData.href,
         ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:href` } : {}),
-        oninput: (e: Event) => syncItem(i, { href: (e.target as HTMLInputElement).value }),
+        oninput: (e: Event) => {
+          const v = (e.target as HTMLInputElement).value;
+          syncItem(i, { href: v });
+          syncHrefWarn(v);
+        },
       });
+      syncHrefWarn(rowData.href);
       const rm = h(
         'button',
           {
@@ -860,7 +874,7 @@ export class RightPanel {
         ['×'],
       );
       mainRow.append(sel, inp, rm);
-      rowWrap.append(mainRow);
+      rowWrap.append(mainRow, hrefWarnEl);
 
       const extras = h('div', { class: 'sm-social-link-list__row-extras' });
       const bgResolved = defaultSocialIconBackground(rowData.network);
@@ -934,7 +948,16 @@ export class RightPanel {
     onChange: (v: string) => void,
     placeholder = '',
     focusToken?: string,
+    validate?: (v: string) => string | null,
   ) {
+    const warnEl = h('div', { class: 'sm-field__warn', style: 'display:none' });
+    const syncWarn = (v: string) => {
+      if (!validate) return;
+      const msg = validate(v);
+      warnEl.textContent = msg ?? '';
+      warnEl.style.display = msg ? '' : 'none';
+    };
+    syncWarn(value);
     return h('div', { class: 'sm-field' }, [
       h('label', { class: 'sm-field__label' }, [label]),
       h('input', {
@@ -943,8 +966,13 @@ export class RightPanel {
         value,
         placeholder,
         ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
-        oninput: (e: Event) => onChange((e.target as HTMLInputElement).value),
+        oninput: (e: Event) => {
+          const v = (e.target as HTMLInputElement).value;
+          onChange(v);
+          syncWarn(v);
+        },
       }),
+      warnEl,
     ]);
   }
 

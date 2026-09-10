@@ -163,6 +163,13 @@ export interface BlockSchemaField {
   step?: number;
   placeholder?: string;
   help?: string;
+  /**
+   * 输入即时校验：返回文案则在字段下方红字提示，返回 null 表示通过。
+   * 只提示、不阻塞保存（运营可能故意留占位链接或使用短链）。
+   * `type: 'url'` 未设置时使用内核默认规则（见 `isRenderableHref`），
+   * 拦截 `#`、`1234`、缺协议的域名等会被 Outlook 网页端清除的链接。
+   */
+  validate?: (value: string) => string | null;
   /** 为 true 时右栏显示「继承全局」开关：开=留空跟随邮件全局，关=写入当前全局值为块级固定值 */
   inheritGlobal?: boolean;
 }

@@ -1,4 +1,4 @@
-import { defineBlock, blockButtonWidthCss } from '@simple-mail/core';
+import { defineBlock, blockButtonWidthCss, resolveHref } from '@simple-mail/core';
 import { icons } from './icons';
 
 interface ButtonProps {
@@ -84,7 +84,11 @@ export const buttonBlock = defineBlock<ButtonProps>({
     const innerPadding = `${p.innerPaddingV}px ${p.innerPaddingH}px`;
     const bw = blockButtonWidthCss(p.width);
     const widthAttr = bw ? ` width="${escapeAttr(bw)}"` : '';
-    return `<mj-button href="${escapeAttr(p.href)}" background-color="${escapeAttr(
+    /** 不可跳转的 href（空、`#`、`1234` 等）会被 Outlook 网页端连内容一起清除，
+     *  这里不输出 href，MJML 退化为 `<p>`：样式保留，仅不可点。 */
+    const href = resolveHref(p.href);
+    const hrefAttr = href ? ` href="${escapeAttr(href)}"` : '';
+    return `<mj-button${hrefAttr} background-color="${escapeAttr(
       p.backgroundColor,
     )}" color="${escapeAttr(p.color)}" border-radius="${p.borderRadius}px" font-size="${escapeAttr(
       p.fontSize,
@@ -95,9 +99,11 @@ export const buttonBlock = defineBlock<ButtonProps>({
   renderPreview: (p) => {
     const bw = blockButtonWidthCss(p.width);
     const wst = bw ? `width:${bw};max-width:100%;box-sizing:border-box;` : '';
+    const href = resolveHref(p.href);
+    const hrefAttr = href ? ` href="${escapeAttr(href)}"` : '';
     /* 画布对 .sm-canvas a 设置了带 !important 的链接色，文字颜色必须写在子节点上才能生效 */
     return `<div style="padding:${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px;text-align:${p.align};">
-      <a href="${escapeAttr(p.href)}" style="display:inline-block;background:${
+      <a${hrefAttr} style="display:inline-block;background:${
         p.backgroundColor
       };border-radius:${p.borderRadius}px;padding:${p.innerPaddingV}px ${
         p.innerPaddingH
