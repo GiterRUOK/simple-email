@@ -567,6 +567,7 @@ export class MailEditor {
         ui?.paletteBlockGroupTitle ?? ui?.blockCategoryLabels?.content,
       customPaletteTooltipSuffix: ui?.customPaletteTooltipSuffix,
       hiddenPaletteBlockTypes: ui?.hiddenPaletteBlockTypes,
+      enableDynamicVariantKey: ui?.enableDynamicVariantKey,
     });
     const autoWrap = this.opts.autoWrapSection !== false;
     this.root.classList.toggle('sm-allow-auto-wrap', autoWrap);

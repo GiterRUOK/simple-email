@@ -22,6 +22,11 @@ export {
 } from './utils/lockedMjml';
 export { renderDoc, replaceVariables } from './renderer';
 export { isRenderableHref, resolveHref, invalidHrefMessage } from './utils/link';
+export {
+  paletteDropHasSectionLayout,
+  paletteDropIsSectionLevel,
+  resolvePaletteDropResult,
+} from './utils/paletteDrop';
 export { annotateDynamicVariantHtmlAttributes } from './utils/dynamicVariantHtml';
 export {
   DYNAMIC_VARIANT_HTML_ATTR,

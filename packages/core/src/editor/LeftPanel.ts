@@ -2,6 +2,7 @@ import Sortable from 'sortablejs';
 import type { Registry } from '../registry/registry';
 import type { BlockDefinition, SectionLayout } from '../types';
 import { clear, h } from '../utils/dom';
+import { paletteDropIsSectionLevel } from '../utils/paletteDrop';
 import type { SimpleMailT } from '../i18n';
 
 export interface LeftPanelOptions {
@@ -13,6 +14,8 @@ export interface LeftPanelOptions {
   customPaletteTooltipSuffix?: string;
   /** 不显示在左栏的 block type（仍可在 Registry 中 createBlock） */
   hiddenPaletteBlockTypes?: string[];
+  /** 与画布一致：开启后带 `sectionAttrs.dynamicVariantKey` 的组合块会创建独立 Section */
+  enableDynamicVariantKey?: boolean;
 }
 
 interface LayoutCard {
@@ -66,14 +69,33 @@ export class LeftPanel {
       ...filterPalette(this.opts.registry.byCategory('custom')),
     ];
 
+    /** 自带布局的组件与布局卡片同组，拖拽时只能落在 Section 之间（见 paletteDropIsSectionLevel） */
+    const sectionLevel: BlockDefinition[] = [];
+    const blockLevel: BlockDefinition[] = [];
+    const dropOpts = { enableDynamicVariantKey: this.opts.enableDynamicVariantKey };
+    for (const def of paletteBlocks) {
+      if (paletteDropIsSectionLevel(def, this.opts.registry, dropOpts)) sectionLevel.push(def);
+      else blockLevel.push(def);
+    }
+
     const wrap = h('div', { class: 'sm-blocks' });
 
     wrap.append(this._renderLayoutGroup());
-    if (paletteBlocks.length) {
+    if (sectionLevel.length) {
       wrap.append(
-        this._renderBlockGroup(
+        this._renderBlockCardsGroup(
+          this.opts.t('leftPanel.sectionBlocks'),
+          sectionLevel,
+          'sections',
+        ),
+      );
+    }
+    if (blockLevel.length) {
+      wrap.append(
+        this._renderBlockCardsGroup(
           this.opts.blockGroupTitle ?? this.opts.t('leftPanel.components'),
-          paletteBlocks,
+          blockLevel,
+          'blocks',
         ),
       );
     }
@@ -125,7 +147,16 @@ export class LeftPanel {
     return def.name;
   }
 
-  private _renderBlockGroup(title: string, defs: BlockDefinition[]): HTMLElement {
+  /**
+   * 组件卡片网格。`sourceGroup` 决定画布哪一层接收：
+   *  - `blocks`：列内（Column）；
+   *  - `sections`：Section 之间（自带布局的组件，表现与布局卡片一致）。
+   */
+  private _renderBlockCardsGroup(
+    title: string,
+    defs: BlockDefinition[],
+    sourceGroup: 'blocks' | 'sections',
+  ): HTMLElement {
     const grid = h('div', { class: 'sm-blocks__grid' });
     for (const def of defs) {
       const isCustom = def.category === 'custom';
@@ -141,8 +172,11 @@ export class LeftPanel {
         h(
           'div',
           {
-            class: 'sm-block-card',
-            'data-source-group': 'blocks',
+            class:
+              sourceGroup === 'sections'
+                ? 'sm-block-card sm-block-card--section'
+                : 'sm-block-card',
+            'data-source-group': sourceGroup,
             'data-block-type': def.type,
             title: this._blockCardTitle(def),
           },
@@ -151,7 +185,7 @@ export class LeftPanel {
       );
     }
     Sortable.create(grid, {
-      group: { name: 'blocks', pull: 'clone', put: false },
+      group: { name: sourceGroup, pull: 'clone', put: false },
       sort: false,
       animation: 120,
       ghostClass: 'sm-ghost',

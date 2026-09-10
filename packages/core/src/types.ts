@@ -204,6 +204,13 @@ export interface BlockDefinition<P extends object = Record<string, unknown>> {
    */
   inlineEditable?: InlineEditableConfig<P>;
   /**
+   * 左栏拖入层级：
+   *  - `section`：自带布局（如双列卡组），与布局卡片同组，只能落在 Section 之间，不能落进 Column；
+   *  - `block`：落在 Column 内（默认）。
+   * 缺省时按 `expandPaletteDrop` 结果自动判定（多列布局 / 多列分发即视为 `section`）。
+   */
+  paletteDropLevel?: 'block' | 'section';
+  /**
    * 从左栏拖入时在目标列（或自动包裹的单列 Section）中一次性插入多个块，
    * 用于「组合模板」：画布内仅为通用 image/text 等，便于逐项修改。
    * 文档里不会出现本定义的 `type`，仅作左栏入口；若需提供请返回内置块的实例。

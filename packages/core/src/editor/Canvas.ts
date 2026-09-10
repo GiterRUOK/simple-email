@@ -28,6 +28,7 @@ import {
   resolveLockedMjmlCanvasContent,
 } from '../utils/lockedMjml';
 import { layoutHumanLabel } from '../utils/sectionLayout';
+import { paletteDropHasSectionLayout, resolvePaletteDropResult } from '../utils/paletteDrop';
 import { BlockCodeModal } from './BlockCodeModal';
 import { InlineEditor, type SelectionState } from './InlineEditor';
 import type { RichTextToolbar } from './RichTextToolbar';
@@ -822,12 +823,8 @@ export class Canvas {
 
   private _resolvePaletteDrop(blockType: string): PaletteDropResult {
     const def = this.opts.registry.get(blockType);
-    if (def?.expandPaletteDrop) {
-      const out = def.expandPaletteDrop((t) => this.opts.registry.createBlock(t));
-      if (Array.isArray(out)) return { blocks: out };
-      return out;
-    }
-    return { blocks: [this.opts.registry.createBlock(blockType)] };
+    if (!def) return { blocks: [this.opts.registry.createBlock(blockType)] };
+    return resolvePaletteDropResult(def, this.opts.registry);
   }
 
   private _applySectionAttrs(target: Section, partial?: Partial<SectionAttrs>) {
@@ -864,8 +861,7 @@ export class Canvas {
   }
 
   private _paletteDropNeedsDedicatedSection(drop: PaletteDropResult): boolean {
-    if (drop.sectionLayout && drop.sectionLayout !== '1') return true;
-    if ((drop.columnBlocks?.length ?? 0) > 1) return true;
+    if (paletteDropHasSectionLayout(drop)) return true;
     const attrs = this._paletteSectionAttrsForDrop(drop.sectionAttrs);
     return !!attrs?.dynamicVariantKey;
   }
@@ -896,8 +892,10 @@ export class Canvas {
       return;
     }
 
-    // 路径 B：左栏内容/自定义卡片拖到 sections 之间 → 自动裹一列 Section
-    if (sourceGroup === 'blocks' && blockType) {
+    // 路径 B：左栏内容/自定义卡片拖到 sections 之间 → 生成 Section。
+    // 'sections' 组里带 data-block-type 的是「自带布局的组件」（与布局卡片同组），
+    // 同样在这里落成新 Section，而不是塞进列里。
+    if (blockType && (sourceGroup === 'blocks' || sourceGroup === 'sections')) {
       item.parentElement?.removeChild(item);
       const drop = this._resolvePaletteDrop(blockType);
       const newSection = this._createSectionFromPaletteDrop(drop);

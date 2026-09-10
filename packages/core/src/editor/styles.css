@@ -638,6 +638,10 @@
   font-size: 12px;
   color: var(--sm-text);
 }
+/* 自带布局的组件：与布局卡片同组，落点在 Section 之间而非列内 */
+.sm-block-card--section {
+  border-style: dashed;
+}
 
 /* 中栏：画布 ------------------------------------------------------------- */
 .sm-canvas-wrap {
