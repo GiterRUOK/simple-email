@@ -45,6 +45,14 @@ import {
   hasRichHtmlLineBreak,
   getRichHtmlPlainText,
 } from '../utils/richHtmlEmpty';
+import {
+  convertFontTags,
+  firstTextNode,
+  lastTextNode,
+  mergeRedundantSpans,
+  purgeInlineStyleDecl,
+  unwrapEmptyInlineShells,
+} from '../utils/richTextStyle';
 import { isColorPickerOpen } from './ColorPickerPopover';
 
 export interface InlineEditorOptions {
@@ -225,10 +233,33 @@ export class InlineEditor {
       this.saveSelection();
       this._emitSelection();
       return;
-    } else {
-      richTextExecCommand('styleWithCSS', false, isListCmd ? 'false' : 'true');
-      richTextExecCommand(command, false, value);
     }
+    // 文字色 / 背景色：单块内联选区走 purge 流程，化简嵌套 span
+    // （execCommand 只会再包一层 span，不清旧声明，导致内层旧色盖过新色）。
+    // 跨块时 extractContents 会把块级内容塞进一个 <span>，产生 <span>包<p> 非法嵌套，
+    // 此时退回 execCommand（浏览器按文本节点逐段上色，跨块反而正确）。
+    if (
+      sel?.rangeCount &&
+      (command === 'foreColor' || command === 'hiliteColor') &&
+      value &&
+      !sel.getRangeAt(0).collapsed &&
+      isRangeInlineOnly(sel.getRangeAt(0), this.el)
+    ) {
+      const prop = command === 'foreColor' ? 'color' : 'background-color';
+      this._applyInlineStyleDecl(prop, value);
+      // 链接内改文字色时同步到 <a> 自身：下划线由 <a> 绘制，不同步会出现「线与字异色」
+      if (command === 'foreColor') this._syncAnchorColor(value);
+      if (command === 'hiliteColor') {
+        this.pendingHiliteColor = value ?? null;
+        this.pendingHiliteAnchor = hiliteAnchor;
+      }
+      this.saveSelection();
+      this._emitSelection();
+      return;
+    }
+    // 跨块 / 折叠光标 / 其它命令：走 execCommand
+    richTextExecCommand('styleWithCSS', false, isListCmd ? 'false' : 'true');
+    richTextExecCommand(command, false, value);
     // 链接内改文字色时同步到 <a> 自身：下划线由 <a> 绘制，不同步会出现「线与字异色」
     if (command === 'foreColor' && value) this._syncAnchorColor(value);
     if (command === 'hiliteColor') {
@@ -316,7 +347,7 @@ export class InlineEditor {
   applyFontSize(px: string) {
     const css = normalizeFontSizeCss(px);
     if (!css) return;
-    this._wrapInlineStyle(`font-size:${css};`);
+    this.applyInlineStyle('font-size', css);
   }
 
   /**
@@ -324,14 +355,29 @@ export class InlineEditor {
    * 有选区包裹内容；折叠光标插入 typing span，后续输入沿用。
    */
   applyFontWeight(weight: string) {
-    this._wrapInlineStyle(`font-weight:${weight};`);
+    const w = String(weight ?? '').trim();
+    if (!w) return;
+    this.applyInlineStyle('font-weight', w);
   }
 
   /**
-   * 用 `<span style="...">` 包裹选区写入内联样式。
+   * 统一的内联样式入口：把 `prop:value` 应用到当前选区。
+   * 目前供字号 / 字重使用；文字色、背景色等同样适用（前者另有 <a> 同步逻辑，暂不切）。
+   */
+  applyInlineStyle(prop: string, value: string) {
+    this._applyInlineStyleDecl(prop, value);
+  }
+
+  /**
+   * 用 `<span style="prop:value">` 包裹选区写入内联样式。
+   *
+   * 关键：包裹前先把选区内**同属性**的旧声明清掉——否则内层旧值会覆盖外层新值
+   * （选了更大范围改字号，被包含的旧字号却不变）。清完变空壳的 span 直接拆掉，
+   * 避免 `<span style="">` 这类无意义标签堆积。
+   *
    * 有选区则包裹内容并重新选中；折叠光标则插入零宽占位 span，后续输入沿用。
    */
-  private _wrapInlineStyle(style: string) {
+  private _applyInlineStyleDecl(prop: string, value: string) {
     this.edited = true;
     this._ensureFocus();
     this._restoreSelection();
@@ -341,15 +387,28 @@ export class InlineEditor {
     if (!this.el.contains(range.startContainer) || !this.el.contains(range.endContainer)) return;
 
     const span = document.createElement('span');
-    span.setAttribute('style', style);
+    span.setAttribute('style', `${prop}:${value};`);
     try {
       if (!range.collapsed) {
-        span.appendChild(range.extractContents());
+        const frag = range.extractContents();
+        // 先把 <font size> 等转成 span：字号在属性上、不在 style 上，
+        // 不转的话 purge 按 [style] 抓不到，外层新字号盖不过 <font> 的 UA 字号
+        convertFontTags(frag);
+        purgeInlineStyleDecl(frag, prop);
+        span.appendChild(frag);
         range.insertNode(span);
-        const newRange = document.createRange();
-        newRange.selectNodeContents(span);
-        sel.removeAllRanges();
-        sel.addRange(newRange);
+        // 先记下文本节点：下面的 span 合并可能把 span 自身拆掉，而文本节点引用仍然有效
+        const first = firstTextNode(span);
+        const last = lastTextNode(span);
+        // extractContents 在边界 split 会留下空壳 span（如 <span style="font-size:20px;"></span>），
+        // 它们不在 fragment 里、purge 抓不到，mergeRedundantSpans 也只合并不拆空壳；
+        // 在此一并清掉，避免编辑期无意义标签堆积导致工具条状态读数不准
+        unwrapEmptyInlineShells(this.el);
+        mergeRedundantSpans(this.el);
+        // 合并相邻文本节点：跨节点拆开的纯文本变量 {{user.name}} 合回来，
+        // 展示层高亮/替换才能匹配到；放 _selectSpanText 之前
+        this.el.normalize();
+        this._selectSpanText(sel, span, first, last);
       } else {
         // 标记 typing 占位：只设了样式却没输入内容时，提交前由 sanitizeRichHtml 拆掉空壳
         span.setAttribute('data-sm-typing', '1');
@@ -367,6 +426,21 @@ export class InlineEditor {
 
     this.saveSelection();
     this._emitSelection();
+  }
+
+  /** 重新选中刚写入的这段内容（合并 span 后按文本节点重建，避免选区丢失） */
+  private _selectSpanText(sel: Selection, span: Element, first: Text | null, last: Text | null) {
+    const r = document.createRange();
+    if (first && last && first.isConnected && last.isConnected) {
+      r.setStart(first, 0);
+      r.setEnd(last, last.length);
+    } else if (span.isConnected) {
+      r.selectNodeContents(span);
+    } else {
+      return;
+    }
+    sel.removeAllRanges();
+    sel.addRange(r);
   }
 
   /**
@@ -862,6 +936,57 @@ function resolveInlineFormatsAtSelection(
 const TEXT_DECORATION_RE = /^text-decoration(-line)?\s*:/i;
 const COLOR_RE = /^color\s*:/i;
 
+/** 块级标签：选区跨越这些元素时，extractContents + 包 span 会产生非法嵌套 */
+const BLOCK_TAGS = new Set(['p', 'div', 'li', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+
+function isBlockElement(el: Node | null): boolean {
+  return el !== null && el.nodeType === 1 && BLOCK_TAGS.has((el as Element).tagName.toLowerCase());
+}
+
+/** 从 node 向上找到最近的块级祖先（不含 root 本身） */
+function nearestBlockAncestor(node: Node | null, root: HTMLElement): Element | null {
+  let el: Node | null = node;
+  while (el && el !== root) {
+    if (isBlockElement(el)) return el as Element;
+    el = el.parentNode;
+  }
+  return null;
+}
+
+/**
+ * 选区是否完全落在「单块内联」上下文内，可以安全 extractContents + 包 span。
+ *
+ * 判断标准：选区两端（startContainer / endContainer）的最近块级祖先必须是同一个块级元素，
+ * 且选区内不含其它块级元素。跨块时 extractContents 会把块级内容塞进一个 <span>，
+ * 产生 `<span>包<p>` 的非法嵌套，此时应退回 execCommand（浏览器按文本节点逐段上色，跨块反而正确）。
+ *
+ * 同一个块级元素（p / div / li / h*）内的纯内联选区是安全的：
+ * extractContents 只取走块级元素内部的内联子节点，块级元素本身留在原地，
+ * 不会出现 `<span>包<p>` 的问题。
+ */
+function isRangeInlineOnly(range: Range, root: HTMLElement): boolean {
+  const startBlock = nearestBlockAncestor(range.startContainer, root);
+  const endBlock = nearestBlockAncestor(range.endContainer, root);
+  // 两端都没有块级祖先（root 内纯内联）→ 视为同一内联上下文
+  if (!startBlock && !endBlock) return true;
+  // 一端在块内、另一端不在，或两端在不同块 → 跨块
+  if (startBlock !== endBlock) return false;
+  // 两端在同一个块内：还需确认选区中间没有夹着其它块级元素
+  // （如 <div><p>a</p><p>b</p></div> 里跨两个 <p> 选中，两端块级祖先是不同的 p，
+  //   上面已拦截；但 <p>text<div>block</div>text</p> 这种浏览器不修复的罕见结构，
+  //   两端块级祖先同为 p，但中间夹着 div，需额外检查）
+  const common = range.commonAncestorContainer;
+  const searchRoot: ParentNode =
+    common.nodeType === 1 ? (common as HTMLElement) : (common.parentNode as HTMLElement);
+  if (!searchRoot || searchRoot === root) return true;
+  for (const el of Array.from(searchRoot.querySelectorAll('*'))) {
+    if (!isBlockElement(el) || !range.intersectsNode(el)) continue;
+    // 块级元素被选区触及但不是两端共享的那一个块 → 跨块
+    if (el !== startBlock) return false;
+  }
+  return true;
+}
+
 /** 选区内（折叠光标则取其所在）的 <a> 元素 */
 function collectAnchorsInRange(range: Range, root: HTMLElement): HTMLAnchorElement[] {
   const found = new Set<HTMLAnchorElement>();
@@ -1006,8 +1131,11 @@ function plainTextToRichHtml(text: string): string {
 export function sanitizeRichHtml(html: string): string {
   const tpl = document.createElement('template');
   tpl.innerHTML = html;
+  // 先把 <font color/size/face> 转成 span，与 apply 路径共用同一转换逻辑
+  convertFontTags(tpl.content);
   walk(tpl.content);
   mergeRedundantSpans(tpl.content);
+  unwrapEmptyInlineShells(tpl.content);
   return tpl.innerHTML.replace(/\u200b/g, '');
 
   function walk(root: Node) {
@@ -1028,22 +1156,6 @@ export function sanitizeRichHtml(html: string): string {
           el.remove();
           return;
         }
-      }
-      // <font color="..." size="..." face="..."> → 转成 span style
-      if (tag === 'font') {
-        const span = document.createElement('span');
-        const color = el.getAttribute('color');
-        const size = el.getAttribute('size');
-        const face = el.getAttribute('face');
-        const styles: string[] = [el.getAttribute('style') ?? ''];
-        if (color) styles.push(`color:${color}`);
-        if (size) styles.push(`font-size:${fontSizeFromLegacy(size)}`);
-        if (face) styles.push(`font-family:${face}`);
-        const cleaned = styles.filter(Boolean).join(';');
-        if (cleaned) span.setAttribute('style', cleaned);
-        while (el.firstChild) span.appendChild(el.firstChild);
-        el.parentNode?.replaceChild(span, el);
-        return;
       }
       // 标签级白名单
       const allowed = [
@@ -1100,35 +1212,6 @@ export function sanitizeRichHtml(html: string): string {
   }
 }
 
-/**
- * 合并 style/class 完全相同的父子 span：反复改字号/字重会套出多层同义 span，
- * 渲染结果一样但 HTML 变胖（逼近 Gmail 102KB 截断）。合并后内层子节点上提。
- */
-function mergeRedundantSpans(root: ParentNode): void {
-  for (let pass = 0; pass < 5; pass++) {
-    let changed = false;
-    for (const el of Array.from(root.querySelectorAll('span'))) {
-      const parent = el.parentElement;
-      if (!parent || parent.tagName.toLowerCase() !== 'span') continue;
-      if (spanIdentity(parent) !== spanIdentity(el)) continue;
-      while (el.firstChild) parent.insertBefore(el.firstChild, el);
-      el.remove();
-      changed = true;
-    }
-    if (!changed) break;
-  }
-}
-
-/** span 的样式身份：class + 规范化后的 style，用于判断是否可合并 */
-function spanIdentity(el: Element): string {
-  const style = (el.getAttribute('style') ?? '')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase()
-    .replace(/;+$/, '');
-  return `${(el.getAttribute('class') ?? '').trim()} ${style}`;
-}
-
 function hasMarginStyle(el: Element): boolean {
   const style = el.getAttribute('style') ?? '';
   return /(?:^|;)\s*margin(?:-(?:top|right|bottom|left))?\s*:/i.test(style);
@@ -1137,20 +1220,4 @@ function hasMarginStyle(el: Element): boolean {
 function appendStyle(el: Element, style: string) {
   const raw = (el.getAttribute('style') ?? '').trim();
   el.setAttribute('style', raw ? `${raw.replace(/;+\s*$/, '')};${style}` : style);
-}
-
-function fontSizeFromLegacy(size: string): string {
-  // 旧 <font size="1..7"> → px。必须用浏览器实际渲染 legacy 档位的那张表
-  // （与 HTML 规范建议值一致：1=10, 2=13, 3=16, 4=18, 5=24, 6=32, 7=48），
-  // 否则编辑器里看到的字号与提交进邮件的字号不一致（如 size=5 显示 24px 却存成 20px）。
-  const map: Record<string, string> = {
-    '1': '10px',
-    '2': '13px',
-    '3': '16px',
-    '4': '18px',
-    '5': '24px',
-    '6': '32px',
-    '7': '48px',
-  };
-  return map[size] ?? size;
 }

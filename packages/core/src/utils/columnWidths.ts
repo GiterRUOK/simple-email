@@ -34,6 +34,10 @@ interface ColumnWidthRule {
   maxWidth?: string;
 }
 
+/** 行内 style 中是否已有 width / max-width 声明 */
+const WIDTH_DECL_RE = /(?:^|;)\s*width\s*:/i;
+const MAX_WIDTH_DECL_RE = /(?:^|;)\s*max-width\s*:/i;
+
 function firstDeclaration(block: string, prop: string): string | undefined {
   const m = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, 'i').exec(block);
   if (!m) return undefined;
@@ -45,14 +49,19 @@ function parseColumnWidthRules(css: string): Map<string, ColumnWidthRule> {
   const rules = new Map<string, ColumnWidthRule>();
   if (!css) return rules;
 
-  const re = /\.mj-column-per-([^\s,{]+)\s*\{([^}]*)\}/g;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(css))) {
-    const width = firstDeclaration(m[2], 'width');
-    if (!width) continue;
-    const className = `mj-column-per-${m[1]}`;
-    if (rules.has(className)) continue;
-    rules.set(className, { width, maxWidth: firstDeclaration(m[2], 'max-width') });
+  const ruleRe = /\.mj-column-per-([^\s,{]+)\s*\{([^}]*)\}/g;
+  let match = ruleRe.exec(css);
+  while (match) {
+    const width = firstDeclaration(match[2], 'width');
+    if (!width) {
+      match = ruleRe.exec(css);
+      continue;
+    }
+    const className = `mj-column-per-${match[1]}`;
+    if (!rules.has(className)) {
+      rules.set(className, { width, maxWidth: firstDeclaration(match[2], 'max-width') });
+    }
+    match = ruleRe.exec(css);
   }
   return rules;
 }
@@ -70,7 +79,7 @@ function applyColumnWidth(el: Element, rule: ColumnWidthRule): boolean {
   if (currentWidth && currentWidth !== '100%') return false;
 
   let next = style;
-  if (new RegExp('(?:^|;)\\s*width\\s*:', 'i').test(next)) {
+  if (WIDTH_DECL_RE.test(next)) {
     // 保留前导的 `;`，否则会吞掉上一条声明的分隔符
     next = next.replace(/((?:^|;)\s*)width\s*:\s*[^;]*/i, `$1width:${rule.width}`);
   } else {
@@ -79,11 +88,8 @@ function applyColumnWidth(el: Element, rule: ColumnWidthRule): boolean {
   }
 
   if (rule.maxWidth) {
-    if (new RegExp('(?:^|;)\\s*max-width\\s*:', 'i').test(next)) {
-      next = next.replace(
-        /((?:^|;)\s*)max-width\s*:\s*[^;]*/i,
-        `$1max-width:${rule.maxWidth}`,
-      );
+    if (MAX_WIDTH_DECL_RE.test(next)) {
+      next = next.replace(/((?:^|;)\s*)max-width\s*:\s*[^;]*/i, `$1max-width:${rule.maxWidth}`);
     } else {
       next = `${next};max-width:${rule.maxWidth}`;
     }
