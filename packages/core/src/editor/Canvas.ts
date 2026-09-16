@@ -292,7 +292,7 @@ export class Canvas {
     this.inner.style.fontSize = doc.styles.fontSize;
     this.inner.style.fontWeight = normalizeFontWeightStep(doc.styles.fontWeight);
     this.inner.style.color = doc.styles.color;
-    this.inner.style.lineHeight = doc.styles.lineHeight ?? '1.25';
+    this.inner.style.lineHeight = doc.styles.lineHeight ?? '1.5';
     this.inner.style.setProperty('--sm-editor-link-color', doc.styles.linkColor);
     this.inner.style.setProperty(
       '--sm-list-indent-default',

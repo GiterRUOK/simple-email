@@ -1,4 +1,9 @@
-import { defineBlock, FONT_WEIGHT_STEP_OPTIONS, isRichHtmlEffectivelyEmpty, normalizeFontWeightStep } from '@simple-mail/core';
+import {
+  FONT_WEIGHT_STEP_OPTIONS,
+  defineBlock,
+  isRichHtmlEffectivelyEmpty,
+  normalizeFontWeightStep,
+} from '@simple-mail/core';
 import { icons } from './icons';
 
 interface TextProps {
@@ -116,7 +121,7 @@ export const textBlock = defineBlock<TextProps>({
     const fwRaw = String(p.fontWeight ?? '').trim();
     const fwCss = fwRaw ? `font-weight:${normalizeFontWeightStep(fwRaw)};` : '';
     const lhRaw = String(p.lineHeight ?? '').trim();
-    const lh = lhRaw ? `line-height:${lhRaw};` : 'line-height:normal;';
+    const lh = lhRaw ? `line-height:${lhRaw};` : '';
     const colorRaw = String(p.color ?? '').trim();
     const colorCss = colorRaw ? `color:${colorRaw};` : '';
     const fsRaw = String(p.fontSize ?? '').trim();

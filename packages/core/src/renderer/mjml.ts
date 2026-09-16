@@ -29,7 +29,7 @@ export function docToMjml(doc: EmailDoc, registry: Registry): string {
     ${doc.meta.preheader ? `<mj-preview>${escapeAttr(doc.meta.preheader)}</mj-preview>` : ''}
     <mj-attributes>
       <mj-all font-family="${escapeAttr(attrs.fontFamily)}" />
-      <mj-text font-size="${escapeAttr(attrs.fontSize)}" font-weight="${escapeAttr(normalizeFontWeightStep(attrs.fontWeight))}" color="${escapeAttr(attrs.color)}" line-height="${escapeAttr(attrs.lineHeight ?? '1.25')}" />
+      <mj-text font-size="${escapeAttr(attrs.fontSize)}" font-weight="${escapeAttr(normalizeFontWeightStep(attrs.fontWeight))}" color="${escapeAttr(attrs.color)}" line-height="${escapeAttr(attrs.lineHeight ?? '1.5')}" />
       <mj-class name="link" color="${escapeAttr(attrs.linkColor)}" />
     </mj-attributes>
     <mj-style>

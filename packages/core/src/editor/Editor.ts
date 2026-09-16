@@ -1253,7 +1253,7 @@ function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
     fontWeight: '400',
     color: '#433f3f',
     linkColor: '#ff5a00',
-    lineHeight: '1.25',
+    lineHeight: '1.5',
     ...migrateLegacyStyles(partial?.styles ?? {}),
   };
   return {
@@ -1268,7 +1268,7 @@ function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
     styles: {
       ...mergedStyles,
       fontWeight: mergedStyles.fontWeight ?? '400',
-      lineHeight: mergedStyles.lineHeight ?? '1.25',
+      lineHeight: mergedStyles.lineHeight ?? '1.5',
     },
     sections: partial?.sections ?? [],
   };

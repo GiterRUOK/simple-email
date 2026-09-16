@@ -424,7 +424,7 @@ export class RightPanel {
       ),
       this._textField(
         this.opts.t('rightPanel.doc.lineHeight'),
-        doc.styles.lineHeight ?? '1.25',
+        doc.styles.lineHeight ?? '1.5',
         (v) =>
           this.opts.store.update((d) => {
             d.styles.lineHeight = v;
