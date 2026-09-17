@@ -10,6 +10,8 @@ import {
 } from '../store/store';
 import type {
   Block,
+  BlockDefinition,
+  BlockSchemaField,
   Column,
   EditorUiOptions,
   EmailDoc,
@@ -28,8 +30,10 @@ import { defaultPaddingForLockedBlock, resolveLockedMjmlCanvasContent } from '..
 import { paletteDropHasSectionLayout, resolvePaletteDropResult } from '../utils/paletteDrop';
 import { layoutHumanLabel } from '../utils/sectionLayout';
 import { BlockCodeModal } from './BlockCodeModal';
+import { openImageGalleryModal } from './ImageGalleryModal';
 import { InlineEditor, type SelectionState } from './InlineEditor';
 import type { RichTextToolbar } from './RichTextToolbar';
+import type { ImageAssetsHandlers } from './imageAssets';
 
 export interface CanvasOptions {
   store: Store;
@@ -50,6 +54,8 @@ export interface CanvasOptions {
   layerRoot: HTMLElement;
   /** 与 MailEditor.opts.ui 对齐 */
   ui?: EditorUiOptions;
+  /** 与 MailEditor.opts.imageAssets 对齐：启用图库（showGallery）时，双击图片类块可直接打开图库换图 */
+  imageAssets?: ImageAssetsHandlers;
   /** Section / Block 工具条「复制设计稿」回调（写局部 JSON 到剪贴板，供其他画布追加） */
   onCopySelectionDesign?: (target: { sectionId: string } | { blockId: string }) => void;
   /** 「选择节」批量模式动作（由 Editor 实现：写剪贴板 / 下载 JSON / 批量删除）；块为散选、节为整选，二者可混合 */
@@ -738,6 +744,18 @@ export class Canvas {
         e.stopPropagation();
         this._enterEditing(block);
       });
+    } else {
+      // 启用图库时：双击图片类块（含 type: 'image' 字段，如 image / logo / hero）直接打开图库换图，
+      // 与右栏「图库」按钮共用同一份 adapter 与权限配置
+      const galleryField = this._galleryImageField(def);
+      if (galleryField) {
+        el.addEventListener('dblclick', (e) => {
+          if (this.sectionSelectActive) return; // 批量选择模式下双击仍只作勾选
+          e.stopPropagation();
+          e.preventDefault();
+          this._openGalleryForBlock(block, galleryField);
+        });
+      }
     }
 
     return el;
@@ -773,6 +791,51 @@ export class Canvas {
   /* ----------------------------- 内联编辑 -------------------------------- */
 
   /** 空文档时：在画布白底区域双击，插入一列 Section + 空文本并进入编辑 */
+  /** 图库启用（showGallery 且配置了 imageGallery / pickImageFromGallery）时返回块内第一个 `type: 'image'` 字段，作为双击换图入口 */
+  private _galleryImageField(def: BlockDefinition | undefined): BlockSchemaField | null {
+    const assets = this.opts.imageAssets;
+    if (!assets || assets.showGallery !== true) return null;
+    if (!assets.imageGallery && !assets.pickImageFromGallery) return null;
+    return def?.schema.find((f) => f.type === 'image') ?? null;
+  }
+
+  /**
+   * 双击图片类块打开图库换图，选中后写入 field 对应的 props 字段
+   * （image.src / logo.src / hero.backgroundUrl…）。
+   * 优先内置图库弹层（与右栏「图库」按钮同一 adapter / 权限），
+   * 宿主自管场景走 pickImageFromGallery 回调。
+   */
+  private _openGalleryForBlock(block: Block, field: BlockSchemaField) {
+    const assets = this.opts.imageAssets;
+    if (!assets) return;
+    const propKey = field.key;
+    const currentUrl = String((block.props as Record<string, unknown>)[propKey] ?? '');
+    const applyUrl = (url: string | null) => {
+      const value = url == null ? '' : String(url).trim();
+      if (!value) return;
+      const blockId = block.id;
+      this.opts.store.update((d) => {
+        const loc = findBlockLocation(d, blockId);
+        if (loc) (loc.block.props as Record<string, unknown>)[propKey] = value;
+      });
+    };
+    if (assets.imageGallery) {
+      openImageGalleryModal({
+        adapter: assets.imageGallery,
+        permissions: assets.permissions,
+        onPick: (url) => applyUrl(url),
+        t: this.opts.t,
+        parent: this.opts.layerRoot,
+      });
+      return;
+    }
+    assets
+      .pickImageFromGallery?.({ blockId: block.id, propKey, currentUrl })
+      .then(applyUrl, (e) => {
+        console.error('[simple-mail] pickImageFromGallery', e);
+      });
+  }
+
   private _onEmptyCanvasDblClick(e: MouseEvent) {
     if (this.sectionSelectActive) return;
     if (this.opts.store.doc.sections.length > 0) return;

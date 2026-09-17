@@ -789,6 +789,7 @@ export class MailEditor {
       clearSelectionOnCanvasMargin: this.opts.clearSelectionOnCanvasMargin === true,
       layerRoot: this.root,
       ui: this.opts.ui,
+      imageAssets: this.opts.imageAssets,
       t: this.i18n.t,
       onCopySelectionDesign: (target) => void this.copySelectionDesign(target),
       onSectionSelectCopy: (ids, blockIds) => void this.copySectionsDesign(ids, blockIds),
