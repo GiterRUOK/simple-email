@@ -56,6 +56,8 @@ export interface CanvasOptions {
   onSectionSelectCopy?: (sectionIds: string[]) => void;
   onSectionSelectExport?: (sectionIds: string[]) => void;
   onSectionSelectRemove?: (sectionIds: string[]) => void;
+  /** 进入 / 退出节选择模式时通知宿主同步 UI（如顶栏按钮高亮）；画布内「完成」按钮与 ⌘/Ctrl+点击直达均会触发 */
+  onSectionSelectModeChange?: (active: boolean) => void;
   t: SimpleMailT;
 }
 
@@ -92,6 +94,8 @@ export class Canvas {
   /** 节选择模式（批量复制 / 导出 / 删除）：点击 Section 勾选而非单选 */
   private sectionSelectActive = false;
   private checkedSectionIds = new Set<string>();
+  /** 区间勾选锚点：最近一次点击的节 id，Shift+点击以它与目标节为界整段勾选 */
+  private sectionCheckAnchorId: string | null = null;
   private sectionSelectBar: HTMLElement | null = null;
   private sectionSelectCountEl: HTMLElement | null = null;
   private sectionSelectAllBtn: HTMLButtonElement | null = null;
@@ -111,6 +115,10 @@ export class Canvas {
     });
 
     this._bindDesignModeLinkSuppression();
+    // 节选择模式下 Shift+点击 = 区间勾选：阻止浏览器默认的 Shift 扩展文本选区
+    this.inner.addEventListener('mousedown', (e: MouseEvent) => {
+      if (this.sectionSelectActive && e.shiftKey) e.preventDefault();
+    });
     if (opts.clearSelectionOnCanvasMargin) {
       this._bindClearSelectionGestureTracking();
       this._bindClearSelectionOnCanvasWhitespace();
@@ -457,10 +465,18 @@ export class Canvas {
     host.addEventListener('click', (e) => {
       if (this.sectionSelectActive) {
         e.stopPropagation();
-        this._toggleSectionCheck(section.id);
+        if (e.shiftKey) this._checkSectionRange(section.id);
+        else this._toggleSectionCheck(section.id);
         return;
       }
       if ((e.target as HTMLElement).closest('.sm-block')) return;
+      /** ⌘/Ctrl+点击节空白：直达节选择模式并勾选该节（macOS ⌘ / Windows·Linux Ctrl） */
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._enterSectionSelectModeWith(section.id);
+        return;
+      }
       // 文本拖选时在 Section padding 等区域松开会冒泡 click，不应误切成 Section 选中
       if (!e.altKey && this._shouldSuppressSectionSelectFromTextInteraction()) return;
       e.stopPropagation();
@@ -670,7 +686,8 @@ export class Canvas {
     el.addEventListener('click', (e) => {
       if (this.sectionSelectActive) {
         e.stopPropagation();
-        this._toggleSectionCheck(section.id);
+        if (e.shiftKey) this._checkSectionRange(section.id);
+        else this._toggleSectionCheck(section.id);
         return;
       }
       if (this.editingBlockId === block.id) return; // 编辑中不抢焦点
@@ -678,6 +695,13 @@ export class Canvas {
       if (e.altKey) {
         e.stopPropagation();
         this.opts.store.setSelection({ kind: 'section', sectionId: section.id });
+        return;
+      }
+      /** ⌘/Ctrl+点击块：直达节选择模式并勾选所属节（与文件管理器加选一致的心智） */
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        this._enterSectionSelectModeWith(section.id);
         return;
       }
       e.stopPropagation();
@@ -1103,11 +1127,13 @@ export class Canvas {
     this.commitInlineEdit();
     this.sectionSelectActive = true;
     this.checkedSectionIds.clear();
+    this.sectionCheckAnchorId = null;
     this.opts.store.setSelection(null);
     this.el.classList.add('sm-section-select-mode');
     this._setSortablesDisabled(true);
     this._renderSectionSelectBar();
     this._syncSectionChecks();
+    this.opts.onSectionSelectModeChange?.(true);
   }
 
   /** 退出节选择模式，恢复常规画布交互 */
@@ -1115,6 +1141,7 @@ export class Canvas {
     if (!this.sectionSelectActive) return;
     this.sectionSelectActive = false;
     this.checkedSectionIds.clear();
+    this.sectionCheckAnchorId = null;
     this.el.classList.remove('sm-section-select-mode');
     this.sectionSelectBar?.remove();
     this.sectionSelectBar = null;
@@ -1123,11 +1150,44 @@ export class Canvas {
     this.sectionSelectActionBtns = [];
     this._setSortablesDisabled(false);
     this._syncSectionChecks();
+    this.opts.onSectionSelectModeChange?.(false);
   }
 
   private _toggleSectionCheck(id: string) {
     if (this.checkedSectionIds.has(id)) this.checkedSectionIds.delete(id);
     else this.checkedSectionIds.add(id);
+    this.sectionCheckAnchorId = id;
+    this._syncSectionChecks();
+  }
+
+  /**
+   * ⌘/Ctrl+点击直达：进入节选择模式并勾选该节（macOS ⌘ / Windows·Linux Ctrl，
+   * 与文件管理器「加选」一致的手势，省去先点顶栏入口的往返）。
+   */
+  private _enterSectionSelectModeWith(sectionId: string) {
+    this.enterSectionSelectMode();
+    this.checkedSectionIds.add(sectionId);
+    this.sectionCheckAnchorId = sectionId;
+    this._syncSectionChecks();
+  }
+
+  /** Shift+点击：以最近一次点击的节为锚点整段勾选 [锚点, 目标]，替换现有勾选（文件管理器同款语义） */
+  private _checkSectionRange(targetId: string) {
+    const ids = this.opts.store.doc.sections.map((s) => s.id);
+    const targetIdx = ids.indexOf(targetId);
+    if (targetIdx < 0) return;
+    const anchorIdx = this.sectionCheckAnchorId ? ids.indexOf(this.sectionCheckAnchorId) : -1;
+    if (anchorIdx < 0) {
+      // 无有效锚点（如进入模式后直接 Shift+点击）：退化为普通切换并记锚点
+      if (this.checkedSectionIds.has(targetId)) this.checkedSectionIds.delete(targetId);
+      else this.checkedSectionIds.add(targetId);
+      this.sectionCheckAnchorId = targetId;
+      this._syncSectionChecks();
+      return;
+    }
+    const from = Math.min(anchorIdx, targetIdx);
+    const to = Math.max(anchorIdx, targetIdx);
+    this.checkedSectionIds = new Set(ids.slice(from, to + 1));
     this._syncSectionChecks();
   }
 

@@ -734,6 +734,7 @@ export class MailEditor {
       onSectionSelectCopy: (ids) => void this.copySectionsDesign(ids),
       onSectionSelectExport: (ids) => this.exportSectionsDesign(ids),
       onSectionSelectRemove: (ids) => this.removeSections(ids),
+      onSectionSelectModeChange: (active) => this.topbar.setSectionSelectActive(active),
     });
     this.rightPanel = new RightPanel({
       store: this.store,
@@ -1408,18 +1409,13 @@ export class MailEditor {
 
   /** 顶栏「选择节」入口：进入 / 退出 Section 批量选择模式（批量复制 / 导出 / 删除） */
   private _toggleSectionSelectMode() {
-    if (this.canvas.isSectionSelectMode) {
-      this._exitSectionSelectMode();
-    } else {
-      this.canvas.enterSectionSelectMode();
-      this.topbar.setSectionSelectActive(true);
-    }
+    // 顶栏高亮由 canvas.onSectionSelectModeChange 回调统一同步（顶栏按钮 / 画布「完成」/ Esc / ⌘点击直达同源）
+    if (this.canvas.isSectionSelectMode) this._exitSectionSelectMode();
+    else this.canvas.enterSectionSelectMode();
   }
 
   private _exitSectionSelectMode() {
-    if (!this.canvas.isSectionSelectMode) return;
     this.canvas.exitSectionSelectMode();
-    this.topbar.setSectionSelectActive(false);
   }
 }
 
