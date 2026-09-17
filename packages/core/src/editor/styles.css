@@ -2337,6 +2337,9 @@
 .sm-canvas-wrap.sm-section-select-mode .sm-section-host {
   cursor: pointer;
 }
+.sm-canvas-wrap.sm-section-select-mode .sm-block {
+  cursor: pointer;
+}
 .sm-canvas-wrap.sm-section-select-mode .sm-section__toolbar,
 .sm-canvas-wrap.sm-section-select-mode .sm-block__toolbar {
   display: none !important;
@@ -2345,7 +2348,17 @@
   pointer-events: none;
   opacity: 0.45;
 }
-/* 勾选气泡：Section 左上角（pointer-events:none，点击由 host 统一处理） */
+/* 模式内块 hover：淡虚线提示可点，与选中实线区分 */
+.sm-canvas-wrap.sm-section-select-mode .sm-block:hover:not(.is-check-selected) {
+  outline: 2px dashed color-mix(in srgb, var(--sm-primary, #4f46e5) 45%, transparent);
+  outline-offset: 0;
+}
+/* 散选块高亮：实线描边 */
+.sm-canvas-wrap.sm-section-select-mode .sm-block.is-check-selected {
+  outline: 2px solid var(--sm-primary, #4f46e5);
+  outline-offset: 0;
+}
+/* 勾选气泡：Section 左上角；自身接收点击（点击冒泡到 host = 命中整节） */
 .sm-section-check {
   display: none;
 }
@@ -2364,12 +2377,26 @@
   color: var(--sm-primary, #4f46e5);
   z-index: 40;
   box-shadow: 0 1px 4px rgba(16, 24, 40, 0.18);
-  pointer-events: none;
+  cursor: pointer;
+}
+/* 扩大圈命中区（含突出 host 外的弧形部分） */
+.sm-canvas-wrap.sm-section-select-mode .sm-section-check::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
 }
 .sm-section-check svg {
   opacity: 0;
+  /* 勾 / 减号两个图标绝对定位叠放于圆心：脱离 flex 流，避免并排各占一半宽度导致偏心 */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
-.sm-section-host.is-check-selected .sm-section-check svg {
+/* 三态：全选 = 实底 + 勾；半选 = 空心底 + 减号；无选 = 空圈（svg 全隐） */
+.sm-section-host.is-check-selected .sm-section-check .sm-section-check__icon-check,
+.sm-section-host.is-check-partial .sm-section-check .sm-section-check__icon-minus {
   opacity: 1;
 }
 .sm-section-host.is-check-selected .sm-section-check {
@@ -2378,6 +2405,11 @@
 }
 .sm-section-host.is-check-selected .sm-section {
   outline: 2px solid var(--sm-primary, #4f46e5);
+  outline-offset: 2px;
+}
+/* 半选节：虚线描边（实线 = 全选） */
+.sm-section-host.is-check-partial .sm-section {
+  outline: 2px dashed var(--sm-primary, #4f46e5);
   outline-offset: 2px;
 }
 /* 底部浮动操作条（sticky 于滚动容器内） */

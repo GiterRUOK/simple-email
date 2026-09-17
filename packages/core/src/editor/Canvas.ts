@@ -52,10 +52,10 @@ export interface CanvasOptions {
   ui?: EditorUiOptions;
   /** Section / Block 工具条「复制设计稿」回调（写局部 JSON 到剪贴板，供其他画布追加） */
   onCopySelectionDesign?: (target: { sectionId: string } | { blockId: string }) => void;
-  /** 「选择节」批量模式动作（由 Editor 实现：写剪贴板 / 下载 JSON / 批量删除） */
-  onSectionSelectCopy?: (sectionIds: string[]) => void;
-  onSectionSelectExport?: (sectionIds: string[]) => void;
-  onSectionSelectRemove?: (sectionIds: string[]) => void;
+  /** 「选择节」批量模式动作（由 Editor 实现：写剪贴板 / 下载 JSON / 批量删除）；块为散选、节为整选，二者可混合 */
+  onSectionSelectCopy?: (sectionIds: string[], blockIds: string[]) => void;
+  onSectionSelectExport?: (sectionIds: string[], blockIds: string[]) => void;
+  onSectionSelectRemove?: (sectionIds: string[], blockIds: string[]) => void;
   /** 进入 / 退出节选择模式时通知宿主同步 UI（如顶栏按钮高亮）；画布内「完成」按钮与 ⌘/Ctrl+点击直达均会触发 */
   onSectionSelectModeChange?: (active: boolean) => void;
   t: SimpleMailT;
@@ -93,9 +93,20 @@ export class Canvas {
   private blockCodeModal: BlockCodeModal;
   /** 节选择模式（批量复制 / 导出 / 删除）：点击 Section 勾选而非单选 */
   private sectionSelectActive = false;
+  /** 完整选中的节（点击节空白 / 选择圈命中） */
   private checkedSectionIds = new Set<string>();
-  /** 区间勾选锚点：最近一次点击的节 id，Shift+点击以它与目标节为界整段勾选 */
-  private sectionCheckAnchorId: string | null = null;
+  /** 散选的块（所属节未被完整选中；不变式由 _normalizeCheckedSets 维护） */
+  private checkedBlockIds = new Set<string>();
+  /**
+   * 区间锚点：最近一次点击的命中（节或块）。Shift+点击以它与目标为界做同类区间：
+   * 节↔节 = 节区间；同列块↔块 = 列内区间；跨类 / 跨列退化为单点切换。
+   */
+  private sectionCheckAnchor: {
+    kind: 'section' | 'block';
+    id: string;
+    sectionId: string;
+    columnIndex: number;
+  } | null = null;
   private sectionSelectBar: HTMLElement | null = null;
   private sectionSelectCountEl: HTMLElement | null = null;
   private sectionSelectAllBtn: HTMLButtonElement | null = null;
@@ -459,14 +470,17 @@ export class Canvas {
 
     wrap.append(cols);
 
-    const check = h('div', { class: 'sm-section-check', 'aria-hidden': 'true' }, [iconCheck()]);
+    const check = h('div', { class: 'sm-section-check', 'aria-hidden': 'true' }, [
+      iconCheck(),
+      iconMinus(),
+    ]);
     host.append(wrap, toolbar, check);
 
     host.addEventListener('click', (e) => {
       if (this.sectionSelectActive) {
         e.stopPropagation();
-        if (e.shiftKey) this._checkSectionRange(section.id);
-        else this._toggleSectionCheck(section.id);
+        if (e.shiftKey) this._shiftClickSection(section.id);
+        else this._toggleSectionFull(section.id);
         return;
       }
       if ((e.target as HTMLElement).closest('.sm-block')) return;
@@ -686,8 +700,8 @@ export class Canvas {
     el.addEventListener('click', (e) => {
       if (this.sectionSelectActive) {
         e.stopPropagation();
-        if (e.shiftKey) this._checkSectionRange(section.id);
-        else this._toggleSectionCheck(section.id);
+        if (e.shiftKey) this._shiftClickBlock(section.id, columnIndex, block.id);
+        else this._toggleBlockCheck(section.id, columnIndex, block.id);
         return;
       }
       if (this.editingBlockId === block.id) return; // 编辑中不抢焦点
@@ -697,11 +711,11 @@ export class Canvas {
         this.opts.store.setSelection({ kind: 'section', sectionId: section.id });
         return;
       }
-      /** ⌘/Ctrl+点击块：直达节选择模式并勾选所属节（与文件管理器加选一致的心智） */
+      /** ⌘/Ctrl+点击块：直达选择模式并勾选该块（不带走同节其他块） */
       if (e.metaKey || e.ctrlKey) {
         e.preventDefault();
         e.stopPropagation();
-        this._enterSectionSelectModeWith(section.id);
+        this._enterSectionSelectModeWithBlock(section.id, columnIndex, block.id);
         return;
       }
       e.stopPropagation();
@@ -1121,13 +1135,14 @@ export class Canvas {
     return this.sectionSelectActive;
   }
 
-  /** 进入节选择模式：屏蔽单选 / 拖拽 / 内联编辑，点击 Section 勾选，可批量复制 / 导出 / 删除 */
+  /** 进入节选择模式：屏蔽单选 / 拖拽 / 内联编辑，点击块勾块、点击节空白/圈勾整节，可批量复制 / 导出 / 删除 */
   enterSectionSelectMode() {
     if (this.sectionSelectActive) return;
     this.commitInlineEdit();
     this.sectionSelectActive = true;
     this.checkedSectionIds.clear();
-    this.sectionCheckAnchorId = null;
+    this.checkedBlockIds.clear();
+    this.sectionCheckAnchor = null;
     this.opts.store.setSelection(null);
     this.el.classList.add('sm-section-select-mode');
     this._setSortablesDisabled(true);
@@ -1141,7 +1156,8 @@ export class Canvas {
     if (!this.sectionSelectActive) return;
     this.sectionSelectActive = false;
     this.checkedSectionIds.clear();
-    this.sectionCheckAnchorId = null;
+    this.checkedBlockIds.clear();
+    this.sectionCheckAnchor = null;
     this.el.classList.remove('sm-section-select-mode');
     this.sectionSelectBar?.remove();
     this.sectionSelectBar = null;
@@ -1153,83 +1169,221 @@ export class Canvas {
     this.opts.onSectionSelectModeChange?.(false);
   }
 
-  private _toggleSectionCheck(id: string) {
-    if (this.checkedSectionIds.has(id)) this.checkedSectionIds.delete(id);
-    else this.checkedSectionIds.add(id);
-    this.sectionCheckAnchorId = id;
+  /** 点节（空白 / 选择圈）：未全选 → 整节选中；已全选 → 清空该节（取消其内散选块） */
+  private _toggleSectionFull(id: string) {
+    const sec = findSection(this.opts.store.doc, id);
+    if (!sec) return;
+    if (this.checkedSectionIds.has(id)) {
+      this.checkedSectionIds.delete(id);
+    } else {
+      for (const c of sec.columns) {
+        for (const b of c.blocks) this.checkedBlockIds.delete(b.id);
+      }
+      this.checkedSectionIds.add(id);
+    }
+    this.sectionCheckAnchor = { kind: 'section', id, sectionId: id, columnIndex: -1 };
     this._syncSectionChecks();
   }
 
   /**
-   * ⌘/Ctrl+点击直达：进入节选择模式并勾选该节（macOS ⌘ / Windows·Linux Ctrl，
-   * 与文件管理器「加选」一致的手势，省去先点顶栏入口的往返）。
+   * 点块：切换该块选中态，不带走同节其他块。
+   * 整节选中时点其中一块 = 取消该块，其余块退散为逐块选中（半选）。
    */
-  private _enterSectionSelectModeWith(sectionId: string) {
-    this.enterSectionSelectMode();
-    this.checkedSectionIds.add(sectionId);
-    this.sectionCheckAnchorId = sectionId;
+  private _toggleBlockCheck(sectionId: string, columnIndex: number, blockId: string) {
+    const sec = findSection(this.opts.store.doc, sectionId);
+    if (!sec) return;
+    if (this.checkedSectionIds.has(sectionId)) {
+      this.checkedSectionIds.delete(sectionId);
+      for (const c of sec.columns) {
+        for (const b of c.blocks) if (b.id !== blockId) this.checkedBlockIds.add(b.id);
+      }
+    } else if (this.checkedBlockIds.has(blockId)) {
+      this.checkedBlockIds.delete(blockId);
+    } else {
+      this.checkedBlockIds.add(blockId);
+    }
+    this.sectionCheckAnchor = { kind: 'block', id: blockId, sectionId, columnIndex };
+    this._normalizeCheckedSets();
     this._syncSectionChecks();
   }
 
-  /** Shift+点击：以最近一次点击的节为锚点整段勾选 [锚点, 目标]，替换现有勾选（文件管理器同款语义） */
-  private _checkSectionRange(targetId: string) {
+  /** Shift+点击节：锚也是节时做节区间（替换全部勾选，Finder 语义）；否则退化为单点切换 */
+  private _shiftClickSection(targetId: string) {
     const ids = this.opts.store.doc.sections.map((s) => s.id);
     const targetIdx = ids.indexOf(targetId);
     if (targetIdx < 0) return;
-    const anchorIdx = this.sectionCheckAnchorId ? ids.indexOf(this.sectionCheckAnchorId) : -1;
+    const anchor = this.sectionCheckAnchor;
+    const anchorIdx = anchor?.kind === 'section' ? ids.indexOf(anchor.id) : -1;
     if (anchorIdx < 0) {
-      // 无有效锚点（如进入模式后直接 Shift+点击）：退化为普通切换并记锚点
-      if (this.checkedSectionIds.has(targetId)) this.checkedSectionIds.delete(targetId);
-      else this.checkedSectionIds.add(targetId);
-      this.sectionCheckAnchorId = targetId;
-      this._syncSectionChecks();
+      this._toggleSectionFull(targetId);
       return;
     }
     const from = Math.min(anchorIdx, targetIdx);
     const to = Math.max(anchorIdx, targetIdx);
     this.checkedSectionIds = new Set(ids.slice(from, to + 1));
+    this.checkedBlockIds.clear();
     this._syncSectionChecks();
+  }
+
+  /** Shift+点击块：锚是同节同列的块时做列内区间（替换全部勾选）；跨类 / 跨列退化为单点切换 */
+  private _shiftClickBlock(sectionId: string, columnIndex: number, blockId: string) {
+    const sec = findSection(this.opts.store.doc, sectionId);
+    const col = sec?.columns[columnIndex];
+    if (!sec || !col) return;
+    const ids = col.blocks.map((b) => b.id);
+    const targetIdx = ids.indexOf(blockId);
+    if (targetIdx < 0) return;
+    const anchor = this.sectionCheckAnchor;
+    const anchorIdx =
+      anchor?.kind === 'block' &&
+      anchor.sectionId === sectionId &&
+      anchor.columnIndex === columnIndex
+        ? ids.indexOf(anchor.id)
+        : -1;
+    if (anchorIdx < 0) {
+      this._toggleBlockCheck(sectionId, columnIndex, blockId);
+      return;
+    }
+    const from = Math.min(anchorIdx, targetIdx);
+    const to = Math.max(anchorIdx, targetIdx);
+    this.checkedSectionIds.clear();
+    this.checkedBlockIds = new Set(ids.slice(from, to + 1));
+    this._syncSectionChecks();
+  }
+
+  /**
+   * ⌘/Ctrl+点击直达：进入选择模式并整节勾选（macOS ⌘ / Windows·Linux Ctrl，
+   * 与文件管理器「加选」一致的手势，省去先点顶栏入口的往返）。
+   */
+  private _enterSectionSelectModeWith(sectionId: string) {
+    this.enterSectionSelectMode();
+    this.checkedSectionIds.add(sectionId);
+    this.sectionCheckAnchor = { kind: 'section', id: sectionId, sectionId, columnIndex: -1 };
+    this._syncSectionChecks();
+  }
+
+  /** ⌘/Ctrl+点击块直达：进入选择模式并勾选该块（锚为块，后续可 Shift 列内区间） */
+  private _enterSectionSelectModeWithBlock(
+    sectionId: string,
+    columnIndex: number,
+    blockId: string,
+  ) {
+    this.enterSectionSelectMode();
+    this.checkedBlockIds.add(blockId);
+    this.sectionCheckAnchor = { kind: 'block', id: blockId, sectionId, columnIndex };
+    this._syncSectionChecks();
+  }
+
+  /** 节的勾选三态：无选 / 半选（部分散选块）/ 全选（整节） */
+  private _sectionCheckState(section: Section): 'none' | 'partial' | 'full' {
+    if (this.checkedSectionIds.has(section.id)) return 'full';
+    let total = 0;
+    let hit = 0;
+    for (const c of section.columns) {
+      for (const b of c.blocks) {
+        total++;
+        if (this.checkedBlockIds.has(b.id)) hit++;
+      }
+    }
+    if (total === 0 || hit === 0) return 'none';
+    return hit === total ? 'full' : 'partial';
+  }
+
+  /**
+   * 勾选集归一化，维护两条不变式：
+   *  1. 失效 id（节/块被删）及时清理
+   *  2. 节内全部块散选时折叠为整节选中；散选块的所属节被整选时清掉该块
+   */
+  private _normalizeCheckedSets() {
+    const sections = this.opts.store.doc.sections;
+    const aliveSectionIds = new Set(sections.map((s) => s.id));
+    for (const id of [...this.checkedSectionIds]) {
+      if (!aliveSectionIds.has(id)) this.checkedSectionIds.delete(id);
+    }
+    const aliveBlockIds = new Set<string>();
+    for (const s of sections) {
+      for (const c of s.columns) for (const b of c.blocks) aliveBlockIds.add(b.id);
+    }
+    for (const id of [...this.checkedBlockIds]) {
+      if (!aliveBlockIds.has(id)) this.checkedBlockIds.delete(id);
+    }
+    for (const s of sections) {
+      if (this.checkedSectionIds.has(s.id)) {
+        for (const c of s.columns) {
+          for (const b of c.blocks) this.checkedBlockIds.delete(b.id);
+        }
+        continue;
+      }
+      const total = s.columns.reduce((n, c) => n + c.blocks.length, 0);
+      if (total === 0) continue;
+      const hit = s.columns.reduce(
+        (n, c) => n + c.blocks.filter((b) => this.checkedBlockIds.has(b.id)).length,
+        0,
+      );
+      if (hit === total) {
+        this.checkedSectionIds.add(s.id);
+        for (const c of s.columns) {
+          for (const b of c.blocks) this.checkedBlockIds.delete(b.id);
+        }
+      }
+    }
   }
 
   private _toggleSelectAllSections() {
     const doc = this.opts.store.doc;
     if (doc.sections.length > 0 && this.checkedSectionIds.size === doc.sections.length) {
       this.checkedSectionIds.clear();
+      this.checkedBlockIds.clear();
     } else {
       this.checkedSectionIds = new Set(doc.sections.map((s) => s.id));
+      this.checkedBlockIds.clear();
     }
     this._syncSectionChecks();
   }
 
-  /** 同步勾选态：清理已不存在的 id、刷新计数 / 全选 / 动作按钮可用性 */
+  /** 同步勾选态：归一化 → 节三态圈 / 块高亮 → 计数 / 全选 / 动作按钮可用性 */
   private _syncSectionChecks() {
+    this._normalizeCheckedSets();
     const doc = this.opts.store.doc;
-    const alive = new Set(doc.sections.map((s) => s.id));
-    for (const id of [...this.checkedSectionIds]) {
-      if (!alive.has(id)) this.checkedSectionIds.delete(id);
+    const sectionById = new Map(doc.sections.map((s) => [s.id, s]));
+
+    for (const host of this.inner.querySelectorAll<HTMLElement>('.sm-section-host')) {
+      host.classList.remove('is-check-selected', 'is-check-partial');
+      const id = host.getAttribute('data-id') ?? '';
+      const sec = sectionById.get(id);
+      if (!sec) continue;
+      const state = this._sectionCheckState(sec);
+      if (state === 'full') host.classList.add('is-check-selected');
+      else if (state === 'partial') host.classList.add('is-check-partial');
     }
-    for (const host of this.inner.querySelectorAll('.sm-section-host.is-check-selected')) {
-      host.classList.remove('is-check-selected');
+    for (const el of this.inner.querySelectorAll('.sm-block.is-check-selected')) {
+      el.classList.remove('is-check-selected');
     }
-    for (const id of this.checkedSectionIds) {
+    for (const id of this.checkedBlockIds) {
       this.inner
-        .querySelector(`.sm-section-host[data-id="${cssEscape(id)}"]`)
+        .querySelector(`.sm-block[data-id="${cssEscape(id)}"]`)
         ?.classList.add('is-check-selected');
     }
+
+    const secCount = this.checkedSectionIds.size;
+    const blockCount = this.checkedBlockIds.size;
     if (this.sectionSelectCountEl) {
-      this.sectionSelectCountEl.textContent = this.opts.t('sectionSelect.count', {
-        count: this.checkedSectionIds.size,
-      });
+      this.sectionSelectCountEl.textContent =
+        secCount > 0 && blockCount > 0
+          ? this.opts.t('sectionSelect.countMixed', { sections: secCount, blocks: blockCount })
+          : blockCount > 0
+            ? this.opts.t('sectionSelect.countBlocks', { count: blockCount })
+            : this.opts.t('sectionSelect.count', { count: secCount });
     }
     if (this.sectionSelectAllBtn) {
-      const all = doc.sections.length > 0 && this.checkedSectionIds.size === doc.sections.length;
+      const all = doc.sections.length > 0 && secCount === doc.sections.length;
       this.sectionSelectAllBtn.textContent = this.opts.t(
         all ? 'sectionSelect.unselectAll' : 'sectionSelect.selectAll',
       );
       this.sectionSelectAllBtn.disabled = doc.sections.length === 0;
     }
     for (const btn of this.sectionSelectActionBtns) {
-      btn.disabled = this.checkedSectionIds.size === 0;
+      btn.disabled = secCount + blockCount === 0;
     }
   }
 
@@ -1306,17 +1460,26 @@ export class Canvas {
   }
 
   private _runSectionSelectAction(kind: 'copy' | 'export' | 'remove') {
-    const ids = [...this.checkedSectionIds];
-    if (!ids.length) return;
+    const sectionIds = [...this.checkedSectionIds];
+    const blockIds = [...this.checkedBlockIds];
+    if (!sectionIds.length && !blockIds.length) return;
     if (kind === 'remove') {
-      if (!window.confirm(this.opts.t('sectionSelect.deleteConfirm', { count: ids.length }))) {
-        return;
-      }
-      this.opts.onSectionSelectRemove?.(ids);
+      const t = this.opts.t;
+      const msg =
+        sectionIds.length > 0 && blockIds.length > 0
+          ? t('sectionSelect.deleteConfirmMixed', {
+              sections: sectionIds.length,
+              blocks: blockIds.length,
+            })
+          : blockIds.length > 0
+            ? t('sectionSelect.deleteConfirmBlocks', { count: blockIds.length })
+            : t('sectionSelect.deleteConfirm', { count: sectionIds.length });
+      if (!window.confirm(msg)) return;
+      this.opts.onSectionSelectRemove?.(sectionIds, blockIds);
       return;
     }
-    if (kind === 'copy') this.opts.onSectionSelectCopy?.(ids);
-    else this.opts.onSectionSelectExport?.(ids);
+    if (kind === 'copy') this.opts.onSectionSelectCopy?.(sectionIds, blockIds);
+    else this.opts.onSectionSelectExport?.(sectionIds, blockIds);
   }
 
   /* -------------------------------- 操作 ---------------------------------- */
@@ -1475,9 +1638,19 @@ function iconCode() {
     '<path d="M7 7l-3 3 3 3M13 7l3 3-3 3" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   );
 }
-/** 勾选（节选择模式气泡） */
+/** 勾选（节选择模式气泡）：全选态 */
 function iconCheck() {
-  return svg(
+  const el = svg(
     '<path d="M4.5 10.5l3.4 3.4 7.6-7.8" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   );
+  el.classList.add('sm-section-check__icon-check');
+  return el;
+}
+/** 减号（节选择模式气泡）：半选态（节内部分块被散选） */
+function iconMinus() {
+  const el = svg(
+    '<path d="M5 10h10" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round"/>',
+  );
+  el.classList.add('sm-section-check__icon-minus');
+  return el;
 }

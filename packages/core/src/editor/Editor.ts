@@ -493,12 +493,13 @@ export class MailEditor {
   }
 
   /**
-   * 批量复制多个 Section 的局部设计稿到剪贴板（与 copySelectionDesign 同信封，多节形态）。
+   * 批量复制混合勾选（整节 + 散块）的局部设计稿到剪贴板。
+   * 统一走 sections 通道：散块按母节骨架重建（保 attrs / 列结构，各列仅保留选中块），粘贴后所见即所得。
    * @returns 是否成功写入剪贴板
    */
-  async copySectionsDesign(sectionIds: string[]): Promise<boolean> {
+  async copySectionsDesign(sectionIds: string[], blockIds: string[] = []): Promise<boolean> {
     this.canvas.commitInlineEdit();
-    const sections = this._pickSections(sectionIds);
+    const sections = this._buildSectionsFromChecked(sectionIds, blockIds);
     if (!sections.length) {
       this._showToast(this.i18n.t('toast.copySelectionNoTarget'));
       return false;
@@ -507,12 +508,12 @@ export class MailEditor {
   }
 
   /**
-   * 批量导出多个 Section 的局部设计稿为 JSON 文件（内容与局部设计稿剪贴板同构，可手动粘贴追加）。
+   * 批量导出混合勾选（整节 + 散块）的局部设计稿为 JSON 文件（与剪贴板内容同构，可手动粘贴追加）。
    * @returns 是否成功触发下载
    */
-  exportSectionsDesign(sectionIds: string[]): boolean {
+  exportSectionsDesign(sectionIds: string[], blockIds: string[] = []): boolean {
     this.canvas.commitInlineEdit();
-    const sections = this._pickSections(sectionIds);
+    const sections = this._buildSectionsFromChecked(sectionIds, blockIds);
     if (!sections.length) {
       this._showToast(this.i18n.t('toast.copySelectionNoTarget'));
       return false;
@@ -550,10 +551,69 @@ export class MailEditor {
     return removed;
   }
 
-  /** 按文档顺序取出指定 id 的 Section（忽略不存在的 id） */
-  private _pickSections(sectionIds: string[]): Section[] {
-    const idSet = new Set(sectionIds);
-    return this.store.doc.sections.filter((s) => idSet.has(s.id));
+  /**
+   * 批量删除选择模式下的混合勾选（单条撤销记录）。
+   * 只删显式命中的内容：整选节整节删除；散选块仅从列中移除，节壳保留（可再圈选清理）。
+   * @returns 实际删除的节 + 块总数
+   */
+  removeCheckedSelection(sectionIds: string[], blockIds: string[]): number {
+    this.canvas.commitInlineEdit();
+    this._blurRightPanelIfFocused();
+    const secSet = new Set(sectionIds);
+    const blockSet = new Set(blockIds);
+    let removedSections = 0;
+    let removedBlocks = 0;
+    this.store.update((d) => {
+      const before = d.sections.length;
+      d.sections = d.sections.filter((s) => !secSet.has(s.id));
+      removedSections = before - d.sections.length;
+      for (const sec of d.sections) {
+        for (const col of sec.columns) {
+          const n = col.blocks.length;
+          col.blocks = col.blocks.filter((b) => !blockSet.has(b.id));
+          removedBlocks += n - col.blocks.length;
+        }
+      }
+    });
+    this.store.setSelection(null);
+    const total = removedSections + removedBlocks;
+    if (total > 0) {
+      this._showToast(
+        this.i18n.t('toast.removeCheckedOk', {
+          sections: removedSections,
+          blocks: removedBlocks,
+        }),
+      );
+    }
+    return total;
+  }
+
+  /**
+   * 按混合勾选构建局部设计稿节列表（统一走 sections 通道）：
+   * - 整选节：原样携带（id 由粘贴端重生成）
+   * - 含散选块的节：按母节骨架重建——保留 attrs / layout / 列结构，各列仅保留选中块
+   */
+  private _buildSectionsFromChecked(sectionIds: string[], blockIds: string[]): Section[] {
+    const secSet = new Set(sectionIds);
+    const blockSet = new Set(blockIds);
+    const out: Section[] = [];
+    for (const sec of this.store.doc.sections) {
+      if (secSet.has(sec.id)) {
+        out.push(sec);
+        continue;
+      }
+      const hasHit = sec.columns.some((c) => c.blocks.some((b) => blockSet.has(b.id)));
+      if (!hasHit) continue;
+      const rebuilt = structuredClone(sec);
+      for (let i = 0; i < rebuilt.columns.length; i++) {
+        const src = sec.columns[i];
+        rebuilt.columns[i].blocks = src.blocks
+          .filter((b) => blockSet.has(b.id))
+          .map((b) => structuredClone(b));
+      }
+      out.push(rebuilt);
+    }
+    return out;
   }
 
   /** 序列化局部设计稿写入剪贴板并 toast 反馈 */
@@ -731,9 +791,9 @@ export class MailEditor {
       ui: this.opts.ui,
       t: this.i18n.t,
       onCopySelectionDesign: (target) => void this.copySelectionDesign(target),
-      onSectionSelectCopy: (ids) => void this.copySectionsDesign(ids),
-      onSectionSelectExport: (ids) => this.exportSectionsDesign(ids),
-      onSectionSelectRemove: (ids) => this.removeSections(ids),
+      onSectionSelectCopy: (ids, blockIds) => void this.copySectionsDesign(ids, blockIds),
+      onSectionSelectExport: (ids, blockIds) => this.exportSectionsDesign(ids, blockIds),
+      onSectionSelectRemove: (ids, blockIds) => this.removeCheckedSelection(ids, blockIds),
       onSectionSelectModeChange: (active) => this.topbar.setSectionSelectActive(active),
     });
     this.rightPanel = new RightPanel({
