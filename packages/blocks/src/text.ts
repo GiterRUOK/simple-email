@@ -33,7 +33,7 @@ export const textBlock = defineBlock<TextProps>({
   icon: icons.text,
   defaultProps: {
     content:
-      '<p style="margin:0;">在此处输入文本。<strong>双击</strong>进入编辑模式，<em>选中文字</em>会出现工具条；支持变量 {{user.name}}</p>',
+      '<p>双击进入编辑...</p>',
     align: 'left',
     color: '',
     fontSize: '',
