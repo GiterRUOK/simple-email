@@ -128,6 +128,8 @@ http://localhost:5173/?locale=zh-CN
 http://localhost:5173/?locale=en-US
 ```
 
+也可点击页面右下角语言按钮即时切换：保留当前画布内容，销毁旧实例后按新语言重建，并同步 URL 参数。
+
 ---
 
 ## 安装与集成

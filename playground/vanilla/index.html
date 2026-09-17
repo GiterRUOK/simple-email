@@ -7,10 +7,27 @@
     <style>
       html, body, #app { height: 100%; margin: 0; padding: 0; }
       body { font: 14px -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif; }
+      #locale-switch {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        z-index: 9999;
+        height: 32px;
+        padding: 0 14px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: 16px;
+        background: #fff;
+        color: #333;
+        font: 600 12px/30px -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+      }
+      #locale-switch:hover { background: #f5f5f5; }
     </style>
   </head>
   <body>
     <div id="app"></div>
+    <button id="locale-switch" type="button"></button>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
