@@ -1,9 +1,9 @@
-import { bindColorPickerInput } from './ColorPickerPopover';
-import { h } from '../utils/dom';
-import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
-import { LIST_INDENT_PRESETS_PX, type ListIndentValue } from '../utils/emailListStyles';
-import type { InlineEditor, SelectionState } from './InlineEditor';
 import type { SimpleMailT } from '../i18n';
+import { h } from '../utils/dom';
+import { LIST_INDENT_PRESETS_PX, type ListIndentValue } from '../utils/emailListStyles';
+import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
+import { bindColorPickerInput } from './ColorPickerPopover';
+import type { InlineEditor, SelectionState } from './InlineEditor';
 
 /**
  * 富文本浮动工具条。
@@ -31,8 +31,16 @@ export interface RichTextToolbarOptions {
 const FONT_FAMILIES = [
   { labelKey: 'toolbar.fontDefault', label: 'Default', value: '' },
   { label: 'Inter', value: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif' },
-  { labelKey: 'toolbar.fontPingFang', label: 'PingFang SC', value: '"PingFang SC", "Helvetica Neue", Arial, sans-serif' },
-  { labelKey: 'toolbar.fontMicrosoftYaHei', label: 'Microsoft YaHei', value: '"Microsoft YaHei", "Segoe UI", sans-serif' },
+  {
+    labelKey: 'toolbar.fontPingFang',
+    label: 'PingFang SC',
+    value: '"PingFang SC", "Helvetica Neue", Arial, sans-serif',
+  },
+  {
+    labelKey: 'toolbar.fontMicrosoftYaHei',
+    label: 'Microsoft YaHei',
+    value: '"Microsoft YaHei", "Segoe UI", sans-serif',
+  },
   { labelKey: 'toolbar.fontSimSun', label: 'SimSun', value: 'SimSun, "Songti SC", serif' },
   { label: 'Helvetica', value: '"Helvetica Neue", Arial, sans-serif' },
   { label: 'Arial', value: 'Arial, sans-serif' },
@@ -144,9 +152,7 @@ export class RichTextToolbar {
       const hex = colorToHexInput(f.foreColor);
       if (hex) this.inputColor.value = hex;
     }
-    this.inputBgColor.value = f.backColor
-      ? (colorToHexInput(f.backColor) ?? '#ffffff')
-      : '#ffffff';
+    this.inputBgColor.value = f.backColor ? (colorToHexInput(f.backColor) ?? '#ffffff') : '#ffffff';
     if (f.fontName) this.selectFontFamily.value = matchFamily(f.fontName);
     this.selectFontSize.value = matchFontSize(f.fontSize);
     this.selectFontWeight.value = matchFontWeight(f.fontWeight);
@@ -173,9 +179,14 @@ export class RichTextToolbar {
     this.btns.bold = this._btn('B', t('toolbar.bold'), exec('bold'), { fontWeight: '700' });
     this.btns.italic = this._btn('I', t('toolbar.italic'), exec('italic'), { fontStyle: 'italic' });
     // 链接内的下划线归 <a> 管，走专用实现；非链接文本回落到 execCommand
-    this.btns.underline = this._btn('U', t('toolbar.underline'), () => this.editor?.toggleUnderline(), {
-      textDecoration: 'underline',
-    });
+    this.btns.underline = this._btn(
+      'U',
+      t('toolbar.underline'),
+      () => this.editor?.toggleUnderline(),
+      {
+        textDecoration: 'underline',
+      },
+    );
     this.btns.strikethrough = this._btn('S', t('toolbar.strikethrough'), exec('strikeThrough'), {
       textDecoration: 'line-through',
     });
@@ -585,13 +596,13 @@ function matchFontSize(raw: string | null): string {
   if (!raw) return '';
   const m = raw.trim().match(/^(\d+(?:\.\d+)?)px$/i);
   if (!m) return '';
-  const px = `${Math.round(parseFloat(m[1]))}px`;
+  const px = `${Math.round(Number.parseFloat(m[1]))}px`;
   if (FONT_SIZES.includes(px)) return px;
-  const num = parseFloat(px);
+  const num = Number.parseFloat(px);
   let best = FONT_SIZES[0];
-  let bestD = Infinity;
+  let bestD = Number.POSITIVE_INFINITY;
   for (const s of FONT_SIZES) {
-    const d = Math.abs(parseFloat(s) - num);
+    const d = Math.abs(Number.parseFloat(s) - num);
     if (d < bestD) {
       bestD = d;
       best = s;

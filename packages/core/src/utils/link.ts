@@ -11,9 +11,9 @@
  */
 
 /** 变量占位（发送时替换），如 {{couponLink}} */
-const VARIABLE_PATTERN = /\{\{[^{}]*\}\}/
+const VARIABLE_PATTERN = /\{\{[^{}]*\}\}/;
 /** 放行协议；其余一律不放行，兼顾安全（屏蔽 javascript: / data: 等） */
-const ALLOWED_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:', 'sms:']
+const ALLOWED_SCHEMES = ['http:', 'https:', 'mailto:', 'tel:', 'sms:'];
 
 export function isRenderableHref(raw: unknown): boolean {
   const href = String(raw ?? '').trim();
@@ -41,10 +41,7 @@ export function resolveHref(raw: unknown): string {
 }
 
 /** 右栏链接字段默认校验：空值放行（允许暂不填），填了但不可跳转则给提示 */
-export function invalidHrefMessage(
-  raw: unknown,
-  t: (key: string) => string,
-): string | null {
+export function invalidHrefMessage(raw: unknown, t: (key: string) => string): string | null {
   const href = String(raw ?? '').trim();
   if (!href || isRenderableHref(href)) return null;
   return t('rightPanel.block.invalidLink');

@@ -13,9 +13,7 @@
     },
     "./style.css": "./dist/style.css"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch",

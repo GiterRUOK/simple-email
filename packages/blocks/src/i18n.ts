@@ -157,7 +157,11 @@ function localizeDefaultProps(block: AnyBlock, t: SimpleMailT): Record<string, u
   return props;
 }
 
-function localizeField(blockType: string, field: BlockSchemaField, t: SimpleMailT): BlockSchemaField {
+function localizeField(
+  blockType: string,
+  field: BlockSchemaField,
+  t: SimpleMailT,
+): BlockSchemaField {
   const labelKey = BLOCK_FIELD_LABEL_KEYS[blockType]?.[field.key] ?? FIELD_LABEL_KEYS[field.key];
   return {
     ...field,
@@ -173,10 +177,7 @@ function localizeField(blockType: string, field: BlockSchemaField, t: SimpleMail
   };
 }
 
-function localizeOptionLabel(
-  option: { label: string; value: string },
-  t: SimpleMailT,
-): string {
+function localizeOptionLabel(option: { label: string; value: string }, t: SimpleMailT): string {
   if (option.value === 'left') return t('common.left');
   if (option.value === 'center') return t('common.center');
   if (option.value === 'right') return t('common.right');
@@ -204,12 +205,10 @@ function localizeRenderPreview(
   const localizedPlaceholder = escapeAttr(inlinePlaceholderText);
 
   return (props, ctx) =>
-    block
-      .renderPreview!(props, ctx)
-      .replaceAll(
-        `data-placeholder="${sourcePlaceholder}"`,
-        `data-placeholder="${localizedPlaceholder}"`,
-      );
+    block.renderPreview!(props, ctx).replaceAll(
+      `data-placeholder="${sourcePlaceholder}"`,
+      `data-placeholder="${localizedPlaceholder}"`,
+    );
 }
 
 function escapeAttr(value: string): string {

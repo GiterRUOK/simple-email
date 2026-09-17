@@ -1,17 +1,14 @@
-import { EditorView, basicSetup } from 'codemirror';
 import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
+import { EditorView, basicSetup } from 'codemirror';
+import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
 import { findBlockLocation } from '../store/store';
 import type { Store } from '../store/store';
 import { h } from '../utils/dom';
 import { prettyHtml } from '../utils/html';
-import {
-  getCodeEditorModalDefaultSize,
-  getCodeEditorModalMaximizedSize,
-} from '../utils/modalSize';
+import { getCodeEditorModalDefaultSize, getCodeEditorModalMaximizedSize } from '../utils/modalSize';
 import { Modal } from './Modal';
-import type { SimpleMailT } from '../i18n';
 
 export interface BlockCodeModalOptions {
   store: Store;
@@ -134,7 +131,9 @@ export class BlockCodeModal {
   }
 
   private _syncMaximizeButton() {
-    this.maximizeBtn.title = this.maximized ? this.opts.t('common.restore') : this.opts.t('common.maximize');
+    this.maximizeBtn.title = this.maximized
+      ? this.opts.t('common.restore')
+      : this.opts.t('common.maximize');
     this.maximizeBtn.setAttribute('aria-pressed', this.maximized ? 'true' : 'false');
     this.maximizeBtn.replaceChildren(this.maximized ? iconRestore() : iconMaximize());
   }

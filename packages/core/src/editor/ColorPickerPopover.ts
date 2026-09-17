@@ -1,6 +1,6 @@
+import { type SimpleMailT, createI18nContext } from '../i18n';
 import { normalizeAccentHex } from '../utils/accentColor';
 import { h } from '../utils/dom';
-import { createI18nContext, type SimpleMailT } from '../i18n';
 
 /** 邮件常用预设色 */
 export const COLOR_PICKER_PALETTE = [
@@ -70,7 +70,7 @@ function positionLayer(layer: HTMLElement, anchor: HTMLElement, layerRoot: HTMLE
   requestAnimationFrame(() => {
     const popRect = layer.getBoundingClientRect();
     if (popRect.right > rootRect.right - 8) {
-      layer.style.left = `${Math.max(4, parseFloat(layer.style.left) - (popRect.right - rootRect.right + 8))}px`;
+      layer.style.left = `${Math.max(4, Number.parseFloat(layer.style.left) - (popRect.right - rootRect.right + 8))}px`;
     }
     if (popRect.bottom > window.innerHeight - 8) {
       layer.style.top = `${rect.top - rootRect.top - popRect.height - 4}px`;

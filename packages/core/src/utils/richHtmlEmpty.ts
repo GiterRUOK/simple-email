@@ -1,6 +1,8 @@
 /** 是否仅为进入编辑时注入的占位 <br>（用户未改动） */
 export function isRichHtmlEditorSeedOnly(html: string): boolean {
-  const s = String(html ?? '').trim().toLowerCase();
+  const s = String(html ?? '')
+    .trim()
+    .toLowerCase();
   return s === '<br>' || s === '<br/>' || s === '<br />';
 }
 

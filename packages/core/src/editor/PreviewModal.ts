@@ -1,9 +1,9 @@
+import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
 import { renderDoc } from '../renderer';
 import type { Store } from '../store/store';
 import { h } from '../utils/dom';
 import { Modal } from './Modal';
-import type { SimpleMailT } from '../i18n';
 
 export type PreviewDevice = 'pc' | 'pad' | 'phone';
 
@@ -98,9 +98,7 @@ export class PreviewModal {
     for (const k of Object.keys(this.deviceBtns) as PreviewDevice[]) {
       this.deviceBtns[k].classList.toggle('sm-segmented__item--active', k === d);
     }
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => this._scheduleFitPreviewHeight()),
-    );
+    requestAnimationFrame(() => requestAnimationFrame(() => this._scheduleFitPreviewHeight()));
   }
 
   private _render() {
@@ -130,10 +128,7 @@ export class PreviewModal {
       const body = doc?.body;
       if (!root || !body) return;
       const raw = Math.max(root.scrollHeight, body.scrollHeight);
-      const maxPx = Math.max(
-        240,
-        window.innerHeight - PreviewModal.VIEWPORT_RESERVED_Y,
-      );
+      const maxPx = Math.max(240, window.innerHeight - PreviewModal.VIEWPORT_RESERVED_Y);
       const minPx = 200;
       const next = Math.min(Math.max(Math.ceil(raw), minPx), maxPx);
       this.viewport.style.height = `${next}px`;

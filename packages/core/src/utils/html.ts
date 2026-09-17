@@ -58,9 +58,10 @@ export function prettyHtml(html: string, indent = '  '): string {
   ]);
   const PRESERVE = new Set(['pre', 'textarea', 'script', 'style']);
 
-  const tokens = html.match(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\/?[^<>]+>|[^<]+/g) ?? [];
+  const tokens =
+    html.match(/<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\/?[^<>]+>|[^<]+/g) ?? [];
   let depth = 0;
-  let preserveStack: string[] = [];
+  const preserveStack: string[] = [];
   const out: string[] = [];
   const pad = (n: number) => indent.repeat(Math.max(0, n));
 

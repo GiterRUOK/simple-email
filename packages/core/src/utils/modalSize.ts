@@ -15,9 +15,10 @@ export function getCodeEditorModalDefaultSize(): CodeEditorModalSize {
 }
 
 /** 代码编辑弹框最大化时的视口占比 */
-export function getCodeEditorModalMaximizedSize(
-  opts?: { maxWidthRatio?: number; maxHeightRatio?: number },
-): CodeEditorModalSize {
+export function getCodeEditorModalMaximizedSize(opts?: {
+  maxWidthRatio?: number;
+  maxHeightRatio?: number;
+}): CodeEditorModalSize {
   const maxWidthRatio = opts?.maxWidthRatio ?? DEFAULT_MAX_WIDTH_RATIO;
   const maxHeightRatio = opts?.maxHeightRatio ?? DEFAULT_MAX_HEIGHT_RATIO;
   return {

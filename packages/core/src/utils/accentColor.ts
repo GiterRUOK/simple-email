@@ -30,9 +30,9 @@ export function rgbCssToHex(rgb: string): string | null {
 export function accentPrimarySoftRgba(primaryHex: string, isDarkChrome: boolean): string {
   const hex = normalizeAccentHex(primaryHex);
   if (!hex) return isDarkChrome ? 'rgba(129, 140, 248, 0.18)' : 'rgba(79, 70, 229, 0.12)';
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
   const a = isDarkChrome ? 0.22 : 0.14;
   return `rgba(${r},${g},${b},${a})`;
 }

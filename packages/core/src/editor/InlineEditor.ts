@@ -1,3 +1,12 @@
+import type { GlobalStyles } from '../types';
+import {
+  LIST_INDENT_DEFAULT_PX,
+  type ListIndentValue,
+  setListIndent as applyListIndentToElement,
+  findListAtSelection,
+  getListIndent,
+  resolveGlobalListIndentPx,
+} from '../utils/emailListStyles';
 /**
  * 把任意 DOM 元素临时变成 contenteditable，并暴露提交/取消/选区事件。
  *
@@ -11,23 +20,14 @@
  */
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import {
-  findListAtSelection,
-  getListIndent,
-  LIST_INDENT_DEFAULT_PX,
-  resolveGlobalListIndentPx,
-  setListIndent as applyListIndentToElement,
-  type ListIndentValue,
-} from '../utils/emailListStyles';
-import type { GlobalStyles } from '../types';
-import {
   applyListCommandForSelection,
   detectListFormats,
   findListItem,
-  getListItemsInRange,
   getCaretTextOffsetAtRangeEnd,
+  getListItemsInRange,
   insertSelectionBoundaryMarkers,
-  mergeListItemOnBackspace,
   mergeAdjacentSameTypeLists,
+  mergeListItemOnBackspace,
   mergeNextListItemOnDelete,
   removeSelectionBoundaryMarkers,
   restoreCaretAfterListMutation,
@@ -35,16 +35,16 @@ import {
   splitListItemOnEnter,
 } from '../utils/inlineListEditing';
 import {
+  getRichHtmlPlainText,
+  hasRichHtmlLineBreak,
+  isRichHtmlEditorSeedOnly,
+  isRichHtmlEffectivelyEmpty,
+} from '../utils/richHtmlEmpty';
+import {
   richTextExecCommand,
   richTextQueryCommandState,
   richTextQueryCommandValue,
 } from '../utils/richTextCommand';
-import {
-  isRichHtmlEffectivelyEmpty,
-  isRichHtmlEditorSeedOnly,
-  hasRichHtmlLineBreak,
-  getRichHtmlPlainText,
-} from '../utils/richHtmlEmpty';
 import {
   convertFontTags,
   firstTextNode,
@@ -145,11 +145,7 @@ export class InlineEditor {
       const text = (this.el.textContent ?? '').replace(/\u200b/g, '');
       if (text.length > 0) {
         value = sanitized;
-      } else if (
-        this.initiallyEmpty &&
-        !this.edited &&
-        isRichHtmlEditorSeedOnly(sanitized)
-      ) {
+      } else if (this.initiallyEmpty && !this.edited && isRichHtmlEditorSeedOnly(sanitized)) {
         value = '';
       } else if (hasRichHtmlLineBreak(sanitized) && !this.hadTextInSession) {
         // 从未有过文本，仅换行（含单个 <br>）视为有效
@@ -209,9 +205,7 @@ export class InlineEditor {
     const isListCmd = command === 'insertOrderedList' || command === 'insertUnorderedList';
     if (isListCmd && sel?.rangeCount) {
       const range = sel.getRangeAt(0);
-      const itemsInRange = range.collapsed
-        ? []
-        : getListItemsInRange(range, this.el);
+      const itemsInRange = range.collapsed ? [] : getListItemsInRange(range, this.el);
       const savedOffset = getCaretTextOffsetAtRangeEnd(this.el, range);
       const boundaryMarkers = insertSelectionBoundaryMarkers(range);
       this.suppressListMerge = true;
@@ -514,8 +508,7 @@ export class InlineEditor {
     el.classList.remove('is-empty');
 
     const initial = this.opts.initialValue ?? '';
-    const initiallyEmpty =
-      mode === 'plain' ? !initial.trim() : isRichHtmlEffectivelyEmpty(initial);
+    const initiallyEmpty = mode === 'plain' ? !initial.trim() : isRichHtmlEffectivelyEmpty(initial);
     this.initiallyEmpty = initiallyEmpty;
     this.edited = false;
     this.hadTextInSession =
@@ -625,7 +618,8 @@ export class InlineEditor {
         const active = document.activeElement as HTMLElement | null;
         if (active && (active === el || el.contains(active))) return;
         if (isColorPickerOpen()) return;
-        if (active?.closest?.('.sm-floating-toolbar, .sm-color-picker, .sm-color-picker-layer')) return;
+        if (active?.closest?.('.sm-floating-toolbar, .sm-color-picker, .sm-color-picker-layer'))
+          return;
         if (active?.closest?.('.sm-topbar, .sm-popover, .sm-panel--variable-picker')) return;
         // 从左栏拖入 / 画布内 Sortable 排序：mousedown 会先 blur，若在此时提交会触发画布重渲染并拆掉 drop 目标
         if (active?.closest?.('.sm-panel--left')) return;
@@ -787,7 +781,7 @@ export class InlineEditor {
 
     const inline = resolveInlineFormatsAtSelection(this.el, sel);
 
-    let foreColor = inline.foreColor ?? safeQueryValue('foreColor');
+    const foreColor = inline.foreColor ?? safeQueryValue('foreColor');
     let backColor = inline.backColor;
     if (
       !backColor &&
@@ -805,8 +799,7 @@ export class InlineEditor {
     const listIndentGlobalPx = this.opts.globalStyles
       ? resolveGlobalListIndentPx(this.opts.globalStyles)
       : LIST_INDENT_DEFAULT_PX;
-    const listIndentEffectivePx =
-      listIndentPx != null ? listIndentPx : listIndentGlobalPx;
+    const listIndentEffectivePx = listIndentPx != null ? listIndentPx : listIndentGlobalPx;
 
     const state: SelectionState = {
       hasSelection: true,
@@ -839,9 +832,7 @@ export class InlineEditor {
   /** 焦点在浮动工具条上时沿用上一帧选区，避免点开链接框 / 颜色等控件后工具条消失。 */
   private _emitSelectionOrKeepToolbar(fallback: null) {
     if (
-      fallback === null &&
-      this.lastSelectionState &&
-      isColorPickerOpen() ||
+      (fallback === null && this.lastSelectionState && isColorPickerOpen()) ||
       document.activeElement?.closest?.(
         '.sm-floating-toolbar, .sm-color-picker, .sm-color-picker-layer',
       )
@@ -870,7 +861,8 @@ export class InlineEditor {
 
 /* ----------------------------- helpers ----------------------------- */
 
-function findAncestorAnchor(node: Node | null, root: HTMLElement): HTMLAnchorElement | null {
+function findAncestorAnchor(start: Node | null, root: HTMLElement): HTMLAnchorElement | null {
+  let node = start;
   while (node && node !== root) {
     if (node.nodeType === 1 && (node as HTMLElement).tagName === 'A') {
       return node as HTMLAnchorElement;
@@ -913,7 +905,11 @@ function resolveInlineFormatsAtSelection(
   if (!host) return { fontSize: null, fontWeight: null, foreColor: null, backColor: null };
 
   let fontWeight: string | null = null;
-  for (let el: HTMLElement | null = host; el && root.contains(el) && el !== root; el = el.parentElement) {
+  for (
+    let el: HTMLElement | null = host;
+    el && root.contains(el) && el !== root;
+    el = el.parentElement
+  ) {
     if (el.style.fontWeight) fontWeight = el.style.fontWeight;
   }
 
@@ -1033,7 +1029,11 @@ function resolveUnderlineAtSelection(root: HTMLElement, sel: Selection): boolean
 
 /** 光标处文字色（foreColor / 链接局部 color；queryCommandValue 在 <a> 内常不准） */
 function resolveForeColorAtSelection(root: HTMLElement, host: HTMLElement): string | null {
-  for (let el: HTMLElement | null = host; el && root.contains(el) && el !== root; el = el.parentElement) {
+  for (
+    let el: HTMLElement | null = host;
+    el && root.contains(el) && el !== root;
+    el = el.parentElement
+  ) {
     const inline = el.style.color?.trim();
     if (inline) return inline;
 
@@ -1055,7 +1055,11 @@ function readColorFromStyleAttr(styleAttr: string | null): string | null {
 
 /** 光标处文字背景/高亮色（hiliteColor 的 queryCommandValue 在 Chrome 常为空，需读 DOM） */
 function resolveBackColorAtSelection(root: HTMLElement, host: HTMLElement): string | null {
-  for (let el: HTMLElement | null = host; el && root.contains(el) && el !== root; el = el.parentElement) {
+  for (
+    let el: HTMLElement | null = host;
+    el && root.contains(el) && el !== root;
+    el = el.parentElement
+  ) {
     const inline = el.style.backgroundColor?.trim();
     if (inline && !isTransparentColor(inline)) return inline;
 
@@ -1103,7 +1107,7 @@ function isTransparentColor(c: string): boolean {
   if (s === 'rgba(0, 0, 0, 0)' || s === 'rgba(0,0,0,0)') return true;
   const rgba = s.match(/^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+))?\s*\)$/);
   if (rgba) {
-    const a = rgba[4] !== undefined ? parseFloat(rgba[4]) : 1;
+    const a = rgba[4] !== undefined ? Number.parseFloat(rgba[4]) : 1;
     return a === 0;
   }
   return false;

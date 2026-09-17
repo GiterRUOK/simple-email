@@ -3,7 +3,8 @@
 /** 空列表项 Enter 退出后插入的正文段，勿当作可合并的分隔块 */
 export const LIST_GAP_ATTR = 'data-sm-list-gap';
 
-export function findListItem(node: Node | null, root: HTMLElement): HTMLLIElement | null {
+export function findListItem(start: Node | null, root: HTMLElement): HTMLLIElement | null {
+  let node = start;
   while (node && node !== root) {
     if (node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).tagName === 'LI') {
       return node as HTMLLIElement;
@@ -13,9 +14,7 @@ export function findListItem(node: Node | null, root: HTMLElement): HTMLLIElemen
   return null;
 }
 
-export function findListRoot(
-  li: HTMLLIElement,
-): HTMLUListElement | HTMLOListElement | null {
+export function findListRoot(li: HTMLLIElement): HTMLUListElement | HTMLOListElement | null {
   const parent = li.parentElement;
   if (!parent) return null;
   if (parent.tagName === 'UL' || parent.tagName === 'OL') {
@@ -146,9 +145,9 @@ export function setCaretByTextOffset(container: HTMLElement, offset: number): vo
   const target = Math.max(0, offset);
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
   let remaining = target;
-  let textNode: Text | null = null;
+  let textNode = walker.nextNode() as Text | null;
 
-  while ((textNode = walker.nextNode() as Text | null)) {
+  while (textNode) {
     const data = textNode.data ?? '';
     const len = visibleTextLength(data);
     if (remaining <= len) {
@@ -171,6 +170,7 @@ export function setCaretByTextOffset(container: HTMLElement, offset: number): vo
       return;
     }
     remaining -= len;
+    textNode = walker.nextNode() as Text | null;
   }
 
   placeCaretAtEndOfElement(container);
@@ -226,17 +226,12 @@ export function insertCaretMarkerAtRangeEnd(range: Range): HTMLSpanElement | nul
 
 export function removeSelectionBoundaryMarkers(root: HTMLElement): void {
   root
-    .querySelectorAll(
-      `span[${RANGE_START_MARKER_ATTR}="1"], span[${CARET_MARKER_ATTR}="1"]`,
-    )
+    .querySelectorAll(`span[${RANGE_START_MARKER_ATTR}="1"], span[${CARET_MARKER_ATTR}="1"]`)
     .forEach((m) => m.remove());
 }
 
 /** 选区末尾在容器内的可见文本偏移 */
-export function getCaretTextOffsetAtRangeEnd(
-  container: HTMLElement,
-  range: Range,
-): number {
+export function getCaretTextOffsetAtRangeEnd(container: HTMLElement, range: Range): number {
   const atEnd = range.cloneRange();
   atEnd.collapse(false);
   return getCaretTextOffset(container, atEnd);
@@ -272,18 +267,14 @@ function listInSelectionSpan(list: Element, start: Node, end: Node): boolean {
   const { anchor, far } = normalizeSelectionSpan(start, end);
   const afterAnchor =
     (list.compareDocumentPosition(anchor) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-  const beforeFar =
-    (list.compareDocumentPosition(far) & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
+  const beforeFar = (list.compareDocumentPosition(far) & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
   return afterAnchor && beforeFar;
 }
 
 function lastListInDocumentOrder(lists: ListElement[]): ListElement | null {
   let best: ListElement | null = null;
   for (const list of lists) {
-    if (
-      !best ||
-      (best.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
-    ) {
+    if (!best || (best.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0) {
       best = list;
     }
   }
@@ -291,9 +282,7 @@ function lastListInDocumentOrder(lists: ListElement[]): ListElement | null {
 }
 
 function placeCaretAtEndOfList(list: ListElement): boolean {
-  const items = Array.from(list.children).filter(
-    (c): c is HTMLLIElement => c.tagName === 'LI',
-  );
+  const items = Array.from(list.children).filter((c): c is HTMLLIElement => c.tagName === 'LI');
   const lastLi = items[items.length - 1];
   if (!lastLi) return false;
   placeCaretAtEndOfElement(lastLi);
@@ -353,9 +342,7 @@ export function exitListFromEmptyItem(li: HTMLLIElement): void {
   const list = findListRoot(li);
   if (!list) return;
 
-  const items = Array.from(list.children).filter(
-    (c): c is HTMLLIElement => c.tagName === 'LI',
-  );
+  const items = Array.from(list.children).filter((c): c is HTMLLIElement => c.tagName === 'LI');
   const index = items.indexOf(li);
   if (index === -1) return;
 
@@ -571,10 +558,7 @@ function sortByDocumentOrder<T extends Node>(nodes: T[]): T[] {
 }
 
 /** 选区触及的列表项（块级，按文档顺序） */
-export function getListItemsInRange(
-  range: Range,
-  root: HTMLElement,
-): HTMLLIElement[] {
+export function getListItemsInRange(range: Range, root: HTMLElement): HTMLLIElement[] {
   const items: HTMLLIElement[] = [];
   for (const node of root.querySelectorAll('li')) {
     if (!(node instanceof HTMLLIElement)) continue;
@@ -614,9 +598,7 @@ function appendUnwrappedItems(frag: DocumentFragment, items: HTMLLIElement[]): v
   }
 }
 
-type ListSegmentMiddle =
-  | 'unwrap'
-  | { tag: 'ul' | 'ol' };
+type ListSegmentMiddle = 'unwrap' | { tag: 'ul' | 'ol' };
 
 /** 将列表拆成前/中/后三段：中段改类型或取消列表 */
 function replaceListWithSegments(
@@ -695,8 +677,7 @@ export function applyListCommandForSelection(
     );
     const selectedSet = new Set(selected);
     const allSelected =
-      selected.length === allItems.length &&
-      allItems.every((li) => selectedSet.has(li));
+      selected.length === allItems.length && allItems.every((li) => selectedSet.has(li));
 
     if (allSelected) {
       applyListTypeToWholeList(list, wantUl);
@@ -761,7 +742,10 @@ export function convertListTag(
   return next;
 }
 
-export function detectListFormats(node: Node | null, root: HTMLElement): {
+export function detectListFormats(
+  node: Node | null,
+  root: HTMLElement,
+): {
   unorderedList: boolean;
   orderedList: boolean;
 } {

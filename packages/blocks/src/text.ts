@@ -32,8 +32,7 @@ export const textBlock = defineBlock<TextProps>({
   category: 'content',
   icon: icons.text,
   defaultProps: {
-    content:
-      '<p>双击进入编辑...</p>',
+    content: '<p>双击进入编辑...</p>',
     align: 'left',
     color: '',
     fontSize: '',

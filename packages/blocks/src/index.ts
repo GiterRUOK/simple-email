@@ -1,21 +1,21 @@
 import {
-  createI18nContext,
   type BlockDefinition,
   type SimpleMailI18nOptions,
   type SimpleMailT,
+  createI18nContext,
 } from '@simple-mail/core';
 import { buttonBlock } from './button';
 import { dividerBlock } from './divider';
 import { footerBlock } from './footer';
 import { heroBlock } from './hero';
 import { htmlBlock } from './html';
+import { localizeBlockDefinitions } from './i18n';
 import { imageBlock } from './image';
 import { logoBlock } from './logo';
 import { socialBlock } from './social';
 import { socialGroupBlock } from './socialGroup';
 import { spacerBlock } from './spacer';
 import { textBlock } from './text';
-import { localizeBlockDefinitions } from './i18n';
 
 export {
   buttonBlock,
@@ -79,7 +79,9 @@ export function createBuiltinBlocks(options: CreateBlocksOptions = {}): BlockDef
 }
 
 /** 业务示例的“自定义”组件。可作为参考或直接使用；正式业务块应由宿主应用注册。 */
-export function createExampleCustomBlocks(options: CreateBlocksOptions = {}): BlockDefinition<any>[] {
+export function createExampleCustomBlocks(
+  options: CreateBlocksOptions = {},
+): BlockDefinition<any>[] {
   return localizeBlockDefinitions(baseExampleCustomBlocks, resolveBlocksT(options));
 }
 

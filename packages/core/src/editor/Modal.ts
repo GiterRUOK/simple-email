@@ -1,5 +1,5 @@
-import { h } from '../utils/dom';
 import type { SimpleMailT } from '../i18n';
+import { h } from '../utils/dom';
 
 /**
  * 极简 Modal：遮罩 + 居中卡片 + header/body/footer 三段。

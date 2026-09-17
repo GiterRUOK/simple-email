@@ -1,11 +1,11 @@
 import type { EmailDoc } from '../types';
-import { serializeParsedHtmlDocument } from './html';
 import {
   DYNAMIC_VARIANT_HTML_ATTR,
   getSectionDynamicVariantKey,
   isDynamicVariantSection,
   sectionMjClassName,
 } from './dynamicVariantKey';
+import { serializeParsedHtmlDocument } from './html';
 
 /**
  * 编译后为带 `dynamicVariantKey` 的 Section 根节点写入 `data-dv="{key}"`，供宿主 DOM 抽取。

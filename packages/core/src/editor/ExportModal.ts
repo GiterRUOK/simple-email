@@ -1,14 +1,14 @@
+import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
-import { html as cmHtml } from '@codemirror/lang-html';
+import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
 import { renderDoc } from '../renderer';
 import type { Store } from '../store/store';
-import { prettyHtml } from '../utils/html';
 import { h } from '../utils/dom';
+import { prettyHtml } from '../utils/html';
 import { richTextExecCommand } from '../utils/richTextCommand';
 import { Modal } from './Modal';
-import type { SimpleMailT } from '../i18n';
 
 export interface ExportModalOptions {
   store: Store;
@@ -27,7 +27,7 @@ export class ExportModal {
   private opts: ExportModalOptions;
   private modal: Modal;
   private cm: EditorView | null = null;
-  private current: string = '';
+  private current = '';
 
   constructor(opts: ExportModalOptions) {
     this.opts = opts;
@@ -43,11 +43,9 @@ export class ExportModal {
     const editorHost = h('div', { class: 'sm-export__editor' });
     this.modal.body.append(editorHost);
 
-    const copyBtn = h(
-      'button',
-      { class: 'sm-btn', type: 'button', onclick: () => this._copy() },
-      [this.opts.t('export.copyHtml')],
-    );
+    const copyBtn = h('button', { class: 'sm-btn', type: 'button', onclick: () => this._copy() }, [
+      this.opts.t('export.copyHtml'),
+    ]);
     const beautifyBtn = h(
       'button',
       { class: 'sm-btn', type: 'button', onclick: () => this._beautify() },

@@ -1,12 +1,12 @@
+import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
-import { html as cmHtml } from '@codemirror/lang-html';
+import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
 import { renderDoc } from '../renderer';
 import type { Store } from '../store/store';
 import { clear, h } from '../utils/dom';
 import { richTextExecCommand } from '../utils/richTextCommand';
-import type { SimpleMailT } from '../i18n';
 
 export interface SourceViewOptions {
   store: Store;
@@ -49,7 +49,9 @@ export class SourceView {
   }
 
   private _isVisible(): boolean {
-    return this.el.isConnected && (this.el.offsetParent !== null || this.el.getClientRects().length > 0);
+    return (
+      this.el.isConnected && (this.el.offsetParent !== null || this.el.getClientRects().length > 0)
+    );
   }
 
   private _render() {

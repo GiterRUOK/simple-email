@@ -106,7 +106,7 @@ export function getListIndent(list: HTMLUListElement | HTMLOListElement): ListIn
   if (list.hasAttribute(LIST_INDENT_ATTR)) {
     const raw = list.getAttribute(LIST_INDENT_ATTR);
     if (raw == null || raw === 'default') return null;
-    const n = parseInt(raw, 10);
+    const n = Number.parseInt(raw, 10);
     return Number.isFinite(n) ? clampListIndent(n) : null;
   }
   const fromStyle =

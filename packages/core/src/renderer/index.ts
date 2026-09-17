@@ -1,12 +1,9 @@
 import mjmlCompile from 'mjml-browser';
-import type { EmailDoc, RenderEngine, Variable } from '../types';
 import type { Registry } from '../registry/registry';
-import { annotateDynamicVariantHtmlAttributes } from '../utils/dynamicVariantHtml';
-import {
-  normalizeEmailListsInHtml,
-  resolveGlobalListIndentPx,
-} from '../utils/emailListStyles';
+import type { EmailDoc, RenderEngine, Variable } from '../types';
 import { inlineColumnWidthsInHtml } from '../utils/columnWidths';
+import { annotateDynamicVariantHtmlAttributes } from '../utils/dynamicVariantHtml';
+import { normalizeEmailListsInHtml, resolveGlobalListIndentPx } from '../utils/emailListStyles';
 import { docToMjml } from './mjml';
 
 export interface RenderResult {

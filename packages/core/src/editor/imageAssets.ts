@@ -89,7 +89,7 @@ export interface ImageGalleryAdapter {
   /** 搜索 + 分页；`query` 为搜索框当前文本，`page` 从 0 起 */
   listItems: (args: { query: string; page: number }) => Promise<ImageGalleryListResult>;
   /** 在弹层内「上传到图库」：成功后编辑器会重新拉取第 0 页 */
-  uploadFile?: (file: File) => Promise<void | string>;
+  uploadFile?: (file: File) => Promise<unknown>;
   /** 在弹层内「通过链接添加」：校验/落库后编辑器会重新拉取第 0 页 */
   addByUrl?: (url: string) => Promise<void>;
   /** 从图库删除一条；提供后每张缩略图右上角显示删除按钮 */

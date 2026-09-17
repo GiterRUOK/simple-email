@@ -1,15 +1,15 @@
-import { defineBlock, FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '@simple-mail/core';
+import { FONT_WEIGHT_STEP_OPTIONS, defineBlock, normalizeFontWeightStep } from '@simple-mail/core';
 import { icons } from './icons';
 import {
+  SOCIAL_NETWORK_OPTIONS,
+  type SocialLinkItem,
   escAttr,
   flexJustifyFromAlign,
   mjSocialElementsLines,
   paddingQuad,
-  socialIconBorderRadiusMjml,
   renderSocialIconPreviewHtml,
+  socialIconBorderRadiusMjml,
   socialIconSpacingPx,
-  SOCIAL_NETWORK_OPTIONS,
-  type SocialLinkItem,
 } from './socialShared';
 
 interface SocialGroupProps {

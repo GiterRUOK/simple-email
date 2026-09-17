@@ -1,16 +1,16 @@
-import { EditorView, basicSetup } from 'codemirror';
 import { html as cmHtml } from '@codemirror/lang-html';
 import { EditorState } from '@codemirror/state';
+import { EditorView, basicSetup } from 'codemirror';
+import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
-import { htmlContainsMjmlTags } from '../utils/lockedMjml';
-import { invalidHrefMessage } from '../utils/link';
+import { defaultSocialIconBackground } from '../socialDefaults';
 import {
+  type DocChangedDetail,
+  type Store,
   findBlockLocation,
   findSection,
   isMultiColumnLayout,
   setSectionLayout,
-  type Store,
-  type DocChangedDetail,
 } from '../store/store';
 import type {
   Block,
@@ -21,27 +21,36 @@ import type {
   SectionLayout,
   Variable,
 } from '../types';
-import { getSectionDynamicVariantKey } from '../utils/dynamicVariantSection';
-import { defaultSocialIconBackground } from '../socialDefaults';
-import { bindColorPickerInput } from './ColorPickerPopover';
 import { normalizeAccentHex } from '../utils/accentColor';
+import {
+  metaWidthInputString,
+  parseMetaWidthFromUserInput,
+  parseSectionWidthFromUserInput,
+  sectionWidthInputString,
+} from '../utils/contentWidth';
 import { clear, h } from '../utils/dom';
-import { metaWidthInputString, parseMetaWidthFromUserInput, parseSectionWidthFromUserInput, sectionWidthInputString } from '../utils/contentWidth';
+import { getSectionDynamicVariantKey } from '../utils/dynamicVariantSection';
 import {
   LIST_INDENT_PRESETS_PX,
   normalizeGlobalListIndentStorage,
   resolveGlobalListIndentPx,
 } from '../utils/emailListStyles';
 import { FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '../utils/fontWeightSteps';
-import { resolveAssetPermission, type ImageAssetsHandlers, type ImageFieldContext } from './imageAssets';
+import { invalidHrefMessage } from '../utils/link';
+import { htmlContainsMjmlTags } from '../utils/lockedMjml';
+import { bindColorPickerInput } from './ColorPickerPopover';
 import { FocusBreadcrumb } from './FocusBreadcrumb';
 import { openImageGalleryModal } from './ImageGalleryModal';
 import {
+  type VariablePickerHandlers,
   buildVariablePickerBody,
   buildVariablePickerHead,
-  type VariablePickerHandlers,
 } from './VariablePickerPanel';
-import type { SimpleMailT } from '../i18n';
+import {
+  type ImageAssetsHandlers,
+  type ImageFieldContext,
+  resolveAssetPermission,
+} from './imageAssets';
 
 /** 与社交组 block 中每行元素结构一致（core 不依赖 blocks） */
 type SocialLinkRow = {
@@ -66,7 +75,7 @@ function layoutWidthNumeric(raw: string, mode: 'px' | '%'): number {
   const t = (raw ?? '').trim();
   if (!t) return mode === '%' ? 100 : 280;
   const m = t.match(/^(\d+(\.\d+)?)/);
-  const n = m ? parseFloat(m[1]) : mode === '%' ? 100 : 280;
+  const n = m ? Number.parseFloat(m[1]) : mode === '%' ? 100 : 280;
   if (mode === '%') return Math.min(100, Math.max(1, Math.round(n)));
   return Math.min(1200, Math.max(1, Math.round(n)));
 }
@@ -231,10 +240,7 @@ export class RightPanel {
     let selEnd = 0;
     if (ae && this.el.contains(ae)) {
       token = ae.getAttribute('data-sm-focus');
-      if (
-        token &&
-        (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement)
-      ) {
+      if (token && (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement)) {
         selStart = ae.selectionStart ?? 0;
         selEnd = ae.selectionEnd ?? 0;
       }
@@ -311,7 +317,7 @@ export class RightPanel {
                   onclick: () => {
                     this.opts.store.update((d) => {
                       const l = findBlockLocation(d, loc.block.id);
-                      if (l) delete l.block.lockedMjml;
+                      if (l) l.block.lockedMjml = undefined;
                     });
                   },
                 },
@@ -357,23 +363,31 @@ export class RightPanel {
     if (!hideMeta) {
       rows.push(
         h('div', { class: 'sm-panel__title' }, [this.opts.t('rightPanel.doc.title')]),
-        this._textField(this.opts.t('rightPanel.doc.subject'), doc.meta.subject, (v) =>
-          this.opts.store.update((d) => {
-            d.meta.subject = v;
-          }),
+        this._textField(
+          this.opts.t('rightPanel.doc.subject'),
+          doc.meta.subject,
+          (v) =>
+            this.opts.store.update((d) => {
+              d.meta.subject = v;
+            }),
           '',
           'doc:meta.subject',
         ),
-        this._textField(this.opts.t('rightPanel.doc.preheader'), doc.meta.preheader ?? '', (v) =>
-          this.opts.store.update((d) => {
-            d.meta.preheader = v;
-          }),
+        this._textField(
+          this.opts.t('rightPanel.doc.preheader'),
+          doc.meta.preheader ?? '',
+          (v) =>
+            this.opts.store.update((d) => {
+              d.meta.preheader = v;
+            }),
           '',
           'doc:meta.preheader',
         ),
       );
     } else {
-      rows.push(h('div', { class: 'sm-panel__title' }, [this.opts.t('rightPanel.doc.layoutTitle')]));
+      rows.push(
+        h('div', { class: 'sm-panel__title' }, [this.opts.t('rightPanel.doc.layoutTitle')]),
+      );
     }
     rows.push(
       this._textField(
@@ -509,7 +523,7 @@ export class RightPanel {
           this.opts.store.update((d) => {
             const s = findSection(d, section.id);
             if (s) s.attrs.backgroundColor = v || undefined;
-        }),
+          }),
         `section:${section.id}:attrs.bg`,
         this.opts.t('rightPanel.section.transparentPlaceholder'),
       ),
@@ -520,7 +534,7 @@ export class RightPanel {
           this.opts.store.update((d) => {
             const s = findSection(d, section.id);
             if (s) s.attrs.width = parseSectionWidthFromUserInput(v);
-        }),
+          }),
         `section:${section.id}:attrs.width`,
         this.opts.t('rightPanel.section.widthHelp'),
       ),
@@ -612,8 +626,7 @@ export class RightPanel {
     const def = this.opts.registry.get(block.type);
     const defaults = def?.defaultProps as Record<string, unknown> | undefined;
     const raw = (block.props as Record<string, unknown>)[field.key];
-    const value: unknown =
-      raw !== undefined && raw !== null ? raw : defaults?.[field.key];
+    const value: unknown = raw !== undefined && raw !== null ? raw : defaults?.[field.key];
     const onChange = (v: any) => this._updateBlock(blockId, field.key, v);
 
     switch (field.type) {
@@ -625,10 +638,7 @@ export class RightPanel {
             onChange,
             field.help,
             fp,
-            (v) =>
-              htmlContainsMjmlTags(v)
-                ? this.opts.t('rightPanel.block.mjmlWarning')
-                : null,
+            (v) => (htmlContainsMjmlTags(v) ? this.opts.t('rightPanel.block.mjmlWarning') : null),
           );
         }
         return this._textareaField(field.label, String(value ?? ''), onChange, field.help, fp);
@@ -644,8 +654,7 @@ export class RightPanel {
         );
       case 'color': {
         const rawColor = (block.props as Record<string, unknown>)[field.key];
-        const stored =
-          rawColor !== undefined && rawColor !== null ? String(rawColor).trim() : '';
+        const stored = rawColor !== undefined && rawColor !== null ? String(rawColor).trim() : '';
         return this._colorField(
           field.label,
           stored,
@@ -656,14 +665,9 @@ export class RightPanel {
       }
       case 'select': {
         const isFw = field.key === 'fontWeight' || field.key === 'labelFontWeight';
-        const opts = field.options?.length
-          ? field.options
-          : isFw
-            ? FONT_WEIGHT_STEP_OPTIONS
-            : [];
+        const opts = field.options?.length ? field.options : isFw ? FONT_WEIGHT_STEP_OPTIONS : [];
         if (isFw && field.inheritGlobal) {
-          const stored =
-            raw !== undefined && raw !== null ? String(raw).trim() : '';
+          const stored = raw !== undefined && raw !== null ? String(raw).trim() : '';
           return this._fontWeightInheritField(
             field.label,
             stored,
@@ -707,8 +711,7 @@ export class RightPanel {
           );
         }
         if (field.key === 'fontSize' && field.inheritGlobal) {
-          const rawFs =
-            raw !== undefined && raw !== null ? String(raw).trim() : '';
+          const rawFs = raw !== undefined && raw !== null ? String(raw).trim() : '';
           return this._fontSizeSliderField(
             field.label,
             rawFs,
@@ -747,14 +750,20 @@ export class RightPanel {
           Number(dp?.paddingBottom ?? 0),
           Number(dp?.paddingLeft ?? 0),
         ];
-        return this._spacingField(field.label, quad, (vals) => {
-          this.opts.store.update((d) => {
-            const loc = findBlockLocation(d, blockId);
-            if (!loc) return;
-            const pr = loc.block.props as Record<string, number>;
-            [pr.paddingTop, pr.paddingRight, pr.paddingBottom, pr.paddingLeft] = vals;
-          });
-        }, `${fp}:pad`, resetQuad);
+        return this._spacingField(
+          field.label,
+          quad,
+          (vals) => {
+            this.opts.store.update((d) => {
+              const loc = findBlockLocation(d, blockId);
+              if (!loc) return;
+              const pr = loc.block.props as Record<string, number>;
+              [pr.paddingTop, pr.paddingRight, pr.paddingBottom, pr.paddingLeft] = vals;
+            });
+          },
+          `${fp}:pad`,
+          resetQuad,
+        );
       }
       case 'socialLinkList': {
         const rows = Array.isArray(value)
@@ -811,9 +820,7 @@ export class RightPanel {
     };
 
     const syncItem = (index: number, patch: Partial<SocialLinkRow>) => {
-      patchElements((rows) =>
-        rows.map((x, i) => (i === index ? { ...x, ...patch } : x)),
-      );
+      patchElements((rows) => rows.map((x, i) => (i === index ? { ...x, ...patch } : x)));
     };
 
     const removeAt = (index: number) => {
@@ -827,8 +834,7 @@ export class RightPanel {
       const sel = h('select', {
         class: 'sm-select sm-social-link-list__network',
         ...(focusPrefix ? { 'data-sm-focus': `${focusPrefix}:row:${i}:net` } : {}),
-        onchange: (e: Event) =>
-          syncItem(i, { network: (e.target as HTMLSelectElement).value }),
+        onchange: (e: Event) => syncItem(i, { network: (e.target as HTMLSelectElement).value }),
       });
       for (const o of networkOptions) {
         const opt = document.createElement('option');
@@ -865,9 +871,9 @@ export class RightPanel {
       syncHrefWarn(rowData.href);
       const rm = h(
         'button',
-          {
-            class: 'sm-social-link-list__remove',
-            type: 'button',
+        {
+          class: 'sm-social-link-list__remove',
+          type: 'button',
           title: this.opts.t('common.delete'),
           onclick: () => removeAt(i),
         },
@@ -879,8 +885,7 @@ export class RightPanel {
       const extras = h('div', { class: 'sm-social-link-list__row-extras' });
       const bgResolved = defaultSocialIconBackground(rowData.network);
       const bgStored = rowData.backgroundColor?.trim();
-      const bgDisplay =
-        bgStored && bgStored.startsWith('#') ? bgStored : bgResolved;
+      const bgDisplay = bgStored?.startsWith('#') ? bgStored : bgResolved;
       extras.append(
         h('input', {
           class: 'sm-input sm-social-link-list__label',
@@ -988,8 +993,7 @@ export class RightPanel {
     const assets = this.opts.imageAssets;
     const showUploadBtn = !!assets?.uploadImage && assets.showUpload !== false;
     const showGalleryBtn =
-      assets?.showGallery === true &&
-      (!!assets.imageGallery || !!assets.pickImageFromGallery);
+      assets?.showGallery === true && (!!assets.imageGallery || !!assets.pickImageFromGallery);
     const hasAssetCallbacks = !!(
       assets?.uploadImage ||
       assets?.pickImageFromGallery ||
@@ -1020,7 +1024,7 @@ export class RightPanel {
       urlInp.value = t;
     };
 
-    const runAsync = (p: Promise<string | null | void>, labelErr: string) => {
+    const runAsync = (p: Promise<unknown>, labelErr: string) => {
       p.catch((e) => {
         console.error(`[simple-mail] ${labelErr}`, e);
       });
@@ -1060,9 +1064,7 @@ export class RightPanel {
                 ? this.opts.t('rightPanel.image.uploadTitle')
                 : uploadPerm.tip,
               disabled: !uploadPerm.allowed,
-              ...(uploadPerm.allowed
-                ? { onclick: () => fileInp.click() }
-                : {}),
+              ...(uploadPerm.allowed ? { onclick: () => fileInp.click() } : {}),
             },
             [this.opts.t('rightPanel.image.upload')],
           ),
@@ -1155,16 +1157,12 @@ export class RightPanel {
         warnEl.style.display = '';
       }
     }
-    return h(
-      'div',
-      { class: 'sm-field' },
-      [
-        h('label', { class: 'sm-field__label' }, [label]),
-        ta,
-        warnEl,
-        help ? h('div', { class: 'sm-field__help' }, [help]) : null,
-      ],
-    );
+    return h('div', { class: 'sm-field' }, [
+      h('label', { class: 'sm-field__label' }, [label]),
+      ta,
+      warnEl,
+      help ? h('div', { class: 'sm-field__help' }, [help]) : null,
+    ]);
   }
   private _numberField(
     label: string,
@@ -1178,10 +1176,11 @@ export class RightPanel {
   ): HTMLElement {
     const field = this._buildNumberField(label, value, min, max, onChange, step, focusToken);
     if (!help) return field;
-    return h('div', { class: 'sm-field', style: 'flex-direction:column;align-items:flex-start;gap:6px;' }, [
-      field,
-      h('div', { class: 'sm-field__help' }, [help]),
-    ]);
+    return h(
+      'div',
+      { class: 'sm-field', style: 'flex-direction:column;align-items:flex-start;gap:6px;' },
+      [field, h('div', { class: 'sm-field__help' }, [help])],
+    );
   }
 
   private _buildNumberField(
@@ -1464,7 +1463,7 @@ export class RightPanel {
       (v) =>
         this.opts.store.update((d) => {
           const stored = normalizeGlobalListIndentStorage(Number(v));
-          if (stored === undefined) delete d.styles.listIndentDefaultPx;
+          if (stored === undefined) d.styles.listIndentDefaultPx = undefined;
           else d.styles.listIndentDefaultPx = stored;
         }),
       'doc:styles.listIndentDefaultPx',
@@ -1517,23 +1516,28 @@ export class RightPanel {
     help?: string,
     focusToken?: string,
   ): HTMLElement {
-    const row = h('label', {
-      class: 'sm-field',
-      style: 'flex-direction:row;align-items:center;gap:8px;',
-    }, [
-      h('input', {
-        type: 'checkbox',
-        ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
-        onchange: (e: Event) => onChange((e.target as HTMLInputElement).checked),
-        ...(value ? { checked: true } : {}),
-      } as any),
-      h('span', { class: 'sm-field__label' }, [label]),
-    ]);
+    const row = h(
+      'label',
+      {
+        class: 'sm-field',
+        style: 'flex-direction:row;align-items:center;gap:8px;',
+      },
+      [
+        h('input', {
+          type: 'checkbox',
+          ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
+          onchange: (e: Event) => onChange((e.target as HTMLInputElement).checked),
+          ...(value ? { checked: true } : {}),
+        } as any),
+        h('span', { class: 'sm-field__label' }, [label]),
+      ],
+    );
     if (!help) return row;
-    return h('div', { class: 'sm-field', style: 'flex-direction:column;align-items:flex-start;gap:6px;' }, [
-      row,
-      h('div', { class: 'sm-field__help' }, [help]),
-    ]);
+    return h(
+      'div',
+      { class: 'sm-field', style: 'flex-direction:column;align-items:flex-start;gap:6px;' },
+      [row, h('div', { class: 'sm-field__help' }, [help])],
+    );
   }
   private _spacingField(
     label: string,
@@ -1662,7 +1666,9 @@ export class RightPanel {
 
     return h('div', { class: 'sm-field' }, [
       h('div', { class: 'sm-spacing-field__label-row' }, [
-        h('label', { class: 'sm-field__label' }, [`${label}${this.opts.t('rightPanel.spacing.suffix')}`]),
+        h('label', { class: 'sm-field__label' }, [
+          `${label}${this.opts.t('rightPanel.spacing.suffix')}`,
+        ]),
         resetQuad
           ? h(
               'button',
@@ -1707,10 +1713,14 @@ export class RightPanel {
       ...(focusToken ? { 'data-sm-focus': focusToken } : {}),
       ...(inheritOn ? { checked: true } : {}),
     }) as HTMLInputElement;
-    const valueEl = h('span', {
-      class: 'sm-inherit-switch__value',
-      hidden: !inheritOn,
-    }, [globalDisplay]);
+    const valueEl = h(
+      'span',
+      {
+        class: 'sm-inherit-switch__value',
+        hidden: !inheritOn,
+      },
+      [globalDisplay],
+    );
     const el = h('div', { class: 'sm-inherit-switch' }, [
       h('label', { class: 'sm-inherit-switch__label' }, [
         input,
@@ -1737,6 +1747,7 @@ export class RightPanel {
     help?: string,
   ): HTMLElement {
     let inheriting = !stored;
+    let storedValue = stored;
     const group = h('div', {
       class: 'sm-segmented sm-segmented--fill',
       role: 'group',
@@ -1745,7 +1756,7 @@ export class RightPanel {
 
     const syncGroup = () => {
       group.classList.toggle('sm-segmented--disabled', inheriting);
-      const display = inheriting ? '' : normalizeFontWeightStep(stored || globalWeight);
+      const display = inheriting ? '' : normalizeFontWeightStep(storedValue || globalWeight);
       clear(group);
       for (const o of options) {
         const active = !inheriting && o.value === display;
@@ -1760,7 +1771,7 @@ export class RightPanel {
               ...(focusToken ? { 'data-sm-focus': `${focusToken}:${o.value}` } : {}),
               onclick: () => {
                 inheriting = false;
-                stored = o.value;
+                storedValue = o.value;
                 inheritSwitch.setInherit(false);
                 syncGroup();
                 onChange(o.value);
@@ -1778,14 +1789,14 @@ export class RightPanel {
       (on) => {
         if (on) {
           inheriting = true;
-          stored = '';
+          storedValue = '';
           inheritSwitch.setInherit(true, globalWeight);
           syncGroup();
           onChange('');
           return;
         }
         inheriting = false;
-        stored = globalWeight;
+        storedValue = globalWeight;
         inheritSwitch.setInherit(false);
         syncGroup();
         onChange(globalWeight);
@@ -1814,6 +1825,7 @@ export class RightPanel {
   ): HTMLElement {
     const globalPx = this._snapFontSizeToPx(globalFontSize);
     let inheriting = !stored.trim();
+    let storedValue = stored;
     const input = h('input', {
       class: 'sm-input',
       type: 'text',
@@ -1822,7 +1834,7 @@ export class RightPanel {
 
     const syncInput = () => {
       input.disabled = inheriting;
-      input.value = inheriting ? '' : stored;
+      input.value = inheriting ? '' : storedValue;
       input.placeholder = inheriting ? '' : this.opts.t('rightPanel.fontSize.placeholder');
       input.classList.toggle('sm-input--inherit-disabled', inheriting);
     };
@@ -1833,17 +1845,17 @@ export class RightPanel {
       (on) => {
         if (on) {
           inheriting = true;
-          stored = '';
+          storedValue = '';
           inheritSwitch.setInherit(true, `${globalPx}px`);
           syncInput();
           onChange('');
           return;
         }
         inheriting = false;
-        stored = `${globalPx}px`;
+        storedValue = `${globalPx}px`;
         inheritSwitch.setInherit(false);
         syncInput();
-        onChange(stored);
+        onChange(storedValue);
       },
       `${focusToken}:inherit`,
     );
@@ -1852,17 +1864,17 @@ export class RightPanel {
 
     input.addEventListener('input', () => {
       if (inheriting) return;
-      stored = input.value;
-      onChange(stored);
+      storedValue = input.value;
+      onChange(storedValue);
     });
 
     input.addEventListener('blur', () => {
       if (inheriting) return;
       const t = input.value.trim();
       if (!t) {
-        stored = `${globalPx}px`;
-        input.value = stored;
-        onChange(stored);
+        storedValue = `${globalPx}px`;
+        input.value = storedValue;
+        onChange(storedValue);
       }
     });
 
@@ -1878,7 +1890,7 @@ export class RightPanel {
   private _snapFontSizeToPx(value: string): number {
     const t = (value ?? '').trim();
     const m = t.match(/^(\d+(\.\d+)?)/);
-    if (m) return Math.min(48, Math.max(10, Math.round(parseFloat(m[1]))));
+    if (m) return Math.min(48, Math.max(10, Math.round(Number.parseFloat(m[1]))));
     return 16;
   }
 
@@ -2043,9 +2055,7 @@ export class RightPanel {
       const wrap = h('div', { class: 'sm-field' });
       wrap.append(h('label', { class: 'sm-field__label' }, [label]));
       wrap.append(
-        h('div', { class: 'sm-field__help' }, [
-          this.opts.t('rightPanel.width.customHelp'),
-        ]),
+        h('div', { class: 'sm-field__help' }, [this.opts.t('rightPanel.width.customHelp')]),
       );
       wrap.append(
         h('input', {
@@ -2165,7 +2175,13 @@ export class RightPanel {
 
   private _docFontWeightField(value: string, onChange: (v: string) => void, focusToken: string) {
     const cur = normalizeFontWeightStep(value);
-    return this._segmentedSelectField(this.opts.t('rightPanel.doc.fontWeight'), cur, FONT_WEIGHT_STEP_OPTIONS, onChange, focusToken);
+    return this._segmentedSelectField(
+      this.opts.t('rightPanel.doc.fontWeight'),
+      cur,
+      FONT_WEIGHT_STEP_OPTIONS,
+      onChange,
+      focusToken,
+    );
   }
 
   private _multiColumnLayoutField(
@@ -2219,7 +2235,7 @@ export class RightPanel {
           onclick: () => {
             this.opts.store.update((d) => {
               const l = findBlockLocation(d, block.id);
-              if (l) delete l.block.lockedMjml;
+              if (l) l.block.lockedMjml = undefined;
             });
           },
         },

@@ -142,9 +142,7 @@ export function pruneSectionIfEmpty(draft: EmailDoc, sectionId: string) {
 
 /** @deprecated 请改用 {@link pruneSectionIfEmpty}，避免误删多个空 Section */
 export function pruneEmptySections(draft: EmailDoc) {
-  draft.sections = draft.sections.filter((sec) =>
-    sec.columns.some((col) => col.blocks.length > 0),
-  );
+  draft.sections = draft.sections.filter((sec) => sec.columns.some((col) => col.blocks.length > 0));
 }
 
 /** 多列 Section 的列布局（左栏拖入默认 `1-1`，右栏可切换列数/比例） */
@@ -156,9 +154,7 @@ export const TWO_COLUMN_LAYOUTS = ['1-1', '1-2', '2-1'] as const;
 export type TwoColumnLayout = (typeof TWO_COLUMN_LAYOUTS)[number];
 
 export function isMultiColumnLayout(layout: SectionLayout): layout is MultiColumnLayout {
-  return (
-    layout === '1-1' || layout === '1-2' || layout === '2-1' || layout === '1-1-1'
-  );
+  return layout === '1-1' || layout === '1-2' || layout === '2-1' || layout === '1-1-1';
 }
 
 /** @deprecated 使用 isMultiColumnLayout */

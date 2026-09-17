@@ -14,7 +14,9 @@ export function variablePlaceholder(key: string): string {
 }
 
 /** 无显式 sample 时保留 Mustache 占位符；仅当宿主传入 sample 才用于可选的示例替换。 */
-export function defaultVariableSample(v: Pick<Variable, 'key' | 'label' | 'kind' | 'sample'>): string {
+export function defaultVariableSample(
+  v: Pick<Variable, 'key' | 'label' | 'kind' | 'sample'>,
+): string {
   if (v.sample != null && String(v.sample).trim() !== '') return String(v.sample);
   const key = v.key?.trim() || tokenToVariableKey(String(v.key));
   return variablePlaceholder(key);
@@ -34,10 +36,7 @@ export function normalizeVariable(v: Variable): Variable {
 
 export function buildLinkVariableHtml(token: string, linkColor: string): string {
   const safeHref = token.replace(/"/g, '&quot;');
-  const safeText = token
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  const safeText = token.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   return `<a href="${safeHref}" style="color:${linkColor} !important;text-decoration:underline;">${safeText}</a>`;
 }
 

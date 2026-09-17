@@ -24,8 +24,7 @@ export const heroBlock = defineBlock<HeroProps>({
   category: 'content',
   icon: icons.hero,
   defaultProps: {
-    backgroundUrl:
-      'https://placehold.co/600x320/312e81/c4b5fd/png?text=Hero+Background',
+    backgroundUrl: 'https://placehold.co/600x320/312e81/c4b5fd/png?text=Hero+Background',
     backgroundColor: '#1e1b4b',
     height: 320,
     content:
@@ -104,7 +103,11 @@ export const heroBlock = defineBlock<HeroProps>({
   renderPreview: (p, ctx) => {
     const w = docContentWidthCss(ctx.doc.meta.width);
     const flexAlign =
-      p.verticalAlign === 'top' ? 'flex-start' : p.verticalAlign === 'bottom' ? 'flex-end' : 'center';
+      p.verticalAlign === 'top'
+        ? 'flex-start'
+        : p.verticalAlign === 'bottom'
+          ? 'flex-end'
+          : 'center';
     const padding = `${p.paddingTop}px ${p.paddingRight}px ${p.paddingBottom}px ${p.paddingLeft}px`;
     const url = escapeAttr(p.backgroundUrl);
     return `<div

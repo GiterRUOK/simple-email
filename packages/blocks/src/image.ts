@@ -69,7 +69,8 @@ export const imageBlock = defineBlock<ImageProps>({
     return `<mj-image src="${escapeAttr(p.src)}"${alt}${href} width="${p.width}px"${h} align="${p.align}" padding="${padding}" />`;
   },
   renderPreview: (p) => {
-    const align = p.align === 'center' ? 'margin:0 auto;' : p.align === 'right' ? 'margin-left:auto;' : '';
+    const align =
+      p.align === 'center' ? 'margin:0 auto;' : p.align === 'right' ? 'margin-left:auto;' : '';
     const fixedH = p.height != null && p.height > 0 ? p.height : 0;
     const sizeStyle =
       fixedH > 0

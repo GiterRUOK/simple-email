@@ -1,4 +1,4 @@
-import { defineBlock, blockButtonWidthCss, resolveHref } from '@simple-mail/core';
+import { blockButtonWidthCss, defineBlock, resolveHref } from '@simple-mail/core';
 import { icons } from './icons';
 
 interface ButtonProps {

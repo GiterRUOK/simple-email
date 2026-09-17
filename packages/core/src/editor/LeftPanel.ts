@@ -1,9 +1,9 @@
 import Sortable from 'sortablejs';
+import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
 import type { BlockDefinition, SectionLayout } from '../types';
 import { clear, h } from '../utils/dom';
 import { paletteDropIsSectionLevel } from '../utils/paletteDrop';
-import type { SimpleMailT } from '../i18n';
 
 export interface LeftPanelOptions {
   registry: Registry;
@@ -173,9 +173,7 @@ export class LeftPanel {
           'div',
           {
             class:
-              sourceGroup === 'sections'
-                ? 'sm-block-card sm-block-card--section'
-                : 'sm-block-card',
+              sourceGroup === 'sections' ? 'sm-block-card sm-block-card--section' : 'sm-block-card',
             'data-source-group': sourceGroup,
             'data-block-type': def.type,
             title: this._blockCardTitle(def),

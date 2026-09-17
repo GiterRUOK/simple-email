@@ -1,15 +1,15 @@
-import { defineBlock, FONT_WEIGHT_STEP_OPTIONS, normalizeFontWeightStep } from '@simple-mail/core';
+import { FONT_WEIGHT_STEP_OPTIONS, defineBlock, normalizeFontWeightStep } from '@simple-mail/core';
 import { icons } from './icons';
 import {
   BIZ_SOCIAL_NETWORK_OPTIONS,
+  type SocialLinkItem,
   escAttr,
   flexJustifyFromAlign,
   mjSocialElementsLines,
   paddingQuad,
-  socialIconBorderRadiusMjml,
   renderSocialIconPreviewHtml,
+  socialIconBorderRadiusMjml,
   socialIconSpacingPx,
-  type SocialLinkItem,
 } from './socialShared';
 
 /** 与社交组一致，仅平台选项收窄为业务五件套 */

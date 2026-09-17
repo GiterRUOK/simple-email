@@ -172,7 +172,7 @@ export function extractPreviewHtmlFromLockedMjml(lockedMjml: string): string | n
 
   const mjRaw = raw.match(/^<mj-raw\b[^>]*>([\s\S]*)<\/mj-raw\s*>$/i);
   if (mjRaw) {
-    let body = mjRaw[1].trim();
+    const body = mjRaw[1].trim();
     if (/^\s*<table\b/i.test(body)) {
       const tdInner = innerFromPresentationTable(body);
       if (tdInner != null) return tdInner;

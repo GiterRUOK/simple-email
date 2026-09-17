@@ -78,8 +78,7 @@ export function socialMeta(network: string): { color: string; preview: string } 
 }
 
 /** MJML 内置社交图标 CDN（与 mjml-browser 4.x 一致） */
-export const MJML_SOCIAL_ICON_BASE =
-  'https://www.mailjet.com/images/theme/v1/icons/ico-social/';
+export const MJML_SOCIAL_ICON_BASE = 'https://www.mailjet.com/images/theme/v1/icons/ico-social/';
 
 /** MJML `mj-social-element` name → 图标文件名 */
 const MJML_SOCIAL_ICON_FILES: Record<string, string> = {

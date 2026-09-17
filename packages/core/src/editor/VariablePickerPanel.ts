@@ -1,7 +1,7 @@
-import type { Variable } from '../types';
-import { variablePlaceholder } from '../variables';
-import { h } from '../utils/dom';
 import type { SimpleMailT } from '../i18n';
+import type { Variable } from '../types';
+import { h } from '../utils/dom';
+import { variablePlaceholder } from '../variables';
 
 export interface VariablePickerHandlers {
   onPickKey: (v: Variable) => void;
@@ -88,9 +88,7 @@ export function buildVariablePickerBody(
 ): HTMLElement {
   const wrap = h('div', { class: 'sm-var-picker' });
   if (!vars.length) {
-    wrap.append(
-      h('div', { class: 'sm-empty-form' }, [t('variablePicker.empty')]),
-    );
+    wrap.append(h('div', { class: 'sm-empty-form' }, [t('variablePicker.empty')]));
     return wrap;
   }
   for (const v of vars) {

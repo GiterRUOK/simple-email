@@ -326,15 +326,15 @@ export class Topbar {
       );
     }
     if (this.opts.showInsertVariableButton !== false) {
-      trailingGroup.push(
-        (this.insertVariableBtn = actionBtn({
-          class: 'sm-topbar__insert-var',
-          title: t('topbar.insertVariable'),
-          icon: iconVariable(),
-          label: t('topbar.insertVariable'),
-          onclick: (e: Event) => this.opts.onInsertVariable(e.currentTarget as HTMLElement),
-        })),
-      );
+      const insertVariableBtn = actionBtn({
+        class: 'sm-topbar__insert-var',
+        title: t('topbar.insertVariable'),
+        icon: iconVariable(),
+        label: t('topbar.insertVariable'),
+        onclick: (e: Event) => this.opts.onInsertVariable(e.currentTarget as HTMLElement),
+      });
+      this.insertVariableBtn = insertVariableBtn;
+      trailingGroup.push(insertVariableBtn);
     } else {
       this.insertVariableBtn = undefined;
     }
@@ -356,15 +356,15 @@ export class Topbar {
     }
 
     if (typeof this.opts.onLayoutBordersToggle === 'function') {
-      canvasToolKids.push(
-        (this.layoutBordersBtn = iconOnlyBtn({
-          class: 'sm-btn--ghost sm-topbar__toggle-btn',
-          title: t('topbar.showLayoutBorders'),
-          icon: iconLayoutBorders(),
-          pressed: false,
-          onclick: () => this.opts.onLayoutBordersToggle!(),
-        }) as HTMLButtonElement),
-      );
+      const layoutBordersBtn = iconOnlyBtn({
+        class: 'sm-btn--ghost sm-topbar__toggle-btn',
+        title: t('topbar.showLayoutBorders'),
+        icon: iconLayoutBorders(),
+        pressed: false,
+        onclick: () => this.opts.onLayoutBordersToggle!(),
+      }) as HTMLButtonElement;
+      this.layoutBordersBtn = layoutBordersBtn;
+      canvasToolKids.push(layoutBordersBtn);
     } else {
       this.layoutBordersBtn = undefined;
     }
@@ -373,15 +373,15 @@ export class Topbar {
       this.opts.showFullscreenButton !== false &&
       typeof this.opts.onFullscreenToggle === 'function';
     if (showFs) {
-      canvasToolKids.push(
-        (this.fullscreenBtn = iconOnlyBtn({
-          class: 'sm-btn--ghost sm-topbar__toggle-btn',
-          title: t('topbar.fullscreen'),
-          icon: iconFullscreenEnter(),
-          pressed: false,
-          onclick: () => this.opts.onFullscreenToggle!(),
-        }) as HTMLButtonElement),
-      );
+      const fullscreenBtn = iconOnlyBtn({
+        class: 'sm-btn--ghost sm-topbar__toggle-btn',
+        title: t('topbar.fullscreen'),
+        icon: iconFullscreenEnter(),
+        pressed: false,
+        onclick: () => this.opts.onFullscreenToggle!(),
+      }) as HTMLButtonElement;
+      this.fullscreenBtn = fullscreenBtn;
+      canvasToolKids.push(fullscreenBtn);
     } else {
       this.fullscreenBtn = undefined;
     }

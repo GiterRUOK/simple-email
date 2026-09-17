@@ -1,9 +1,9 @@
 import type { Registry } from '../registry/registry';
 import type { Column, EmailDoc, RenderContext, Section, SectionLayout } from '../types';
-import { getSectionDynamicVariantKey, sectionMjClassName } from '../utils/dynamicVariantKey';
-import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import { COLUMN_NO_STACK_CLASS } from '../utils/columnWidths';
+import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
 import { escapeAttr } from '../utils/dom';
+import { getSectionDynamicVariantKey, sectionMjClassName } from '../utils/dynamicVariantKey';
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
 import {
   mjRawCellTypographyFromStyles,
@@ -124,8 +124,7 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
   const bg = a.backgroundColor ? ` background-color="${escapeAttr(a.backgroundColor)}"` : '';
   const secW = blockButtonWidthCss(a.width);
   const dvKey = getSectionDynamicVariantKey(section);
-  const secCls =
-    secW || dvKey ? ` css-class="${escapeAttr(sectionMjClassName(section.id))}"` : '';
+  const secCls = secW || dvKey ? ` css-class="${escapeAttr(sectionMjClassName(section.id))}"` : '';
   const widths = layoutWidths(section.layout);
   const gapPx = Math.max(0, section.attrs.columnGap ?? 0);
   /** 仅小屏堆叠时才有水平复位与纵向间距；与下方 grouped 判定保持一致 */
@@ -149,11 +148,7 @@ function sectionToMjml(section: Section, registry: Registry, ctx: RenderContext)
         i,
         section.columns.length,
         gapPx,
-        [
-          hCls,
-          vCls && i < lastIndex ? vCls : '',
-          preserveColumns ? COLUMN_NO_STACK_CLASS : '',
-        ]
+        [hCls, vCls && i < lastIndex ? vCls : '', preserveColumns ? COLUMN_NO_STACK_CLASS : '']
           .filter(Boolean)
           .join(' '),
         registry,

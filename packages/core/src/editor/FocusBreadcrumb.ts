@@ -1,9 +1,9 @@
+import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
 import type { Store } from '../store/store';
 import { findBlockLocation, findSection } from '../store/store';
-import { clear, h } from '../utils/dom';
 import type { SectionLayout } from '../types';
-import type { SimpleMailT } from '../i18n';
+import { clear, h } from '../utils/dom';
 
 export interface FocusBreadcrumbOptions {
   store: Store;
@@ -62,7 +62,7 @@ export class FocusBreadcrumb {
           h(
             'span',
             {
-              class: `sm-focus-crumb__item sm-focus-crumb__item--current`,
+              class: 'sm-focus-crumb__item sm-focus-crumb__item--current',
               title: item.label,
             },
             [item.label],
