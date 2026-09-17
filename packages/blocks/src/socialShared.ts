@@ -8,6 +8,27 @@ export function mjSocialElementName(network: string): string {
   return n;
 }
 
+/** MJML 内置带 share-url 模板的网络：href 会被包装成「分享」链接而非直接跳转 */
+const MJML_SHARE_URL_NETWORKS = new Set([
+  'facebook',
+  'twitter',
+  'x',
+  'google',
+  'pinterest',
+  'linkedin',
+]);
+
+/**
+ * 生成 mj-social-element 的 name（编译安全版）。
+ * facebook/twitter/x 等内置网络带 share-url 模板（如 facebook sharer.php?u=[[URL]]），
+ * href 会被当作「被分享的 URL」包装。MJML 为每个内置网络预生成 `<name>-noshare`
+ * 变体（share-url 为 [[URL]] 原样）：保留内置图标与背景色，href 直达。
+ */
+export function mjSocialElementShareSafeName(network: string): string {
+  const n = mjSocialElementName(network);
+  return MJML_SHARE_URL_NETWORKS.has(n) ? `${n}-noshare` : n;
+}
+
 /** 业务示例：固定海外/垂类五平台（与 custom:social 块配套）。 */
 export const BIZ_SOCIAL_NETWORK_OPTIONS: { label: string; value: string }[] = [
   { label: 'X', value: 'x' },
@@ -184,7 +205,7 @@ export function mjSocialElementsLines(
       const meta = socialMeta(l.network);
       const bgColor = l.backgroundColor?.trim() || meta.color;
       const attrs = [
-        `name="${escAttr(mjSocialElementName(l.network))}"`,
+        `name="${escAttr(mjSocialElementShareSafeName(l.network))}"`,
         `href="${escAttr(l.href)}"`,
         `background-color="${escAttr(bgColor)}"`,
         `color="${escAttr(textColor)}"`,
