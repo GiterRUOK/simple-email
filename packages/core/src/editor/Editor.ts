@@ -169,6 +169,19 @@ export class MailEditor {
       return;
     }
     if (this.mode !== 'design') return;
+    if (this.canvas.isSectionSelectMode) {
+      // 节选择模式：Esc 优先退出模式（弹窗打开时仍优先关弹窗）
+      if (document.querySelector('.sm-modal__mask.is-open')) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.('.sm-modal__mask')) return;
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      this._exitSectionSelectMode();
+      return;
+    }
     if (!this.store.selection) return;
     if (document.querySelector('.sm-modal__mask.is-open')) return;
     const t = e.target as HTMLElement | null;
@@ -476,8 +489,77 @@ export class MailEditor {
       return false;
     }
 
+    return this._writeSelectionClipboard(sections, blocks);
+  }
+
+  /**
+   * 批量复制多个 Section 的局部设计稿到剪贴板（与 copySelectionDesign 同信封，多节形态）。
+   * @returns 是否成功写入剪贴板
+   */
+  async copySectionsDesign(sectionIds: string[]): Promise<boolean> {
+    this.canvas.commitInlineEdit();
+    const sections = this._pickSections(sectionIds);
+    if (!sections.length) {
+      this._showToast(this.i18n.t('toast.copySelectionNoTarget'));
+      return false;
+    }
+    return this._writeSelectionClipboard(sections, []);
+  }
+
+  /**
+   * 批量导出多个 Section 的局部设计稿为 JSON 文件（内容与局部设计稿剪贴板同构，可手动粘贴追加）。
+   * @returns 是否成功触发下载
+   */
+  exportSectionsDesign(sectionIds: string[]): boolean {
+    this.canvas.commitInlineEdit();
+    const sections = this._pickSections(sectionIds);
+    if (!sections.length) {
+      this._showToast(this.i18n.t('toast.copySelectionNoTarget'));
+      return false;
+    }
+    const json = serializeSelectionClipboard({ sections, variables: this.store.doc.variables });
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `simple-mail-sections-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    this._showToast(this.i18n.t('toast.exportSelectionOk'));
+    return true;
+  }
+
+  /**
+   * 批量删除 Section（单条撤销记录，Ctrl/Cmd+Z 可整体恢复）。
+   * @returns 实际删除的节数量
+   */
+  removeSections(sectionIds: string[]): number {
+    this.canvas.commitInlineEdit();
+    this._blurRightPanelIfFocused();
+    const idSet = new Set(sectionIds);
+    let removed = 0;
+    this.store.update((d) => {
+      const before = d.sections.length;
+      d.sections = d.sections.filter((s) => !idSet.has(s.id));
+      removed = before - d.sections.length;
+    });
+    this.store.setSelection(null);
+    if (removed > 0) this._showToast(this.i18n.t('toast.removeSectionsOk', { count: removed }));
+    return removed;
+  }
+
+  /** 按文档顺序取出指定 id 的 Section（忽略不存在的 id） */
+  private _pickSections(sectionIds: string[]): Section[] {
+    const idSet = new Set(sectionIds);
+    return this.store.doc.sections.filter((s) => idSet.has(s.id));
+  }
+
+  /** 序列化局部设计稿写入剪贴板并 toast 反馈 */
+  private async _writeSelectionClipboard(sections: Section[], blocks: Block[]): Promise<boolean> {
     const ok = await writeTextToClipboard(
-      serializeSelectionClipboard({ sections, blocks, variables: doc.variables }),
+      serializeSelectionClipboard({ sections, blocks, variables: this.store.doc.variables }),
     );
     this._showToast(
       ok ? this.i18n.t('toast.copySelectionOk') : this.i18n.t('toast.copyDesignFailed'),
@@ -613,6 +695,10 @@ export class MailEditor {
       showFullscreenButton: this.opts.ui?.hideTopbarFullscreen !== true,
       onFullscreenToggle: () => void this._toggleFullscreen(),
       onLayoutBordersToggle: () => this._toggleLayoutBorders(),
+      onSectionSelectToggle:
+        this.opts.ui?.hideTopbarSectionSelect === true
+          ? undefined
+          : () => this._toggleSectionSelectMode(),
       showClearCanvasButton: this.opts.ui?.hideTopbarClearCanvas !== true,
       onClearCanvas: () => this.clearCanvas(),
       showResetContentButton: this.opts.ui?.hideTopbarResetContent !== true,
@@ -645,6 +731,9 @@ export class MailEditor {
       ui: this.opts.ui,
       t: this.i18n.t,
       onCopySelectionDesign: (target) => void this.copySelectionDesign(target),
+      onSectionSelectCopy: (ids) => void this.copySectionsDesign(ids),
+      onSectionSelectExport: (ids) => this.exportSectionsDesign(ids),
+      onSectionSelectRemove: (ids) => this.removeSections(ids),
     });
     this.rightPanel = new RightPanel({
       store: this.store,
@@ -687,6 +776,7 @@ export class MailEditor {
 
   private _setMode(m: EditorMode) {
     if (this.mode === m) return;
+    if (this.canvas.isSectionSelectMode) this._exitSectionSelectMode();
     this._closeVariablePicker();
     this._dismissVariablePopover();
     if (m !== 'design') this.canvas.commitInlineEdit();
@@ -1314,6 +1404,22 @@ export class MailEditor {
     this.showLayoutBorders = !this.showLayoutBorders;
     this.root.classList.toggle('sm-show-layout-borders', this.showLayoutBorders);
     this.topbar.setLayoutBordersActive(this.showLayoutBorders);
+  }
+
+  /** 顶栏「选择节」入口：进入 / 退出 Section 批量选择模式（批量复制 / 导出 / 删除） */
+  private _toggleSectionSelectMode() {
+    if (this.canvas.isSectionSelectMode) {
+      this._exitSectionSelectMode();
+    } else {
+      this.canvas.enterSectionSelectMode();
+      this.topbar.setSectionSelectActive(true);
+    }
+  }
+
+  private _exitSectionSelectMode() {
+    if (!this.canvas.isSectionSelectMode) return;
+    this.canvas.exitSectionSelectMode();
+    this.topbar.setSectionSelectActive(false);
   }
 }
 

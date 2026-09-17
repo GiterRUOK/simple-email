@@ -454,6 +454,7 @@ function createBlocks(locale: SimpleMailLocale) {
 | `hideTopbarClearCanvas?` / `hideTopbarResetContent?` | 隐藏清空 / 重置 |
 | `hideTopbarDocClipboard?` | 隐藏「复制设计稿」「导入设计稿」 |
 | `hideTopbarInsertVariable?` | 隐藏顶栏「插入变量」（改由应用内其他入口插入时） |
+| `hideTopbarSectionSelect?` | 隐藏顶栏「选择节」入口（Section 批量复制 / 导出 / 删除） |
 | `topbarCompact?` | 顶栏默认仅图标（窄屏/嵌入） |
 | `topbarLabels?` | `auto`（默认）\| `never` \| `always`；与 `topbarCompact` 配合 |
 | `topbarCompactMinWidth?` | `topbarLabels: auto` 时展示文案的最小宽度 px，默认 1200 |
@@ -596,6 +597,22 @@ import {
   serializeSelectionClipboard,
   collectSelectionVariableKeys,
 } from '@simple-mail/core';
+```
+
+### 节选择模式（批量复制 / 导出 / 删除）
+
+顶栏「选择节」按钮（勾选列表图标，可通过 `hideTopbarSectionSelect` 隐藏）进入 Section 批量操作模式：
+
+- 进入后点击 Section 勾选 / 取消（屏蔽单选、拖拽排序、内联编辑与悬浮工具条），底部出现浮动操作条：**已选 N 节 · 全选 · 复制设计稿 · 导出 JSON · 删除 · 完成**。
+- **复制设计稿**：多个 Section 一次性写入剪贴板（与局部设计稿同信封，可在其他画布「追加」粘贴）。
+- **导出 JSON**：下载 `simple-mail-sections-<日期>.json`，内容与剪贴板信封同构，可手动粘贴到导入对话框。
+- **删除**：弹出确认后一次 `store.update` 批量删除，单条撤销记录（⌘Z 整体恢复）。
+- Esc 或再次点击顶栏按钮退出模式；文档变化（撤销 / 清空等）时已失效的勾选自动清理。
+
+```ts
+await editor.copySectionsDesign(['sec_1', 'sec_2']); // 批量复制多节到剪贴板
+editor.exportSectionsDesign(['sec_1', 'sec_2']);     // 批量导出多节 JSON 文件
+editor.removeSections(['sec_1', 'sec_2']);           // 批量删除（返回实际删除数量）
 ```
 
 跨实例迁移时可用 `regenerateDocIds` 避免 id 冲突；局部粘贴由编辑器自动重生成 id（`remapSectionIds` / `regenerateBlockId`）。

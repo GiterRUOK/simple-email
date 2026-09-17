@@ -1,9 +1,9 @@
-import type { Store } from '../store/store';
-import { bindColorPickerInput } from './ColorPickerPopover';
-import { normalizeAccentHex, rgbCssToHex } from '../utils/accentColor';
-import { h, clear } from '../utils/dom';
-import type { EditorTheme } from './theme';
 import type { SimpleMailT } from '../i18n';
+import type { Store } from '../store/store';
+import { normalizeAccentHex, rgbCssToHex } from '../utils/accentColor';
+import { clear, h } from '../utils/dom';
+import { bindColorPickerInput } from './ColorPickerPopover';
+import type { EditorTheme } from './theme';
 
 export type EditorMode = 'design' | 'source';
 
@@ -32,6 +32,8 @@ export interface TopbarOptions {
   onFullscreenToggle?: () => void;
   /** 切换画布 Section / Block 布局虚线边框 */
   onLayoutBordersToggle?: () => void;
+  /** 进入 / 退出「选择节」批量操作模式（批量复制 / 导出 / 删除 Section） */
+  onSectionSelectToggle?: () => void;
   /** 为 false 时不展示全屏按钮（也可用 `ui.hideTopbarFullscreen`） */
   showFullscreenButton?: boolean;
   /** 为 false 时不展示「邮件设置」按钮（也可用 `ui.hideTopbarMailSettings`） */
@@ -62,6 +64,7 @@ export class Topbar {
   private accentInput?: HTMLInputElement;
   private fullscreenBtn?: HTMLButtonElement;
   private layoutBordersBtn?: HTMLButtonElement;
+  private sectionSelectBtn?: HTMLButtonElement;
   private insertVariableBtn?: HTMLButtonElement;
 
   constructor(opts: TopbarOptions) {
@@ -97,7 +100,9 @@ export class Topbar {
   /** 根据 `.sm-root` 上计算后的 `--sm-primary` 更新拾取器显示（无拾取器或未挂 root 时忽略） */
   syncAccentPicker() {
     if (!this.accentInput || !this.opts.accentPickerRoot) return;
-    const raw = getComputedStyle(this.opts.accentPickerRoot).getPropertyValue('--sm-primary').trim();
+    const raw = getComputedStyle(this.opts.accentPickerRoot)
+      .getPropertyValue('--sm-primary')
+      .trim();
     const base = normalizeAccentHex(raw) || rgbCssToHex(raw);
     if (!base) return;
     const norm = normalizeAccentHex(base);
@@ -117,12 +122,26 @@ export class Topbar {
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
   }
 
+  /** 「选择节」批量模式激活时高亮顶栏按钮（按钮不存在时忽略） */
+  setSectionSelectActive(active: boolean) {
+    const btn = this.sectionSelectBtn;
+    if (!btn) return;
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    const title = active
+      ? this.opts.t('topbar.sectionSelectActive')
+      : this.opts.t('topbar.sectionSelect');
+    btn.title = title;
+    btn.setAttribute('aria-label', title);
+  }
+
   /** 与画布布局边框开关同步按钮高亮（按钮不存在时忽略） */
   setLayoutBordersActive(active: boolean) {
     const btn = this.layoutBordersBtn;
     if (!btn) return;
     btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    const title = active ? this.opts.t('topbar.hideLayoutBorders') : this.opts.t('topbar.showLayoutBorders');
+    const title = active
+      ? this.opts.t('topbar.hideLayoutBorders')
+      : this.opts.t('topbar.showLayoutBorders');
     btn.title = title;
     btn.setAttribute('aria-label', title);
   }
@@ -139,7 +158,11 @@ export class Topbar {
     clear(this.el);
     const t = this.opts.t;
 
-    const segmented = h('div', { class: 'sm-segmented sm-topbar__mode-seg', role: 'group', 'aria-label': t('topbar.mode') });
+    const segmented = h('div', {
+      class: 'sm-segmented sm-topbar__mode-seg',
+      role: 'group',
+      'aria-label': t('topbar.mode'),
+    });
     const designBtn = modeSegBtn({
       active: this.opts.mode === 'design',
       title: t('topbar.design'),
@@ -219,7 +242,10 @@ export class Topbar {
     });
 
     const contentActionKids: HTMLElement[] = [];
-    if (this.opts.showClearCanvasButton !== false && typeof this.opts.onClearCanvas === 'function') {
+    if (
+      this.opts.showClearCanvasButton !== false &&
+      typeof this.opts.onClearCanvas === 'function'
+    ) {
       contentActionKids.push(
         actionBtn({
           class: 'sm-btn--ghost',
@@ -315,6 +341,19 @@ export class Topbar {
     trailingGroup.push(previewBtn, exportBtn);
 
     const canvasToolKids: HTMLElement[] = [];
+
+    if (typeof this.opts.onSectionSelectToggle === 'function') {
+      this.sectionSelectBtn = iconOnlyBtn({
+        class: 'sm-btn--ghost sm-topbar__toggle-btn',
+        title: t('topbar.sectionSelect'),
+        icon: iconSectionSelect(),
+        pressed: false,
+        onclick: () => this.opts.onSectionSelectToggle!(),
+      });
+      canvasToolKids.push(this.sectionSelectBtn);
+    } else {
+      this.sectionSelectBtn = undefined;
+    }
 
     if (typeof this.opts.onLayoutBordersToggle === 'function') {
       canvasToolKids.push(
@@ -506,6 +545,12 @@ function iconCopyDoc(): SVGElement {
 function iconImportDoc(): SVGElement {
   return svg(
     '<path d="M10 4.5v6.5M7.2 9.2 10 12l2.8-2.8M5.5 14.5h9" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="14" width="12" height="2.5" rx=".6" fill="currentColor"/>',
+  );
+}
+/** 选择节（批量操作）：勾选列表 */
+function iconSectionSelect(): SVGElement {
+  return svg(
+    '<rect x="3" y="3.5" width="14" height="13" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M6.2 10l2.2 2.2 4.6-5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   );
 }
 /** 显示边框：圆角矩形描边（开启时由 toggle 样式点亮 currentColor） */

@@ -215,9 +215,7 @@ export interface BlockDefinition<P extends object = Record<string, unknown>> {
    * 用于「组合模板」：画布内仅为通用 image/text 等，便于逐项修改。
    * 文档里不会出现本定义的 `type`，仅作左栏入口；若需提供请返回内置块的实例。
    */
-  expandPaletteDrop?: (
-    createBlock: (type: string) => Block,
-  ) => Block[] | PaletteDropResult;
+  expandPaletteDrop?: (createBlock: (type: string) => Block) => Block[] | PaletteDropResult;
 }
 
 /** 左栏组合拖入：可附带新建 Section 的 attrs、布局和按列分发的 Block。 */
@@ -295,6 +293,8 @@ export interface EditorUiOptions {
   hideTopbarDocClipboard?: boolean;
   /** 为 true 时隐藏顶栏「插入变量」按钮（由宿主在编辑器外提供时可用）。 */
   hideTopbarInsertVariable?: boolean;
+  /** 为 true 时隐藏顶栏「选择节」入口（Section 批量复制 / 导出 / 删除的选择模式）。 */
+  hideTopbarSectionSelect?: boolean;
   /**
    * 为 true 时顶栏默认可切换为仅图标（文案收入 `title` / `aria-label`），适合窄屏或嵌入宿主。
    * 默认 false；嵌入场景可在宿主侧设为 true。

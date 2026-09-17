@@ -52,6 +52,10 @@ export interface CanvasOptions {
   ui?: EditorUiOptions;
   /** Section / Block 工具条「复制设计稿」回调（写局部 JSON 到剪贴板，供其他画布追加） */
   onCopySelectionDesign?: (target: { sectionId: string } | { blockId: string }) => void;
+  /** 「选择节」批量模式动作（由 Editor 实现：写剪贴板 / 下载 JSON / 批量删除） */
+  onSectionSelectCopy?: (sectionIds: string[]) => void;
+  onSectionSelectExport?: (sectionIds: string[]) => void;
+  onSectionSelectRemove?: (sectionIds: string[]) => void;
   t: SimpleMailT;
 }
 
@@ -85,6 +89,13 @@ export class Canvas {
   private clearSelectionGestureTracking = new AbortController();
   private pointerGestureStartedInInlineEdit = false;
   private blockCodeModal: BlockCodeModal;
+  /** 节选择模式（批量复制 / 导出 / 删除）：点击 Section 勾选而非单选 */
+  private sectionSelectActive = false;
+  private checkedSectionIds = new Set<string>();
+  private sectionSelectBar: HTMLElement | null = null;
+  private sectionSelectCountEl: HTMLElement | null = null;
+  private sectionSelectAllBtn: HTMLButtonElement | null = null;
+  private sectionSelectActionBtns: HTMLButtonElement[] = [];
 
   constructor(opts: CanvasOptions) {
     this.opts = opts;
@@ -178,6 +189,7 @@ export class Canvas {
   destroy() {
     this.linkNavSuppression.abort();
     this.clearSelectionGestureTracking.abort();
+    this.exitSectionSelectMode();
     this._exitEditing(false);
     this._destroySortables();
     this.blockCodeModal.destroy();
@@ -243,6 +255,7 @@ export class Canvas {
       if (!this.el.contains(t)) return;
       if (this.inner.contains(t)) return;
       if (this.addBar.contains(t)) return;
+      if (this.sectionSelectBar?.contains(t)) return;
       if (this._shouldSuppressClearSelectionFromTextDrag()) return;
       this.commitInlineEdit();
       this.opts.store.setSelection(null);
@@ -324,6 +337,11 @@ export class Canvas {
       onUpdate: (e) => this._handleSectionMove(e),
     });
     this.sortableRefs.push(top);
+
+    if (this.sectionSelectActive) {
+      this._setSortablesDisabled(true);
+      this._syncSectionChecks();
+    }
 
     this._syncSelection();
   }
@@ -433,9 +451,15 @@ export class Canvas {
 
     wrap.append(cols);
 
-    host.append(wrap, toolbar);
+    const check = h('div', { class: 'sm-section-check', 'aria-hidden': 'true' }, [iconCheck()]);
+    host.append(wrap, toolbar, check);
 
     host.addEventListener('click', (e) => {
+      if (this.sectionSelectActive) {
+        e.stopPropagation();
+        this._toggleSectionCheck(section.id);
+        return;
+      }
       if ((e.target as HTMLElement).closest('.sm-block')) return;
       // 文本拖选时在 Section padding 等区域松开会冒泡 click，不应误切成 Section 选中
       if (!e.altKey && this._shouldSuppressSectionSelectFromTextInteraction()) return;
@@ -644,6 +668,11 @@ export class Canvas {
     el.append(blockToolbar, content);
 
     el.addEventListener('click', (e) => {
+      if (this.sectionSelectActive) {
+        e.stopPropagation();
+        this._toggleSectionCheck(section.id);
+        return;
+      }
       if (this.editingBlockId === block.id) return; // 编辑中不抢焦点
       /** Alt（mac Option）：穿透选中父级 Section，解决单列内边距为 0 时块铺满无法点到 Section */
       if (e.altKey) {
@@ -707,6 +736,7 @@ export class Canvas {
 
   /** 空文档时：在画布白底区域双击，插入一列 Section + 空文本并进入编辑 */
   private _onEmptyCanvasDblClick(e: MouseEvent) {
+    if (this.sectionSelectActive) return;
     if (this.opts.store.doc.sections.length > 0) return;
     const t = e.target as HTMLElement | null;
     if (!t || !this.inner.contains(t)) return;
@@ -740,6 +770,7 @@ export class Canvas {
 
   /** 空列双击：插入正文组件（content 为空）并直接进入编辑 */
   private _insertEmptyTextAndEdit(sectionId: string, columnIndex: number) {
+    if (this.sectionSelectActive) return;
     const reg = this.opts.registry;
     if (!reg.get('text')?.inlineEditable) return;
     const newBlock = reg.createBlock('text');
@@ -760,6 +791,7 @@ export class Canvas {
   }
 
   private _enterEditing(block: Block) {
+    if (this.sectionSelectActive) return;
     if (this.editingBlockId === block.id) return;
     this._exitEditing(true);
 
@@ -1059,6 +1091,174 @@ export class Canvas {
     });
   }
 
+  /* ------------------------- 节选择模式（批量操作） ------------------------- */
+
+  get isSectionSelectMode(): boolean {
+    return this.sectionSelectActive;
+  }
+
+  /** 进入节选择模式：屏蔽单选 / 拖拽 / 内联编辑，点击 Section 勾选，可批量复制 / 导出 / 删除 */
+  enterSectionSelectMode() {
+    if (this.sectionSelectActive) return;
+    this.commitInlineEdit();
+    this.sectionSelectActive = true;
+    this.checkedSectionIds.clear();
+    this.opts.store.setSelection(null);
+    this.el.classList.add('sm-section-select-mode');
+    this._setSortablesDisabled(true);
+    this._renderSectionSelectBar();
+    this._syncSectionChecks();
+  }
+
+  /** 退出节选择模式，恢复常规画布交互 */
+  exitSectionSelectMode() {
+    if (!this.sectionSelectActive) return;
+    this.sectionSelectActive = false;
+    this.checkedSectionIds.clear();
+    this.el.classList.remove('sm-section-select-mode');
+    this.sectionSelectBar?.remove();
+    this.sectionSelectBar = null;
+    this.sectionSelectCountEl = null;
+    this.sectionSelectAllBtn = null;
+    this.sectionSelectActionBtns = [];
+    this._setSortablesDisabled(false);
+    this._syncSectionChecks();
+  }
+
+  private _toggleSectionCheck(id: string) {
+    if (this.checkedSectionIds.has(id)) this.checkedSectionIds.delete(id);
+    else this.checkedSectionIds.add(id);
+    this._syncSectionChecks();
+  }
+
+  private _toggleSelectAllSections() {
+    const doc = this.opts.store.doc;
+    if (doc.sections.length > 0 && this.checkedSectionIds.size === doc.sections.length) {
+      this.checkedSectionIds.clear();
+    } else {
+      this.checkedSectionIds = new Set(doc.sections.map((s) => s.id));
+    }
+    this._syncSectionChecks();
+  }
+
+  /** 同步勾选态：清理已不存在的 id、刷新计数 / 全选 / 动作按钮可用性 */
+  private _syncSectionChecks() {
+    const doc = this.opts.store.doc;
+    const alive = new Set(doc.sections.map((s) => s.id));
+    for (const id of [...this.checkedSectionIds]) {
+      if (!alive.has(id)) this.checkedSectionIds.delete(id);
+    }
+    for (const host of this.inner.querySelectorAll('.sm-section-host.is-check-selected')) {
+      host.classList.remove('is-check-selected');
+    }
+    for (const id of this.checkedSectionIds) {
+      this.inner
+        .querySelector(`.sm-section-host[data-id="${cssEscape(id)}"]`)
+        ?.classList.add('is-check-selected');
+    }
+    if (this.sectionSelectCountEl) {
+      this.sectionSelectCountEl.textContent = this.opts.t('sectionSelect.count', {
+        count: this.checkedSectionIds.size,
+      });
+    }
+    if (this.sectionSelectAllBtn) {
+      const all = doc.sections.length > 0 && this.checkedSectionIds.size === doc.sections.length;
+      this.sectionSelectAllBtn.textContent = this.opts.t(
+        all ? 'sectionSelect.unselectAll' : 'sectionSelect.selectAll',
+      );
+      this.sectionSelectAllBtn.disabled = doc.sections.length === 0;
+    }
+    for (const btn of this.sectionSelectActionBtns) {
+      btn.disabled = this.checkedSectionIds.size === 0;
+    }
+  }
+
+  private _setSortablesDisabled(disabled: boolean) {
+    for (const s of this.sortableRefs) {
+      try {
+        s.option('disabled', disabled);
+      } catch {
+        /* sortable 已销毁时忽略 */
+      }
+    }
+  }
+
+  private _renderSectionSelectBar() {
+    const t = this.opts.t;
+    this.sectionSelectCountEl = h('span', { class: 'sm-section-select-bar__count' }, [
+      t('sectionSelect.count', { count: 0 }),
+    ]);
+    this.sectionSelectAllBtn = h(
+      'button',
+      {
+        class: 'sm-section-select-bar__btn',
+        type: 'button',
+        onclick: () => this._toggleSelectAllSections(),
+      },
+      [t('sectionSelect.selectAll')],
+    ) as HTMLButtonElement;
+    const copyBtn = h(
+      'button',
+      {
+        class: 'sm-section-select-bar__btn',
+        type: 'button',
+        onclick: () => this._runSectionSelectAction('copy'),
+      },
+      [t('sectionSelect.copyDesign')],
+    ) as HTMLButtonElement;
+    const exportBtn = h(
+      'button',
+      {
+        class: 'sm-section-select-bar__btn',
+        type: 'button',
+        onclick: () => this._runSectionSelectAction('export'),
+      },
+      [t('sectionSelect.exportJson')],
+    ) as HTMLButtonElement;
+    const deleteBtn = h(
+      'button',
+      {
+        class: 'sm-section-select-bar__btn sm-section-select-bar__btn--danger',
+        type: 'button',
+        onclick: () => this._runSectionSelectAction('remove'),
+      },
+      [t('common.delete')],
+    ) as HTMLButtonElement;
+    const doneBtn = h(
+      'button',
+      {
+        class: 'sm-section-select-bar__btn sm-section-select-bar__btn--primary',
+        type: 'button',
+        onclick: () => this.exitSectionSelectMode(),
+      },
+      [t('sectionSelect.done')],
+    ) as HTMLButtonElement;
+    this.sectionSelectActionBtns = [copyBtn, exportBtn, deleteBtn];
+    this.sectionSelectBar = h('div', { class: 'sm-section-select-bar', role: 'toolbar' }, [
+      this.sectionSelectCountEl,
+      this.sectionSelectAllBtn,
+      copyBtn,
+      exportBtn,
+      deleteBtn,
+      doneBtn,
+    ]);
+    this.el.append(this.sectionSelectBar);
+  }
+
+  private _runSectionSelectAction(kind: 'copy' | 'export' | 'remove') {
+    const ids = [...this.checkedSectionIds];
+    if (!ids.length) return;
+    if (kind === 'remove') {
+      if (!window.confirm(this.opts.t('sectionSelect.deleteConfirm', { count: ids.length }))) {
+        return;
+      }
+      this.opts.onSectionSelectRemove?.(ids);
+      return;
+    }
+    if (kind === 'copy') this.opts.onSectionSelectCopy?.(ids);
+    else this.opts.onSectionSelectExport?.(ids);
+  }
+
   /* -------------------------------- 操作 ---------------------------------- */
 
   private _removeSection(id: string) {
@@ -1213,5 +1413,11 @@ function iconEdit() {
 function iconCode() {
   return svg(
     '<path d="M7 7l-3 3 3 3M13 7l3 3-3 3" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
+  );
+}
+/** 勾选（节选择模式气泡） */
+function iconCheck() {
+  return svg(
+    '<path d="M4.5 10.5l3.4 3.4 7.6-7.8" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
   );
 }
