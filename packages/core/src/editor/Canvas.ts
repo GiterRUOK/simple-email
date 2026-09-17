@@ -1,11 +1,12 @@
 import Sortable from 'sortablejs';
+import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
 import {
+  type Store,
   createSection,
   findBlockLocation,
   findSection,
   pruneSectionIfEmpty,
-  type Store,
 } from '../store/store';
 import type {
   Block,
@@ -18,21 +19,17 @@ import type {
   SectionAttrs,
   SectionLayout,
 } from '../types';
-import { getSectionDynamicVariantKey } from '../utils/dynamicVariantSection';
 import { blockButtonWidthCss, docContentWidthCss } from '../utils/contentWidth';
+import { clear, escapeHtml, h } from '../utils/dom';
+import { getSectionDynamicVariantKey } from '../utils/dynamicVariantSection';
 import { globalListIndentCssVarValue } from '../utils/emailListStyles';
 import { normalizeFontWeightStep } from '../utils/fontWeightSteps';
-import { clear, escapeHtml, h } from '../utils/dom';
-import {
-  defaultPaddingForLockedBlock,
-  resolveLockedMjmlCanvasContent,
-} from '../utils/lockedMjml';
-import { layoutHumanLabel } from '../utils/sectionLayout';
+import { defaultPaddingForLockedBlock, resolveLockedMjmlCanvasContent } from '../utils/lockedMjml';
 import { paletteDropHasSectionLayout, resolvePaletteDropResult } from '../utils/paletteDrop';
+import { layoutHumanLabel } from '../utils/sectionLayout';
 import { BlockCodeModal } from './BlockCodeModal';
 import { InlineEditor, type SelectionState } from './InlineEditor';
 import type { RichTextToolbar } from './RichTextToolbar';
-import type { SimpleMailT } from '../i18n';
 
 export interface CanvasOptions {
   store: Store;
@@ -53,6 +50,8 @@ export interface CanvasOptions {
   layerRoot: HTMLElement;
   /** 与 MailEditor.opts.ui 对齐 */
   ui?: EditorUiOptions;
+  /** Section / Block 工具条「复制设计稿」回调（写局部 JSON 到剪贴板，供其他画布追加） */
+  onCopySelectionDesign?: (target: { sectionId: string } | { blockId: string }) => void;
   t: SimpleMailT;
 }
 
@@ -300,11 +299,7 @@ export class Canvas {
     );
 
     if (!doc.sections.length) {
-      this.inner.append(
-        h('div', { class: 'sm-empty-doc' }, [
-          this.opts.t('canvas.emptyHint'),
-        ]),
-      );
+      this.inner.append(h('div', { class: 'sm-empty-doc' }, [this.opts.t('canvas.emptyHint')]));
     } else {
       for (let si = 0; si < doc.sections.length; si++) {
         this.inner.append(this._renderSection(doc.sections[si], doc, si));
@@ -340,7 +335,9 @@ export class Canvas {
     }px ${a.paddingLeft ?? 0}px`;
 
     const layoutShort =
-      section.layout === '1' ? this.opts.t('rightPanel.layout.oneColumn') : layoutHumanLabel(section.layout);
+      section.layout === '1'
+        ? this.opts.t('rightPanel.layout.oneColumn')
+        : layoutHumanLabel(section.layout);
     const dvKey =
       this.opts.ui?.enableDynamicVariantKey === true
         ? getSectionDynamicVariantKey(section)
@@ -354,7 +351,9 @@ export class Canvas {
 
     const sw = blockButtonWidthCss(a.width);
     const box =
-      sw != null ? `max-width:${sw};width:100%;margin-left:auto;margin-right:auto;box-sizing:border-box;` : '';
+      sw != null
+        ? `max-width:${sw};width:100%;margin-left:auto;margin-right:auto;box-sizing:border-box;`
+        : '';
 
     const host = h('div', {
       class: 'sm-section-host',
@@ -392,6 +391,21 @@ export class Canvas {
           },
           [iconCopy()],
         ),
+        this.opts.onCopySelectionDesign
+          ? h(
+              'button',
+              {
+                class: 'sm-tool-btn',
+                type: 'button',
+                title: this.opts.t('canvas.copySectionDesignTitle'),
+                onclick: (e: Event) => {
+                  e.stopPropagation();
+                  this.opts.onCopySelectionDesign?.({ sectionId: section.id });
+                },
+              },
+              [iconCopyDesign()],
+            )
+          : null,
         h(
           'button',
           {
@@ -596,6 +610,21 @@ export class Canvas {
           },
           [iconCopy()],
         ),
+        this.opts.onCopySelectionDesign
+          ? h(
+              'button',
+              {
+                class: 'sm-tool-btn',
+                type: 'button',
+                title: this.opts.t('canvas.copyBlockDesignTitle'),
+                onclick: (e: Event) => {
+                  e.stopPropagation();
+                  this.opts.onCopySelectionDesign?.({ blockId: block.id });
+                },
+              },
+              [iconCopyDesign()],
+            )
+          : null,
         h(
           'button',
           {
@@ -866,7 +895,9 @@ export class Canvas {
     return !!attrs?.dynamicVariantKey;
   }
 
-  private _firstBlockInSection(section: Section): { block: Block; columnIndex: number } | undefined {
+  private _firstBlockInSection(
+    section: Section,
+  ): { block: Block; columnIndex: number } | undefined {
     for (let columnIndex = 0; columnIndex < section.columns.length; columnIndex += 1) {
       const block = section.columns[columnIndex]?.blocks[0];
       if (block) return { block, columnIndex };
@@ -1125,8 +1156,7 @@ export class Canvas {
 /* ---------------------------------- utils --------------------------------- */
 
 function layoutFlexStyle(_layout: SectionLayout, columnGap?: number): string {
-  const gap =
-    columnGap != null && columnGap > 0 ? `gap:${Math.min(columnGap, 200)}px;` : '';
+  const gap = columnGap != null && columnGap > 0 ? `gap:${Math.min(columnGap, 200)}px;` : '';
   return `display:flex;flex-wrap:nowrap;width:100%;${gap}`;
 }
 
@@ -1167,6 +1197,12 @@ function iconCopy() {
 function iconTrash() {
   return svg(
     '<path d="M5 6h10M8 6V4h4v2M6 6l1 10h6l1-10" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/>',
+  );
+}
+/** 「复制设计稿」：双层文档图形，与顶栏 iconCopyDoc 保持一致 */
+function iconCopyDesign() {
+  return svg(
+    '<rect x="6.5" y="6.5" width="9" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4" fill="none"/><rect x="4.5" y="3.5" width="9" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4" fill="var(--sm-surface, #fff)"/>',
   );
 }
 function iconEdit() {

@@ -88,6 +88,8 @@ export const zhCNMessages: SimpleMailMessages = {
   'canvas.unknownBlock': '未知组件: {type}',
   'canvas.emptyColumnHint': '拖入组件 · 双击插入文本',
   'canvas.lockedCode': '已锁定为代码',
+  'canvas.copySectionDesignTitle': '复制节设计稿：将此 Section JSON 写入剪贴板，可在其他画布中追加',
+  'canvas.copyBlockDesignTitle': '复制组件设计稿：将此组件 JSON 写入剪贴板，可在其他画布中追加',
   'rightPanel.docRoot.mail': '邮件',
   'rightPanel.docRoot.layout': '版式',
   'rightPanel.breadcrumb.selected': '当前选中',
@@ -100,8 +102,10 @@ export const zhCNMessages: SimpleMailMessages = {
   'rightPanel.block.locked': '该组件已被代码模式锁定。',
   'rightPanel.block.restoreProps': '恢复为属性模式',
   'rightPanel.block.unregistered': '未注册的组件: {type}',
-  'rightPanel.block.mjmlWarning': '检测到 MJML 标签（如 <mj-text>）。此处应只写 HTML，否则预览会显示源码。简单链接请用「文本」块。',
-  'rightPanel.block.invalidLink': '该链接无法跳转（如 1234、#、缺少 https://）。Outlook 网页端会清除此类链接，导致按钮/图标不可见。',
+  'rightPanel.block.mjmlWarning':
+    '检测到 MJML 标签（如 <mj-text>）。此处应只写 HTML，否则预览会显示源码。简单链接请用「文本」块。',
+  'rightPanel.block.invalidLink':
+    '该链接无法跳转（如 1234、#、缺少 https://）。Outlook 网页端会清除此类链接，导致按钮/图标不可见。',
   'rightPanel.doc.title': '邮件设置',
   'rightPanel.doc.layoutTitle': '版式',
   'rightPanel.doc.subject': '主题',
@@ -142,9 +146,11 @@ export const zhCNMessages: SimpleMailMessages = {
   'rightPanel.section.padding': '内边距',
   'rightPanel.section.columnGap': '列间距 (px)',
   'rightPanel.section.stackedGap': '堆叠纵向间距 (px)',
-  'rightPanel.section.stackedGapHelp': '小屏堆叠为单列后，相邻列之间的额外纵向间距；0 表示沿用块自身内边距。',
+  'rightPanel.section.stackedGapHelp':
+    '小屏堆叠为单列后，相邻列之间的额外纵向间距；0 表示沿用块自身内边距。',
   'rightPanel.section.preserveMobile': '小屏仍并排显示多列（可能字很窄）',
-  'rightPanel.section.preserveMobileHelp': '开启后 MJML 会生成 mj-group，移动端预览/导出与默认「小屏堆叠列」行为不同。',
+  'rightPanel.section.preserveMobileHelp':
+    '开启后 MJML 会生成 mj-group，移动端预览/导出与默认「小屏堆叠列」行为不同。',
   'rightPanel.section.columnLayout': '列布局',
   'rightPanel.social.labelPlaceholder': '标签文字（可选）',
   'rightPanel.social.iconUrlPlaceholder': '图标 URL（可选）',
@@ -158,14 +164,17 @@ export const zhCNMessages: SimpleMailMessages = {
   'rightPanel.image.helpGallery': '或使用「图库」',
   'rightPanel.image.helpSeparator': '；',
   'rightPanel.image.helpEnd': '。',
-  'rightPanel.image.helpAssetsConfigured': '已传入 imageAssets：上传默认显示（提供 uploadImage 且未设 showUpload:false）；图库需 showGallery:true，可使用内置 imageGallery 或自管 pickImageFromGallery。仍可手输 URL。',
-  'rightPanel.image.helpNoAssets': '在 MailEditor 的 imageAssets 中配置 uploadImage、内置 imageGallery 或 pickImageFromGallery 等；未配置时仅支持手输 URL。',
+  'rightPanel.image.helpAssetsConfigured':
+    '已传入 imageAssets：上传默认显示（提供 uploadImage 且未设 showUpload:false）；图库需 showGallery:true，可使用内置 imageGallery 或自管 pickImageFromGallery。仍可手输 URL。',
+  'rightPanel.image.helpNoAssets':
+    '在 MailEditor 的 imageAssets 中配置 uploadImage、内置 imageGallery 或 pickImageFromGallery 等；未配置时仅支持手输 URL。',
   'rightPanel.color.unset': '未设置',
   'rightPanel.fontSize.placeholder': '如 16px',
   'rightPanel.code.title': '编辑组件 MJML 源码',
   'rightPanel.code.restoreDefault': '恢复默认',
   'rightPanel.code.saveLocked': '保存为锁定 MJML',
-  'rightPanel.code.help': '保存后该组件将以这段 MJML 直接输出，属性面板会被禁用，可点"恢复默认"取消锁定。',
+  'rightPanel.code.help':
+    '保存后该组件将以这段 MJML 直接输出，属性面板会被禁用，可点"恢复默认"取消锁定。',
   'toolbar.fontDefault': '默认',
   'toolbar.fontPingFang': '苹方/PingFang',
   'toolbar.fontMicrosoftYaHei': '微软雅黑',
@@ -226,6 +235,9 @@ export const zhCNMessages: SimpleMailMessages = {
   'importDoc.placeholder': '在此粘贴设计稿 JSON…',
   'importDoc.pasteFromClipboard': '从剪贴板填入',
   'importDoc.apply': '应用并覆盖画布',
+  'importDoc.applyAppend': '追加到画布',
+  'importDoc.hintSelection':
+    '检测到局部设计稿，将追加到当前画布（不覆盖现有内容）；未注册的组件类型会被跳过。',
   'importDoc.clipboardEmpty': '剪贴板为空或无法读取，请手动粘贴 JSON。',
   'importDoc.clipboardFilled': '已从剪贴板填入，请确认后点击「应用并覆盖画布」。',
   'importDoc.empty': '请先粘贴设计稿 JSON。',
@@ -235,6 +247,11 @@ export const zhCNMessages: SimpleMailMessages = {
   'toast.copyDesignOk': '设计稿已复制到剪贴板',
   'toast.copyDesignFailed': '复制失败，请检查浏览器剪贴板权限',
   'toast.importDesignOk': '设计稿已导入',
+  'toast.copySelectionOk': '局部设计稿已复制到剪贴板',
+  'toast.copySelectionNoTarget': '请先选中要复制的 Section 或组件',
+  'toast.pasteSelectionOk': '已追加到当前画布',
+  'toast.pasteSelectionEmpty': '局部设计稿内容为空',
+  'toast.pasteSelectionSkipped': '已跳过未注册的组件类型：{types}',
   'toast.noVariables': '暂无可用变量',
   'toast.variableCopied': '已复制变量',
   'toast.copiedToClipboard': '已复制到剪贴板',
@@ -252,8 +269,10 @@ export const zhCNMessages: SimpleMailMessages = {
   'blocks.footer.name': '页脚',
   'blocks.button.defaultText': '立即查看',
   'blocks.text.defaultContent': '<p>双击进入编辑...</p>',
-  'blocks.html.defaultHtml': '<p style="margin:0;">在此写入任意 HTML，将经 <strong>mj-raw</strong> 原样输出到邮件。支持变量 {{user.name}}</p>',
-  'blocks.hero.defaultContent': '<p style="margin:0;font-size:28px;font-weight:700;line-height:1.25;">主标题落在大图上</p><p style="margin:12px 0 0;font-size:16px;font-weight:400;opacity:0.95;line-height:1.5;">支援变量与 <strong>双击编辑</strong>，与正文组件一致。</p>',
+  'blocks.html.defaultHtml':
+    '<p style="margin:0;">在此写入任意 HTML，将经 <strong>mj-raw</strong> 原样输出到邮件。支持变量 {{user.name}}</p>',
+  'blocks.hero.defaultContent':
+    '<p style="margin:0;font-size:28px;font-weight:700;line-height:1.25;">主标题落在大图上</p><p style="margin:12px 0 0;font-size:16px;font-weight:400;opacity:0.95;line-height:1.5;">支援变量与 <strong>双击编辑</strong>，与正文组件一致。</p>',
   'blocks.footer.defaultCompanyName': '你的公司',
   'blocks.footer.defaultAddress': '上海市某区某路某号',
   'blocks.footer.defaultUnsubscribeText': '退订邮件',
@@ -312,13 +331,18 @@ export const zhCNMessages: SimpleMailMessages = {
   'blocks.help.globalLineHeight': '留空则使用邮件设置里的全局行距',
   'blocks.help.canvasEditRecommended': '建议直接在画布双击编辑；这里保留为高级编辑入口。',
   'blocks.help.canvasEditRecommendedShort': '建议在画布内双击编辑；此处供高级修改。',
-  'blocks.help.htmlOnly': '只写 HTML（如 <a>、<table>），不要写 <mj-text> 等 MJML 标签；MJML 标签在 mj-raw 内不会被编译。简单链接建议用「文本」块。',
+  'blocks.help.htmlOnly':
+    '只写 HTML（如 <a>、<table>），不要写 <mj-text> 等 MJML 标签；MJML 标签在 mj-raw 内不会被编译。简单链接建议用「文本」块。',
   'blocks.help.imageFallbackColor': '图片加载失败时的底色',
-  'blocks.help.imageAutoHeight': '0 为自适应高度；填写固定值时画布与 MJML 会限制显示高度（预览可用 object-fit: cover）',
+  'blocks.help.imageAutoHeight':
+    '0 为自适应高度；填写固定值时画布与 MJML 会限制显示高度（预览可用 object-fit: cover）',
   'blocks.help.buttonWidth': '支持纯数字（按 px）、带 px 或百分比',
-  'blocks.help.socialLinks': '每行：平台、链接、可选标签文字、自定义图标 URL、图标背景色。标签的字号/字重/颜色在下方统一设置。',
-  'blocks.help.bizSocialLinks': '平台：X、Rabbit、Facebook、TikTok、Instagram (ig)。可填标签、自定义图标 URL。MJML 侧 Rabbit/TikTok 使用 web 占位图标，需要品牌图时请填「图标 URL」。',
-  'blocks.help.iconRadius': '0 为方形直角；填较大值（如 999）或与尺寸一半相当时为圆形（默认圆形）。',
+  'blocks.help.socialLinks':
+    '每行：平台、链接、可选标签文字、自定义图标 URL、图标背景色。标签的字号/字重/颜色在下方统一设置。',
+  'blocks.help.bizSocialLinks':
+    '平台：X、Rabbit、Facebook、TikTok、Instagram (ig)。可填标签、自定义图标 URL。MJML 侧 Rabbit/TikTok 使用 web 占位图标，需要品牌图时请填「图标 URL」。',
+  'blocks.help.iconRadius':
+    '0 为方形直角；填较大值（如 999）或与尺寸一半相当时为圆形（默认圆形）。',
   'blocks.help.iconSpacing': '每个图标周围的留白，横向即图标之间的间隔（MJML inner-padding）。',
   'blocks.help.bizIconSpacing': '图标之间的间隔（MJML inner-padding）。',
   'blocks.placeholder.buttonWidth': '留空=自适应，如 280px、100%',
@@ -372,7 +396,8 @@ export const enUSMessages: SimpleMailMessages = {
   'topbar.resetContent': 'Reset content',
   'topbar.copyDesignTitle': 'Copy design: write the canvas JSON to the clipboard for reuse',
   'topbar.copyDesign': 'Copy design',
-  'topbar.importDesignTitle': 'Import design: paste JSON or read from the clipboard to replace the canvas',
+  'topbar.importDesignTitle':
+    'Import design: paste JSON or read from the clipboard to replace the canvas',
   'topbar.importDesign': 'Import design',
   'topbar.preview': 'Preview',
   'topbar.exportHtml': 'Export HTML',
@@ -394,10 +419,15 @@ export const enUSMessages: SimpleMailMessages = {
   'canvas.addSection': '+ Add section:',
   'canvas.dynamicSectionLabel': 'Dynamic variable {index} · {token}',
   'canvas.sectionLabel': 'Section {index} · {layout}',
-  'canvas.sectionTitle': '{chip}. When child blocks fill the column, press Esc or Alt-click a block to select this section.',
+  'canvas.sectionTitle':
+    '{chip}. When child blocks fill the column, press Esc or Alt-click a block to select this section.',
   'canvas.unknownBlock': 'Unknown block: {type}',
   'canvas.emptyColumnHint': 'Drag in a block · Double-click to insert text',
   'canvas.lockedCode': 'Locked as code',
+  'canvas.copySectionDesignTitle':
+    'Copy section design: write this section as JSON to clipboard, appendable on another canvas',
+  'canvas.copyBlockDesignTitle':
+    'Copy block design: write this block as JSON to clipboard, appendable on another canvas',
   'rightPanel.docRoot.mail': 'Email',
   'rightPanel.docRoot.layout': 'Layout',
   'rightPanel.breadcrumb.selected': 'Current selection',
@@ -406,12 +436,15 @@ export const enUSMessages: SimpleMailMessages = {
   'rightPanel.layout.columns': 'Columns',
   'rightPanel.tabs.props': 'Properties',
   'rightPanel.tabs.code': 'Code',
-  'rightPanel.block.deleted': 'This block may have been deleted. Select a block on the canvas again.',
+  'rightPanel.block.deleted':
+    'This block may have been deleted. Select a block on the canvas again.',
   'rightPanel.block.locked': 'This block is locked in code mode.',
   'rightPanel.block.restoreProps': 'Restore property mode',
   'rightPanel.block.unregistered': 'Unregistered block: {type}',
-  'rightPanel.block.mjmlWarning': 'MJML tags were detected, such as <mj-text>. Write HTML only here, otherwise the preview will show source code. Use a Text block for simple links.',
-  'rightPanel.block.invalidLink': 'This link is not navigable (e.g. 1234, #, or a URL without https://). Outlook on the web removes such links, which makes the button or icon invisible.',
+  'rightPanel.block.mjmlWarning':
+    'MJML tags were detected, such as <mj-text>. Write HTML only here, otherwise the preview will show source code. Use a Text block for simple links.',
+  'rightPanel.block.invalidLink':
+    'This link is not navigable (e.g. 1234, #, or a URL without https://). Outlook on the web removes such links, which makes the button or icon invisible.',
   'rightPanel.doc.title': 'Email settings',
   'rightPanel.doc.layoutTitle': 'Layout',
   'rightPanel.doc.subject': 'Subject',
@@ -431,7 +464,8 @@ export const enUSMessages: SimpleMailMessages = {
   'rightPanel.doc.listIndent': 'Default list indent',
   'rightPanel.doc.listIndentHelp': 'Lists without their own indent use this value.',
   'rightPanel.width.auto': 'Auto',
-  'rightPanel.width.customHelp': 'This value uses custom syntax. Edit it directly, or clear it to choose Auto and use the slider.',
+  'rightPanel.width.customHelp':
+    'This value uses custom syntax. Edit it directly, or clear it to choose Auto and use the slider.',
   'rightPanel.width.customPlaceholder': 'e.g. 480px or 90%',
   'rightPanel.inheritGlobal': 'Inherit global',
   'rightPanel.spacing.suffix': ' (top/right/bottom/left)',
@@ -443,8 +477,10 @@ export const enUSMessages: SimpleMailMessages = {
   'rightPanel.section.title': 'Section settings',
   'rightPanel.section.dynamicTitle': 'Dynamic variable section',
   'rightPanel.section.dynamicKey': 'Dynamic variable name',
-  'rightPanel.section.dynamicKeyPlaceholder': 'Use with care. Confirm the business flow supports it.',
-  'rightPanel.section.dynamicKeyHelp': 'This whole section will be replaced by the dynamic variable name.',
+  'rightPanel.section.dynamicKeyPlaceholder':
+    'Use with care. Confirm the business flow supports it.',
+  'rightPanel.section.dynamicKeyHelp':
+    'This whole section will be replaced by the dynamic variable name.',
   'rightPanel.section.backgroundColor': 'Background color',
   'rightPanel.section.transparentPlaceholder': 'Empty = transparent',
   'rightPanel.section.width': 'Section width',
@@ -452,9 +488,11 @@ export const enUSMessages: SimpleMailMessages = {
   'rightPanel.section.padding': 'Padding',
   'rightPanel.section.columnGap': 'Column gap (px)',
   'rightPanel.section.stackedGap': 'Stacked vertical gap (px)',
-  'rightPanel.section.stackedGapHelp': 'Extra vertical space between columns once they stack on small screens. 0 keeps each block own padding.',
+  'rightPanel.section.stackedGapHelp':
+    'Extra vertical space between columns once they stack on small screens. 0 keeps each block own padding.',
   'rightPanel.section.preserveMobile': 'Keep columns side by side on small screens',
-  'rightPanel.section.preserveMobileHelp': 'When enabled, MJML outputs mj-group. Mobile preview/export differs from the default stacked-column behavior.',
+  'rightPanel.section.preserveMobileHelp':
+    'When enabled, MJML outputs mj-group. Mobile preview/export differs from the default stacked-column behavior.',
   'rightPanel.section.columnLayout': 'Column layout',
   'rightPanel.social.labelPlaceholder': 'Label text (optional)',
   'rightPanel.social.iconUrlPlaceholder': 'Icon URL (optional)',
@@ -468,14 +506,17 @@ export const enUSMessages: SimpleMailMessages = {
   'rightPanel.image.helpGallery': 'or use Gallery',
   'rightPanel.image.helpSeparator': '; ',
   'rightPanel.image.helpEnd': '.',
-  'rightPanel.image.helpAssetsConfigured': 'imageAssets is configured: upload is shown by default when uploadImage exists and showUpload is not false; gallery requires showGallery:true and either imageGallery or pickImageFromGallery. Manual URLs are still supported.',
-  'rightPanel.image.helpNoAssets': 'Configure uploadImage, imageGallery, or pickImageFromGallery in MailEditor imageAssets. Without them, only manual URLs are supported.',
+  'rightPanel.image.helpAssetsConfigured':
+    'imageAssets is configured: upload is shown by default when uploadImage exists and showUpload is not false; gallery requires showGallery:true and either imageGallery or pickImageFromGallery. Manual URLs are still supported.',
+  'rightPanel.image.helpNoAssets':
+    'Configure uploadImage, imageGallery, or pickImageFromGallery in MailEditor imageAssets. Without them, only manual URLs are supported.',
   'rightPanel.color.unset': 'Not set',
   'rightPanel.fontSize.placeholder': 'e.g. 16px',
   'rightPanel.code.title': 'Edit block MJML source',
   'rightPanel.code.restoreDefault': 'Restore default',
   'rightPanel.code.saveLocked': 'Save as locked MJML',
-  'rightPanel.code.help': 'After saving, this block will output this MJML directly, and the properties panel will be disabled. Use "Restore default" to unlock it.',
+  'rightPanel.code.help':
+    'After saving, this block will output this MJML directly, and the properties panel will be disabled. Use "Restore default" to unlock it.',
   'toolbar.fontDefault': 'Default',
   'toolbar.fontPingFang': 'PingFang SC',
   'toolbar.fontMicrosoftYaHei': 'Microsoft YaHei',
@@ -530,14 +571,19 @@ export const enUSMessages: SimpleMailMessages = {
   'colorPicker.doubleClickConfirm': '{hex} (double-click to confirm)',
   'colorPicker.openTitle': 'Click to open the palette. Double-click a swatch to confirm.',
   'importDoc.title': 'Import design',
-  'importDoc.hint1': 'This will replace all sections and blocks on the current canvas, including global styles.',
+  'importDoc.hint1':
+    'This will replace all sections and blocks on the current canvas, including global styles.',
   'importDoc.hint2': 'If the host manages subject or width, those fields may remain unchanged.',
   'importDoc.hint3': 'Paste JSON generated by "Copy design", or a raw EmailDoc with version: "1".',
   'importDoc.placeholder': 'Paste design JSON here...',
   'importDoc.pasteFromClipboard': 'Paste from clipboard',
   'importDoc.apply': 'Apply and replace canvas',
+  'importDoc.applyAppend': 'Append to canvas',
+  'importDoc.hintSelection':
+    'Partial design detected. It will be appended to the current canvas (existing content is kept); unregistered block types are skipped.',
   'importDoc.clipboardEmpty': 'Clipboard is empty or unreadable. Paste JSON manually.',
-  'importDoc.clipboardFilled': 'Filled from clipboard. Review it, then apply and replace the canvas.',
+  'importDoc.clipboardFilled':
+    'Filled from clipboard. Review it, then apply and replace the canvas.',
   'importDoc.empty': 'Paste design JSON first.',
   'importDoc.invalid': 'Invalid JSON or not a simple-mail design.',
   'blockCode.title': 'Edit block code',
@@ -545,6 +591,11 @@ export const enUSMessages: SimpleMailMessages = {
   'toast.copyDesignOk': 'Design copied to clipboard',
   'toast.copyDesignFailed': 'Copy failed. Check browser clipboard permissions.',
   'toast.importDesignOk': 'Design imported',
+  'toast.copySelectionOk': 'Partial design copied to clipboard',
+  'toast.copySelectionNoTarget': 'Select a section or block to copy first',
+  'toast.pasteSelectionOk': 'Appended to the current canvas',
+  'toast.pasteSelectionEmpty': 'The partial design is empty',
+  'toast.pasteSelectionSkipped': 'Skipped unregistered block types: {types}',
   'toast.noVariables': 'No variables available',
   'toast.variableCopied': 'Variable copied',
   'toast.copiedToClipboard': 'Copied to clipboard',
@@ -562,8 +613,10 @@ export const enUSMessages: SimpleMailMessages = {
   'blocks.footer.name': 'Footer',
   'blocks.button.defaultText': 'View now',
   'blocks.text.defaultContent': '<p>Double-click to edit...</p>',
-  'blocks.html.defaultHtml': '<p style="margin:0;">Write any HTML here. It will be output through <strong>mj-raw</strong>. Variables like {{user.name}} are supported.</p>',
-  'blocks.hero.defaultContent': '<p style="margin:0;font-size:28px;font-weight:700;line-height:1.25;">Main headline on the hero image</p><p style="margin:12px 0 0;font-size:16px;font-weight:400;opacity:0.95;line-height:1.5;">Supports variables and <strong>double-click editing</strong>, just like text blocks.</p>',
+  'blocks.html.defaultHtml':
+    '<p style="margin:0;">Write any HTML here. It will be output through <strong>mj-raw</strong>. Variables like {{user.name}} are supported.</p>',
+  'blocks.hero.defaultContent':
+    '<p style="margin:0;font-size:28px;font-weight:700;line-height:1.25;">Main headline on the hero image</p><p style="margin:12px 0 0;font-size:16px;font-weight:400;opacity:0.95;line-height:1.5;">Supports variables and <strong>double-click editing</strong>, just like text blocks.</p>',
   'blocks.footer.defaultCompanyName': 'Your company',
   'blocks.footer.defaultAddress': '123 Example Street, Shanghai',
   'blocks.footer.defaultUnsubscribeText': 'Unsubscribe',
@@ -620,16 +673,24 @@ export const enUSMessages: SimpleMailMessages = {
   'blocks.field.htmlPlaceholder': 'Enter HTML...',
   'blocks.field.heroPlaceholder': 'Write copy over the image...',
   'blocks.help.globalLineHeight': 'Leave empty to use the global line height from email settings.',
-  'blocks.help.canvasEditRecommended': 'Double-click on the canvas to edit directly. This field remains as an advanced fallback.',
-  'blocks.help.canvasEditRecommendedShort': 'Double-click on the canvas to edit. Use this field for advanced edits.',
-  'blocks.help.htmlOnly': 'Write HTML only, such as <a> or <table>. Do not use MJML tags like <mj-text>; MJML tags inside mj-raw will not compile. Use a Text block for simple links.',
+  'blocks.help.canvasEditRecommended':
+    'Double-click on the canvas to edit directly. This field remains as an advanced fallback.',
+  'blocks.help.canvasEditRecommendedShort':
+    'Double-click on the canvas to edit. Use this field for advanced edits.',
+  'blocks.help.htmlOnly':
+    'Write HTML only, such as <a> or <table>. Do not use MJML tags like <mj-text>; MJML tags inside mj-raw will not compile. Use a Text block for simple links.',
   'blocks.help.imageFallbackColor': 'Background color used if the image fails to load.',
-  'blocks.help.imageAutoHeight': '0 means automatic height. Fixed values limit both canvas and MJML display height; preview uses object-fit: cover.',
+  'blocks.help.imageAutoHeight':
+    '0 means automatic height. Fixed values limit both canvas and MJML display height; preview uses object-fit: cover.',
   'blocks.help.buttonWidth': 'Supports plain numbers as px, px values, or percentages.',
-  'blocks.help.socialLinks': 'Each row contains a network, link, optional label text, custom icon URL, and icon background color. Label font size, weight, and color are configured below.',
-  'blocks.help.bizSocialLinks': 'Networks: X, Rabbit, Facebook, TikTok, and Instagram (ig). Labels and custom icon URLs are optional. Rabbit/TikTok use the web placeholder icon in MJML unless you provide an icon URL.',
-  'blocks.help.iconRadius': '0 gives square corners. Large values such as 999, or about half the icon size, make it circular.',
-  'blocks.help.iconSpacing': 'Space around each icon; horizontally this is the gap between icons (MJML inner-padding).',
+  'blocks.help.socialLinks':
+    'Each row contains a network, link, optional label text, custom icon URL, and icon background color. Label font size, weight, and color are configured below.',
+  'blocks.help.bizSocialLinks':
+    'Networks: X, Rabbit, Facebook, TikTok, and Instagram (ig). Labels and custom icon URLs are optional. Rabbit/TikTok use the web placeholder icon in MJML unless you provide an icon URL.',
+  'blocks.help.iconRadius':
+    '0 gives square corners. Large values such as 999, or about half the icon size, make it circular.',
+  'blocks.help.iconSpacing':
+    'Space around each icon; horizontally this is the gap between icons (MJML inner-padding).',
   'blocks.help.bizIconSpacing': 'Gap between icons (MJML inner-padding).',
   'blocks.placeholder.buttonWidth': 'Empty = auto, e.g. 280px or 100%',
   'blocks.option.top': 'Top',

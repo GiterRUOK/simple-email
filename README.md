@@ -571,20 +571,34 @@ import {
 - 复制：信封 `{ kind: 'simple-mail/doc', formatVersion: 1, doc }` 写入系统剪贴板。
 - 导入：粘贴 JSON 或裸 `EmailDoc`（`version: '1'`），覆盖当前画布（可撤销）。
 
+### 局部设计稿（追加粘贴）
+
+Section / Block 悬浮工具条的 **复制设计稿** 按钮（双层文档图标）可只复制当前节/组件：
+
+- 信封 `{ kind: 'simple-mail/selection', formatVersion: 1, sections, blocks, variables }`。
+- 粘贴走同一个「导入设计稿」对话框：识别到局部信封时按钮自动变为「追加到画布」，不覆盖现有内容。
+- 追加语义：Section 插到当前选中节之后（无选中则追加末尾）；Block 插到选中块之后，否则包一层单列 Section 落到末尾。
+- 未注册的 `custom:*` 类型会被跳过并在 toast 中提示；内容引用到的 `{{key}}` 变量按 key 并入目标文档变量列表（已存在的不重复）。
+- 全程可撤销（⌘Z）。
+
 ```ts
-await editor.copyDocDesign();
-editor.openImportDocDesign();
-editor.importDocDesignFromJson(raw); // 与对话框「应用」相同
+await editor.copySelectionDesign();                       // 复制当前选中 Section/Block
+await editor.copySelectionDesign({ sectionId: 'sec_x' }); // 显式指定
+editor.importSelectionDesignFromJson(raw);                // 程序化追加（simple-mail/selection 信封）
 
 import {
   DOC_CLIPBOARD_KIND,
+  SELECTION_CLIPBOARD_KIND,
   parseDocClipboard,
+  parseSelectionClipboard,
   regenerateDocIds,
   serializeDocClipboard,
+  serializeSelectionClipboard,
+  collectSelectionVariableKeys,
 } from '@simple-mail/core';
 ```
 
-跨实例迁移时可用 `regenerateDocIds` 避免 id 冲突。
+跨实例迁移时可用 `regenerateDocIds` 避免 id 冲突；局部粘贴由编辑器自动重生成 id（`remapSectionIds` / `regenerateBlockId`）。
 
 ---
 

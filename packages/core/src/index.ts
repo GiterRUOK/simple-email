@@ -105,13 +105,23 @@ export { resolveAssetPermission } from './editor/imageAssets';
 export type { OpenImageGalleryModalOptions } from './editor/ImageGalleryModal';
 export { openImageGalleryModal } from './editor/ImageGalleryModal';
 export {
+  collectSelectionVariableKeys,
   DOC_CLIPBOARD_FORMAT_VERSION,
   DOC_CLIPBOARD_KIND,
   parseDocClipboard,
+  parseSelectionClipboard,
+  regenerateBlockId,
   regenerateDocIds,
+  remapSectionIds,
+  SELECTION_CLIPBOARD_FORMAT_VERSION,
+  SELECTION_CLIPBOARD_KIND,
   serializeDocClipboard,
+  serializeSelectionClipboard,
 } from './utils/docClipboard';
-export type { DocClipboardEnvelope } from './utils/docClipboard';
+export type {
+  DocClipboardEnvelope,
+  SelectionClipboardEnvelope,
+} from './utils/docClipboard';
 export {
   blockButtonWidthCss,
   docContentWidthCss,

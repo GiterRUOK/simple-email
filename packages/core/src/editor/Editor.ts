@@ -1,6 +1,19 @@
+import {
+  type SimpleMailI18nContext,
+  type SimpleMailLocale,
+  type SimpleMailMessagesInput,
+  type SimpleMailT,
+  createI18nContext,
+} from '../i18n';
 import { Registry, defineBlock } from '../registry/registry';
 import { renderDoc } from '../renderer';
-import { Store, createSection, findBlockLocation, pruneSectionIfEmpty } from '../store/store';
+import {
+  Store,
+  createSection,
+  findBlockLocation,
+  findSection,
+  pruneSectionIfEmpty,
+} from '../store/store';
 import type {
   Block,
   BlockDefinition,
@@ -8,40 +21,36 @@ import type {
   EmailDoc,
   GlobalStyles,
   RenderEngine,
+  Section,
   Selection,
   Variable,
 } from '../types';
+import { accentPrimarySoftRgba, normalizeAccentHex } from '../utils/accentColor';
 import {
-  buildLinkVariableHtml,
-  normalizeVariable,
-  variablePlaceholder,
-} from '../variables';
+  type SelectionClipboardEnvelope,
+  collectSelectionVariableKeys,
+  parseDocClipboard,
+  parseSelectionClipboard,
+  regenerateBlockId,
+  regenerateDocIds,
+  remapSectionIds,
+  serializeDocClipboard,
+  serializeSelectionClipboard,
+} from '../utils/docClipboard';
 import { clear, h } from '../utils/dom';
 import { appendInlineToRichHtml } from '../utils/richHtmlInsert';
+import { buildLinkVariableHtml, normalizeVariable, variablePlaceholder } from '../variables';
 import { Canvas } from './Canvas';
 import { ExportModal } from './ExportModal';
+import { ImportDocModal, readTextFromClipboard, writeTextToClipboard } from './ImportDocModal';
 import { LeftPanel } from './LeftPanel';
 import { PreviewModal } from './PreviewModal';
 import { RichTextToolbar } from './RichTextToolbar';
 import { RightPanel } from './RightPanel';
 import { SourceView } from './SourceView';
-import { Topbar, type EditorMode } from './Topbar';
-import type { EditorTheme } from './theme';
+import { type EditorMode, Topbar } from './Topbar';
 import type { ImageAssetsHandlers } from './imageAssets';
-import { accentPrimarySoftRgba, normalizeAccentHex } from '../utils/accentColor';
-import {
-  parseDocClipboard,
-  regenerateDocIds,
-  serializeDocClipboard,
-} from '../utils/docClipboard';
-import { ImportDocModal, readTextFromClipboard, writeTextToClipboard } from './ImportDocModal';
-import {
-  createI18nContext,
-  type SimpleMailI18nContext,
-  type SimpleMailLocale,
-  type SimpleMailMessagesInput,
-  type SimpleMailT,
-} from '../i18n';
+import type { EditorTheme } from './theme';
 
 import './styles.css';
 
@@ -202,12 +211,13 @@ export class MailEditor {
 
   /** 内联编辑、右栏表单等应使用控件/浏览器本地撤销，而非文档 history */
   private _shouldDeferToLocalUndoRedo(target: Node): boolean {
-    const el =
-      target instanceof Element ? target : (target.parentElement as Element | null);
+    const el = target instanceof Element ? target : (target.parentElement as Element | null);
     if (!el) return false;
     if (el.closest('.sm-inline-editing')) return true;
     if (el.closest('.cm-editor')) return true;
-    const panelField = el.closest('.sm-panel--right input, .sm-panel--right textarea, .sm-panel--right select');
+    const panelField = el.closest(
+      '.sm-panel--right input, .sm-panel--right textarea, .sm-panel--right select',
+    );
     if (panelField) return true;
     return false;
   }
@@ -363,10 +373,7 @@ export class MailEditor {
     if (normalized.kind === 'link') {
       const token = variablePlaceholder(normalized.key);
       if (this._tryApplyLinkVariableToken(token)) return true;
-      const html = buildLinkVariableHtml(
-        token,
-        this.store.doc.styles.linkColor || '#ff5a00',
-      );
+      const html = buildLinkVariableHtml(token, this.store.doc.styles.linkColor || '#ff5a00');
       return this._insertAtFocus(html, true);
     }
     return this.insertVariableKey(normalized);
@@ -435,6 +442,61 @@ export class MailEditor {
     return ok;
   }
 
+  /**
+   * 复制局部设计稿：选中 Section / Block 的 JSON 写入剪贴板，可在其他画布「追加」粘贴。
+   * @param target 显式指定目标（工具条调用时传入）；缺省用当前选中项
+   */
+  async copySelectionDesign(
+    target?: { sectionId: string } | { blockId: string },
+  ): Promise<boolean> {
+    this.canvas.commitInlineEdit();
+    const doc = this.store.doc;
+    let sections: Section[] = [];
+    let blocks: Block[] = [];
+
+    if (target && 'sectionId' in target) {
+      const sec = findSection(doc, target.sectionId);
+      if (sec) sections = [sec];
+    } else if (target && 'blockId' in target) {
+      const loc = findBlockLocation(doc, target.blockId);
+      if (loc) blocks = [loc.block];
+    } else {
+      const sel = this.store.selection;
+      if (sel?.kind === 'section') {
+        const sec = findSection(doc, sel.sectionId);
+        if (sec) sections = [sec];
+      } else if (sel?.kind === 'block') {
+        const loc = findBlockLocation(doc, sel.blockId);
+        if (loc) blocks = [loc.block];
+      }
+    }
+
+    if (!sections.length && !blocks.length) {
+      this._showToast(this.i18n.t('toast.copySelectionNoTarget'));
+      return false;
+    }
+
+    const ok = await writeTextToClipboard(
+      serializeSelectionClipboard({ sections, blocks, variables: doc.variables }),
+    );
+    this._showToast(
+      ok ? this.i18n.t('toast.copySelectionOk') : this.i18n.t('toast.copyDesignFailed'),
+    );
+    return ok;
+  }
+
+  /**
+   * 程序化粘贴局部设计稿：把 `simple-mail/selection` 信封内容**追加**到当前画布（不覆盖）。
+   * 未注册的 block type 会被跳过；内容引用到的变量会按 key 并入当前文档变量列表。
+   * @returns 是否成功解析并追加
+   */
+  importSelectionDesignFromJson(raw: string): boolean {
+    const parsed = parseSelectionClipboard(raw);
+    if (!parsed) return false;
+    this._applyImportedSelection(parsed);
+    return true;
+  }
+
   /** 打开导入设计稿对话框（从剪贴板或手动粘贴 JSON，覆盖当前画布）。 */
   openImportDocDesign(): void {
     this.canvas.commitInlineEdit();
@@ -497,7 +559,10 @@ export class MailEditor {
     }
     const dark = this._chromeIsEffectivelyDark();
     this.root.style.setProperty('--sm-primary', this.accentColorOverride);
-    this.root.style.setProperty('--sm-primary-soft', accentPrimarySoftRgba(this.accentColorOverride, dark));
+    this.root.style.setProperty(
+      '--sm-primary-soft',
+      accentPrimarySoftRgba(this.accentColorOverride, dark),
+    );
   }
 
   private _unbindSystemThemeMqForAccent() {
@@ -563,8 +628,7 @@ export class MailEditor {
     this.leftPanel = new LeftPanel({
       registry: this.registry,
       t: this.i18n.t,
-      blockGroupTitle:
-        ui?.paletteBlockGroupTitle ?? ui?.blockCategoryLabels?.content,
+      blockGroupTitle: ui?.paletteBlockGroupTitle ?? ui?.blockCategoryLabels?.content,
       customPaletteTooltipSuffix: ui?.customPaletteTooltipSuffix,
       hiddenPaletteBlockTypes: ui?.hiddenPaletteBlockTypes,
       enableDynamicVariantKey: ui?.enableDynamicVariantKey,
@@ -580,6 +644,7 @@ export class MailEditor {
       layerRoot: this.root,
       ui: this.opts.ui,
       t: this.i18n.t,
+      onCopySelectionDesign: (target) => void this.copySelectionDesign(target),
     });
     this.rightPanel = new RightPanel({
       store: this.store,
@@ -692,7 +757,8 @@ export class MailEditor {
   private _bindVariablePickerOutsideClick(anchor: HTMLElement) {
     this._unbindVariablePickerOutsideClick();
     const handler = (ev: MouseEvent) => {
-      if (!this.rightPanel.isVariablePickerOpen() || this.rightPanel.isVariablePickerPinned()) return;
+      if (!this.rightPanel.isVariablePickerOpen() || this.rightPanel.isVariablePickerPinned())
+        return;
       const target = ev.target as Node;
       if (this.rightPanel.el.contains(target)) return;
       if (anchor.contains(target) || target === anchor) return;
@@ -876,11 +942,7 @@ export class MailEditor {
   /**
    * 按当前选中插入块：block → 其后；section → 该 section 首列末尾；无选中 → 文档最后一节首列末尾。
    */
-  private _insertBlockRelativeToSelection(
-    d: EmailDoc,
-    sel: Selection | null,
-    block: Block,
-  ): void {
+  private _insertBlockRelativeToSelection(d: EmailDoc, sel: Selection | null, block: Block): void {
     if (sel?.kind === 'block') {
       const sec = d.sections.find((s) => s.id === sel.sectionId);
       const col = sec?.columns[sel.columnIndex];
@@ -1031,6 +1093,7 @@ export class MailEditor {
     this.importDocModal = new ImportDocModal({
       readClipboard: readTextFromClipboard,
       onApply: (doc) => this._applyImportedDoc(doc),
+      onApplySelection: (envelope) => this._applyImportedSelection(envelope),
       t: this.i18n.t,
     });
   }
@@ -1047,6 +1110,118 @@ export class MailEditor {
     this.setValue(next);
     this.store.setSelection(null);
     this._showToast(this.i18n.t('toast.importDesignOk'));
+  }
+
+  /**
+   * 追加局部设计稿：过滤未注册类型 → 变量并集 → 按当前选中定位落点 → id 重生成后写入。
+   * 全程走 store.update（可撤销），不覆盖任何现有内容。
+   */
+  private _applyImportedSelection(source: SelectionClipboardEnvelope) {
+    this.canvas.commitInlineEdit();
+    this._blurRightPanelIfFocused();
+
+    const skippedTypes = new Set<string>();
+    const filterBlocks = (blocks: Block[]): Block[] => {
+      const kept: Block[] = [];
+      for (const b of blocks) {
+        if (this.registry.get(b.type)) kept.push(b);
+        else skippedTypes.add(b.type);
+      }
+      return kept;
+    };
+
+    const sections = source.sections
+      .map((sec) => ({
+        ...sec,
+        columns: sec.columns.map((c) => ({ ...c, blocks: filterBlocks(c.blocks) })),
+      }))
+      .filter((sec) => sec.columns.some((c) => c.blocks.length > 0));
+    const blocks = filterBlocks(source.blocks);
+
+    if (!sections.length && !blocks.length) {
+      this._showToast(
+        skippedTypes.size
+          ? this.i18n.t('toast.pasteSelectionSkipped', { types: [...skippedTypes].join(', ') })
+          : this.i18n.t('toast.pasteSelectionEmpty'),
+      );
+      return;
+    }
+
+    // 变量并集：只并入「内容引用到 && 当前文档缺失」的 key
+    const usedKeys = collectSelectionVariableKeys(source);
+    const existingKeys = new Set(this.store.doc.variables.map((v) => v.key));
+    const mergedVars = source.variables.filter(
+      (v) => usedKeys.has(v.key) && !existingKeys.has(v.key),
+    );
+
+    const sel = this.store.selection;
+    let nextSelection: Selection | null = null;
+
+    this.store.update((d) => {
+      if (mergedVars.length) {
+        d.variables = [...d.variables, ...mergedVars.map((v) => ({ ...v }))];
+      }
+
+      if (sections.length) {
+        // 落点：选中 Section（或选中 Block 的所属节）之后；无选中则追加末尾
+        const anchorId =
+          sel?.kind === 'section'
+            ? sel.sectionId
+            : sel?.kind === 'block'
+              ? findBlockLocation(d, sel.blockId)?.section.id
+              : undefined;
+        const anchorIdx = anchorId ? d.sections.findIndex((s) => s.id === anchorId) : -1;
+        const clones = sections.map((s) => remapSectionIds(s));
+        const at = anchorIdx >= 0 ? anchorIdx + 1 : d.sections.length;
+        d.sections.splice(at, 0, ...clones);
+        nextSelection = { kind: 'section', sectionId: clones[0].id };
+      }
+
+      if (blocks.length) {
+        const clones = blocks.map((b) => regenerateBlockId(b));
+        if (sel?.kind === 'block') {
+          const loc = findBlockLocation(d, sel.blockId);
+          if (loc) {
+            const col = loc.section.columns[loc.columnIndex];
+            const at = col.blocks.findIndex((b) => b.id === loc.block.id);
+            col.blocks.splice(at < 0 ? col.blocks.length : at + 1, 0, ...clones);
+            nextSelection = {
+              kind: 'block',
+              sectionId: loc.section.id,
+              columnIndex: loc.columnIndex,
+              blockId: clones[0].id,
+            };
+            return;
+          }
+        }
+        if (sel?.kind === 'section') {
+          const sec = findSection(d, sel.sectionId);
+          if (sec?.columns.length) {
+            sec.columns[0].blocks.push(...clones);
+            nextSelection = {
+              kind: 'block',
+              sectionId: sec.id,
+              columnIndex: 0,
+              blockId: clones[0].id,
+            };
+            return;
+          }
+        }
+        // 无可用落点：包一层单列 Section 追加到末尾（与 autoWrapSection 行为一致）
+        const host = createSection('1');
+        host.columns[0].blocks = clones;
+        d.sections.push(host);
+        nextSelection = { kind: 'section', sectionId: host.id };
+      }
+    });
+
+    this.store.setSelection(nextSelection);
+
+    this._showToast(
+      skippedTypes.size
+        ? this.i18n.t('toast.pasteSelectionSkipped', { types: [...skippedTypes].join(', ') })
+        : this.i18n.t('toast.pasteSelectionOk'),
+    );
   }
 
   private _showExport() {
@@ -1211,7 +1386,8 @@ function smGetFullscreenElement(): Element | null {
 async function smRequestFullscreen(el: HTMLElement): Promise<void> {
   const anyEl = el as HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
   if (typeof anyEl.requestFullscreen === 'function') await anyEl.requestFullscreen();
-  else if (typeof anyEl.webkitRequestFullscreen === 'function') await anyEl.webkitRequestFullscreen();
+  else if (typeof anyEl.webkitRequestFullscreen === 'function')
+    await anyEl.webkitRequestFullscreen();
 }
 
 async function smExitFullscreen(): Promise<void> {
@@ -1248,7 +1424,8 @@ function migrateLegacyStyles(styles: Partial<GlobalStyles>): Partial<GlobalStyle
 function createDefaultDoc(partial?: Partial<EmailDoc>): EmailDoc {
   const mergedStyles = {
     backgroundColor: '#ffffff',
-    fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
+    fontFamily:
+      'Inter, -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif',
     fontSize: '16px',
     fontWeight: '400',
     color: '#433f3f',
