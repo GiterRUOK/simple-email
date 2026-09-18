@@ -4,12 +4,20 @@ import type { EmailDoc, RenderEngine, Variable } from '../types';
 import { inlineColumnWidthsInHtml } from '../utils/columnWidths';
 import { annotateDynamicVariantHtmlAttributes } from '../utils/dynamicVariantHtml';
 import { normalizeEmailListsInHtml, resolveGlobalListIndentPx } from '../utils/emailListStyles';
+import { findBrokenVariableTokens } from '../utils/variableGuard';
 import { docToMjml } from './mjml';
 
 export interface RenderResult {
   mjml: string;
   html: string;
   errors: { message: string }[];
+  /**
+   * 富文本里被切断 / 残缺的变量占位符（fragment 为断裂处附近的文本片段）。
+   * 非空意味着后台 replaceVariables 将无法替换这些 token，收件人会看到裸
+   * `{{key}}`——发送端应以非空为阻断 / 人工确认条件。编辑期的原子 chip 已从
+   * 源头阻断新损坏；此处是覆盖存量数据与手改旁路的最后防线。
+   */
+  brokenVariables: { fragment: string }[];
 }
 
 export interface RenderOptions {
@@ -45,6 +53,9 @@ export function renderDoc(
   html = annotateDynamicVariantHtmlAttributes(html, doc);
   html = inlineColumnWidthsInHtml(html);
   html = normalizeEmailListsInHtml(html, resolveGlobalListIndentPx(doc.styles));
+  // 扫描须在 sample 替换之前：替换后 token 已变成样值，断裂无从检测。
+  // 扫描对象是编译产物 HTML（即 replaceVariables 的实际作用对象），判据完全对齐。
+  const brokenVariables = findBrokenVariableTokens(html);
   if (opts.withSampleVariables) {
     html = replaceVariables(html, doc.variables);
   }
@@ -52,6 +63,7 @@ export function renderDoc(
   return {
     mjml,
     html,
+    brokenVariables,
     errors: (compiled.errors || []).map((e: any) => ({
       message: e.formattedMessage ?? e.message ?? String(e),
     })),

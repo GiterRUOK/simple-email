@@ -2315,6 +2315,41 @@
   height: 100%;
   background: var(--sm-code-bg, #fafbfc);
 }
+/* 断裂变量占位符告警条（导出弹框顶部，非阻断） */
+.sm-export__var-warning {
+  padding: 10px 14px;
+  margin: 0 0 10px;
+  border: 1px solid #f0c36d;
+  border-left: 4px solid #f0c36d;
+  border-radius: 6px;
+  background: #fdf6e3;
+  color: #7a5d0e;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.sm-export__var-warning-title {
+  font-weight: 600;
+}
+.sm-export__var-warning-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.sm-export__var-warning-list li {
+  font-family: var(--sm-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  word-break: break-all;
+}
+/* 变量原子 chip：仅存在于画布编辑会话中（提交时还原为纯 {{token}}）。
+   contenteditable=false 保证不可部分选中；此处补视觉态与整体点选。 */
+.sm-canvas [data-sm-var] {
+  display: inline-block;
+  padding: 0 4px;
+  border: 1px dashed var(--sm-outline-muted, #d0d7de);
+  border-radius: 4px;
+  background: rgba(125, 125, 125, 0.08);
+  cursor: default;
+  user-select: all;
+  -webkit-user-select: all;
+}
 .sm-export__editor .cm-editor {
   height: 100%;
   background: var(--sm-code-bg, #fafbfc) !important;

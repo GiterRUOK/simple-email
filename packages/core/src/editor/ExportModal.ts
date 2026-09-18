@@ -28,6 +28,7 @@ export class ExportModal {
   private modal: Modal;
   private cm: EditorView | null = null;
   private current = '';
+  private warningBox: HTMLElement;
 
   constructor(opts: ExportModalOptions) {
     this.opts = opts;
@@ -41,7 +42,9 @@ export class ExportModal {
     });
 
     const editorHost = h('div', { class: 'sm-export__editor' });
-    this.modal.body.append(editorHost);
+    // 断裂变量占位符告警条（_compile 时按需填充）
+    this.warningBox = h('div', { class: 'sm-export__var-warning', style: 'display:none' });
+    this.modal.body.append(this.warningBox, editorHost);
 
     const copyBtn = h('button', { class: 'sm-btn', type: 'button', onclick: () => this._copy() }, [
       this.opts.t('export.copyHtml'),
@@ -82,7 +85,34 @@ export class ExportModal {
       withSampleVariables: this.opts.withSampleVariables ?? false,
     });
     this.current = result.html;
+    this._renderBrokenVariableWarning(result.brokenVariables);
     this._setText(result.html);
+  }
+
+  /**
+   * 展示断裂变量占位符告警。chip 机制从源头阻断编辑期损坏，
+   * 此告警覆盖存量文档 / 手改 HTML 等旁路——非空时建议运营修复后再导出，
+   * 是否硬阻断由宿主发送端根据 renderDoc().brokenVariables 决定。
+   */
+  private _renderBrokenVariableWarning(broken: { fragment: string }[] | undefined) {
+    const box = this.warningBox;
+    box.style.display = 'none';
+    while (box.firstChild) box.removeChild(box.firstChild);
+    if (!broken || broken.length === 0) return;
+    const t = this.opts.t;
+    box.append(
+      h('div', { class: 'sm-export__var-warning-title' }, [
+        t('export.brokenVariablesTitle', { count: String(broken.length) }),
+      ]),
+      h(
+        'ul',
+        { class: 'sm-export__var-warning-list' },
+        broken.map((b) =>
+          h('li', {}, [t('export.brokenVariablesFragment', { fragment: b.fragment })]),
+        ),
+      ),
+    );
+    box.style.display = '';
   }
 
   private _setText(text: string) {

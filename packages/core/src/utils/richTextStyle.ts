@@ -14,6 +14,8 @@
  * 留在原处的文本仍受旧元素管辖，旧字号自然保留。
  */
 
+import { VARIABLE_CHIP_ATTR } from '../variables';
+
 /** 允许被拆掉的「纯样式壳」标签（语义标签如 a / strong / li 不在内） */
 const UNWRAPPABLE_TAGS = new Set(['span', 'font']);
 const UNWRAPPABLE_SELECTOR = 'span, font';
@@ -159,6 +161,11 @@ export function mergeRedundantSpans(root: ParentNode): void {
     for (const el of Array.from(root.querySelectorAll('span'))) {
       const parent = el.parentElement;
       if (!parent || parent.tagName.toLowerCase() !== 'span') continue;
+      // 变量原子 chip 不参与合并：chip 的样式身份（class+style）恒为空，
+      // 与无属性壳 span 相同，误合并会把子节点上提、拆掉 contenteditable=false 原子边界
+      if (el.hasAttribute(VARIABLE_CHIP_ATTR) || parent.hasAttribute(VARIABLE_CHIP_ATTR)) {
+        continue;
+      }
       if (spanIdentity(parent) !== spanIdentity(el)) continue;
       while (el.firstChild) parent.insertBefore(el.firstChild, el);
       el.remove();

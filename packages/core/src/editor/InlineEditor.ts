@@ -53,6 +53,7 @@ import {
   purgeInlineStyleDecl,
   unwrapEmptyInlineShells,
 } from '../utils/richTextStyle';
+import { VARIABLE_CHIP_ATTR, tokenToVariableKey } from '../variables';
 import { isColorPickerOpen } from './ColorPickerPopover';
 
 export interface InlineEditorOptions {
@@ -129,6 +130,11 @@ export class InlineEditor {
     this.el = opts.el;
     this.originalContent = this.el.innerHTML;
     this._mount();
+  }
+
+  /** 当前编辑模式；Editor 据此决定变量以原子 chip（rich/plain）还是纯文本（html）插入 */
+  get mode(): 'rich' | 'plain' | 'html' {
+    return this.opts.mode;
   }
 
   /** 立即提交并销毁。 */
@@ -327,6 +333,65 @@ export class InlineEditor {
     this.saveSelection();
   }
 
+  /**
+   * 在光标处原子插入 HTML 片段（供变量 chip 使用）。
+   *
+   * 不走 `execCommand('insertHTML')`：Chrome 对含 `contenteditable=false` 元素的
+   * 插入会为安置 caret 而追加 `<br>` / 拆出块级节点——表现为「变量插到新的一行」，
+   * 多余节点还会破坏 chip 的原子边界。这里用 Range API 精确插入，并在片段后补
+   * 一个零宽文本节点做 caret 落点（chip 是不可进入的原子，光标紧贴其后且位于
+   * 块尾时 Chrome 渲染不稳；commit 时零宽统一剥除）。
+   *
+   * @returns 是否成功插入（选区失效时 false，调用方走纯文本 fallback）
+   */
+  insertAtomicHtml(html: string): boolean {
+    this.edited = true;
+    this._ensureFocus();
+    this._restoreSelection();
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    if (!this.el.contains(range.startContainer) || !this.el.contains(range.endContainer)) {
+      return false;
+    }
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const frag = tpl.content;
+    if (!frag.firstChild) return false;
+    // 选中内容整体替换（含整体选中的旧 chip）
+    range.deleteContents();
+    const zwsp = document.createTextNode('\u200b');
+    frag.appendChild(zwsp);
+    const inserted = frag.firstChild;
+    range.insertNode(frag);
+    // 空块的占位 <br> 若留在 chip 前方，会渲染成「变量另起一行」；
+    // 仅当 <br> 前再无有效内容（真占位）时才移除。
+    // chip 可能是片段根节点（文本变量），也可能嵌在 <a> 等包装内（链接变量）。
+    if (
+      inserted instanceof HTMLElement &&
+      (inserted.hasAttribute(VARIABLE_CHIP_ATTR) ||
+        inserted.querySelector(`[${VARIABLE_CHIP_ATTR}]`))
+    ) {
+      const prev = inserted.previousSibling;
+      if (prev?.nodeName === 'BR') {
+        let node = prev.previousSibling;
+        while (node && node.nodeType === Node.TEXT_NODE && !(node.nodeValue ?? '').trim()) {
+          node = node.previousSibling;
+        }
+        if (!node) prev.remove();
+      }
+    }
+    const caret = document.createRange();
+    caret.setStart(zwsp, 1);
+    caret.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(caret);
+    this.saveSelection();
+    // Range API 不触发 input 事件；补发一次以走通既有联动（is-empty 同步、选区广播等）
+    this.el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  }
+
   /** Toolbar 关闭某个面板/控件后调用，把选区还给编辑区，方便用户继续输入。 */
   refocus() {
     this._ensureFocus();
@@ -521,6 +586,10 @@ export class InlineEditor {
       el.innerHTML = mode === 'plain' ? '' : '<br>';
     } else {
       el.innerHTML = mode === 'plain' ? escapeHtml(initial) : initial;
+      // rich 模式：把内容里完整的 {{token}} 重新 chip 化，编辑期获得与「新插入变量」
+      // 同等的原子保护——否则 commit 后再次打开，旧 token 仍是可被样式命令切断的纯文本。
+      // 必须在 innerHTML 写入后执行：chip 化的是刚写入的 DOM，写在赋值前会被整体覆盖。
+      if (mode === 'rich') chipifyVariableTokens(el);
     }
 
     // 初始聚焦并把光标移到末尾，便于"双击 → 直接输入"
@@ -1132,6 +1201,51 @@ function plainTextToRichHtml(text: string): string {
  *  - 标准化：<b> -> <strong>，<i> -> <em>，<font color> -> <span style="color:..">
  *  - 属性白名单：href / target / rel / style / class（保留邮件常见属性）
  */
+/**
+ * 编辑会话开始时把富文本里完整的 `{{token}}` 替换为原子 chip。
+ *
+ * 数据模型里的 token 是纯文本（commit 时 chip 已还原）；再次打开编辑器时若不
+ * 重新 chip 化，历史 token 依旧会被样式命令 / 退格切断。只有完整落在单一文本
+ * 节点内的 token 才替换——已断裂的（如 `{<b>{key</b>}}`）保持原样，交给导出时
+ * 的断裂扫描告警。链接变量的 `<a>` 显示文本同样会被 chip 化，href 属性不受影响。
+ */
+function chipifyVariableTokens(root: HTMLElement): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  let n = walker.nextNode();
+  while (n) {
+    nodes.push(n as Text);
+    n = walker.nextNode();
+  }
+  const re = /\{\{\s*[^}\s]+\s*\}\}/g;
+  for (const textNode of nodes) {
+    const text = textNode.nodeValue ?? '';
+    if (!text.includes('{{')) continue;
+    // chip 内部的 token 本身就是显示文本，跳过
+    if (textNode.parentElement?.hasAttribute(VARIABLE_CHIP_ATTR)) continue;
+    const matches = Array.from(text.matchAll(re));
+    if (matches.length === 0) continue;
+    const frag = document.createDocumentFragment();
+    let last = 0;
+    for (const m of matches) {
+      if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+      frag.appendChild(variableChipElement(m[0]));
+      last = m.index + m[0].length;
+    }
+    if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+    textNode.parentNode?.replaceChild(frag, textNode);
+  }
+}
+
+/** 由 token 文本构建原子 chip 元素（与 variables.variableChipHtml 生成的结构一致） */
+function variableChipElement(token: string): HTMLElement {
+  const span = document.createElement('span');
+  span.setAttribute(VARIABLE_CHIP_ATTR, tokenToVariableKey(token));
+  span.setAttribute('contenteditable', 'false');
+  span.textContent = token;
+  return span;
+}
+
 export function sanitizeRichHtml(html: string): string {
   const tpl = document.createElement('template');
   tpl.innerHTML = html;
@@ -1150,6 +1264,20 @@ export function sanitizeRichHtml(html: string): string {
       if (tag === 'span' && el.getAttribute('data-sm-caret') === '1') {
         while (el.firstChild) el.parentNode?.insertBefore(el.firstChild, el);
         el.remove();
+        return;
+      }
+      // 变量原子 chip 还原：chip 只应存在于编辑会话中，提交时拆壳还原为纯 token，
+      // 保证数据模型（content / 导出 HTML）里 token 永远是完整纯文本。
+      // chip 上若被样式命令写入了内联样式（如整体变色），降级为普通 span 保留样式——
+      // 替换发生在后台字符串层，样式意图应作用于替换后的文本。
+      if (tag === 'span' && el.hasAttribute(VARIABLE_CHIP_ATTR)) {
+        const style = el.getAttribute('style');
+        el.removeAttribute(VARIABLE_CHIP_ATTR);
+        el.removeAttribute('contenteditable');
+        if (!style) {
+          while (el.firstChild) el.parentNode?.insertBefore(el.firstChild, el);
+          el.remove();
+        }
         return;
       }
       // 只改了字号/字重却没输入内容的 typing 占位 span：零宽字符剥掉后是空壳，拆掉避免进邮件

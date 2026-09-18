@@ -46,9 +46,13 @@ export {
   defaultVariableSample,
   normalizeVariable,
   tokenToVariableKey,
+  variableChipHtml,
   variablePlaceholder,
+  VARIABLE_CHIP_ATTR,
 } from './variables';
 export type { BodyVariableInsert, VariableKind } from './variables';
+export { findBrokenVariableTokens } from './utils/variableGuard';
+export type { BrokenVariableToken } from './utils/variableGuard';
 export { docToMjml } from './renderer/mjml';
 export {
   Store,

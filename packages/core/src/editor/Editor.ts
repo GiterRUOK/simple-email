@@ -39,7 +39,12 @@ import {
 } from '../utils/docClipboard';
 import { clear, h } from '../utils/dom';
 import { appendInlineToRichHtml } from '../utils/richHtmlInsert';
-import { buildLinkVariableHtml, normalizeVariable, variablePlaceholder } from '../variables';
+import {
+  buildLinkVariableHtml,
+  normalizeVariable,
+  variableChipHtml,
+  variablePlaceholder,
+} from '../variables';
 import { Canvas } from './Canvas';
 import { ExportModal } from './ExportModal';
 import { ImportDocModal, readTextFromClipboard, writeTextToClipboard } from './ImportDocModal';
@@ -367,11 +372,20 @@ export class MailEditor {
 
   /**
    * 插入变量 key（`{{key}}`）。
+   * 画布 inline editor 处于 rich/plain 模式时插入原子 chip（contenteditable=false），
+   * 防止后续加粗/变色/退格把 token 切断；html 模式（源码编辑，commit 保留原始
+   * innerHTML）与右栏输入框等场景仍插入纯文本 token。
    * @returns 是否成功插入
    */
   insertVariableKey(v: Variable): boolean {
     const normalized = normalizeVariable(v);
-    return this._insertAtFocus(variablePlaceholder(normalized.key), false);
+    const token = variablePlaceholder(normalized.key);
+    const inline = this.canvas.currentInlineEditor;
+    if (inline && inline.mode !== 'html') {
+      // 原子插入：Range API + contenteditable=false，绕开 execCommand 的块级改写
+      if (inline.insertAtomicHtml(variableChipHtml(token))) return true;
+    }
+    return this._insertAtFocus(token, false);
   }
 
   /**
@@ -386,8 +400,18 @@ export class MailEditor {
     if (normalized.kind === 'link') {
       const token = variablePlaceholder(normalized.key);
       if (this._tryApplyLinkVariableToken(token)) return true;
-      const html = buildLinkVariableHtml(token, this.store.doc.styles.linkColor || '#ff5a00');
-      return this._insertAtFocus(html, true);
+      const linkColor = this.store.doc.styles.linkColor || '#ff5a00';
+      const inline = this.canvas.currentInlineEditor;
+      if (inline && inline.mode !== 'html') {
+        // 编辑会话内插入：显示文本用原子 chip，防止样式命令切断 token；
+        // commit 时 sanitizeRichHtml 会拆壳还原（有内联样式则降级为普通 span 保留样式）。
+        if (
+          inline.insertAtomicHtml(buildLinkVariableHtml(token, linkColor, { atomicText: true }))
+        ) {
+          return true;
+        }
+      }
+      return this._insertAtFocus(buildLinkVariableHtml(token, linkColor), true);
     }
     return this.insertVariableKey(normalized);
   }

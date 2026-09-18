@@ -237,6 +237,9 @@ export const zhCNMessages: SimpleMailMessages = {
   'export.title': '导出 HTML',
   'export.copyHtml': '复制 HTML',
   'export.downloadHtml': '下载 .html',
+  'export.brokenVariablesTitle':
+    '检测到 {count} 处变量占位符疑似损坏（文本样式等标签把 token 切断），发送时无法完成替换，收件人将看到原始 {{token}}，请修复后再导出：',
+  'export.brokenVariablesFragment': '…{fragment}…',
   'preview.title': '预览邮件',
   'colorPicker.title': '选择颜色',
   'colorPicker.custom': '自定义颜色',
@@ -599,6 +602,9 @@ export const enUSMessages: SimpleMailMessages = {
   'export.title': 'Export HTML',
   'export.copyHtml': 'Copy HTML',
   'export.downloadHtml': 'Download .html',
+  'export.brokenVariablesTitle':
+    'Detected {count} broken variable placeholder(s) (tokens split by styling tags). Substitution will fail and recipients would see raw {{token}} — please fix before exporting:',
+  'export.brokenVariablesFragment': '…{fragment}…',
   'preview.title': 'Preview email',
   'colorPicker.title': 'Choose color',
   'colorPicker.custom': 'Custom color',
