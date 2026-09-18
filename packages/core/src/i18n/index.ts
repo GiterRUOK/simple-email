@@ -239,6 +239,8 @@ export const zhCNMessages: SimpleMailMessages = {
   'export.downloadHtml': '下载 .html',
   'export.brokenVariablesTitle':
     '检测到 {count} 处变量占位符疑似损坏（文本样式等标签把 token 切断），发送时无法完成替换，收件人将看到原始 {{token}}，请修复后再导出：',
+  'export.unknownVariablesTitle':
+    '检测到 {count} 个未注册变量（key 不在变量列表中），发送时不会被替换，收件人将看到原始 {{token}}，请修正拼写或补充变量列表：',
   'export.brokenVariablesFragment': '…{fragment}…',
   'preview.title': '预览邮件',
   'colorPicker.title': '选择颜色',
@@ -604,6 +606,8 @@ export const enUSMessages: SimpleMailMessages = {
   'export.downloadHtml': 'Download .html',
   'export.brokenVariablesTitle':
     'Detected {count} broken variable placeholder(s) (tokens split by styling tags). Substitution will fail and recipients would see raw {{token}} — please fix before exporting:',
+  'export.unknownVariablesTitle':
+    'Detected {count} unregistered variable(s) (keys missing from the variable list). They will not be substituted and recipients would see raw {{token}} — fix the typo or extend the variable list:',
   'export.brokenVariablesFragment': '…{fragment}…',
   'preview.title': 'Preview email',
   'colorPicker.title': 'Choose color',

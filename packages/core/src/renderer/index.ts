@@ -12,12 +12,12 @@ export interface RenderResult {
   html: string;
   errors: { message: string }[];
   /**
-   * 富文本里被切断 / 残缺的变量占位符（fragment 为断裂处附近的文本片段）。
-   * 非空意味着后台 replaceVariables 将无法替换这些 token，收件人会看到裸
-   * `{{key}}`——发送端应以非空为阻断 / 人工确认条件。编辑期的原子 chip 已从
-   * 源头阻断新损坏；此处是覆盖存量数据与手改旁路的最后防线。
+   * 发送端无法完成替换的变量占位符（fragment 为附近的文本片段）。
+   * kind='broken'：token 被样式标签切断；kind='unknown'：结构完整但 key 未注册。
+   * 非空意味着收件人会看到裸 `{{key}}`——发送端应以非空为阻断 / 人工确认条件。
+   * 编辑期的原子 chip 已从源头阻断新损坏；此处是覆盖存量数据与手改旁路的最后防线。
    */
-  brokenVariables: { fragment: string }[];
+  brokenVariables: { fragment: string; kind: 'broken' | 'unknown'; key?: string }[];
 }
 
 export interface RenderOptions {
@@ -55,7 +55,7 @@ export function renderDoc(
   html = normalizeEmailListsInHtml(html, resolveGlobalListIndentPx(doc.styles));
   // 扫描须在 sample 替换之前：替换后 token 已变成样值，断裂无从检测。
   // 扫描对象是编译产物 HTML（即 replaceVariables 的实际作用对象），判据完全对齐。
-  const brokenVariables = findBrokenVariableTokens(html);
+  const brokenVariables = findBrokenVariableTokens(html, doc.variables);
   if (opts.withSampleVariables) {
     html = replaceVariables(html, doc.variables);
   }

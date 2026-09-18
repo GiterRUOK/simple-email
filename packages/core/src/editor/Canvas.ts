@@ -927,6 +927,7 @@ export class Canvas {
       multiline: !!def.inlineEditable.multiline,
       placeholder: def.inlineEditable.placeholder,
       globalStyles: this.opts.store.doc.styles,
+      variableKeys: this.opts.store.doc.variables.map((v) => v.key),
       onCommit: (value) => {
         const propKey = def.inlineEditable!.propKey;
         const editingId = block.id;

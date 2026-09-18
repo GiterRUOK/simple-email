@@ -2350,6 +2350,13 @@
   user-select: all;
   -webkit-user-select: all;
 }
+/* 结构完整但 key 未注册的 token：保留原子保护，仅以边框+背景警示
+   「发送时不会被替换」，拼写错误在编辑期即自我暴露。字体保持正文色——
+   红虚线+浅红底的信号已足够，红字属于强错误级别，编辑期不应拉满。 */
+.sm-canvas [data-sm-var-unknown] {
+  border-color: var(--sm-danger, #dc2626);
+  background: rgba(220, 38, 38, 0.06);
+}
 .sm-export__editor .cm-editor {
   height: 100%;
   background: var(--sm-code-bg, #fafbfc) !important;

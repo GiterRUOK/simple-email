@@ -90,28 +90,48 @@ export class ExportModal {
   }
 
   /**
-   * 展示断裂变量占位符告警。chip 机制从源头阻断编辑期损坏，
+   * 展示变量占位符告警：kind='broken'（标签切断）与 kind='unknown'（key 未注册）
+   * 成因与修复方式不同，分组提示。chip 机制从源头阻断编辑期损坏，
    * 此告警覆盖存量文档 / 手改 HTML 等旁路——非空时建议运营修复后再导出，
    * 是否硬阻断由宿主发送端根据 renderDoc().brokenVariables 决定。
    */
-  private _renderBrokenVariableWarning(broken: { fragment: string }[] | undefined) {
+  private _renderBrokenVariableWarning(broken: { fragment: string; kind: string }[] | undefined) {
     const box = this.warningBox;
     box.style.display = 'none';
     while (box.firstChild) box.removeChild(box.firstChild);
     if (!broken || broken.length === 0) return;
     const t = this.opts.t;
-    box.append(
-      h('div', { class: 'sm-export__var-warning-title' }, [
-        t('export.brokenVariablesTitle', { count: String(broken.length) }),
-      ]),
+    const split = broken.reduce(
+      (acc, b) => {
+        acc[b.kind === 'unknown' ? 'unknown' : 'broken'].push(b);
+        return acc;
+      },
+      { broken: [] as { fragment: string }[], unknown: [] as { fragment: string }[] },
+    );
+    const list = (items: { fragment: string }[]) =>
       h(
         'ul',
         { class: 'sm-export__var-warning-list' },
-        broken.map((b) =>
+        items.map((b) =>
           h('li', {}, [t('export.brokenVariablesFragment', { fragment: b.fragment })]),
         ),
-      ),
-    );
+      );
+    if (split.broken.length > 0) {
+      box.append(
+        h('div', { class: 'sm-export__var-warning-title' }, [
+          t('export.brokenVariablesTitle', { count: String(split.broken.length) }),
+        ]),
+        list(split.broken),
+      );
+    }
+    if (split.unknown.length > 0) {
+      box.append(
+        h('div', { class: 'sm-export__var-warning-title' }, [
+          t('export.unknownVariablesTitle', { count: String(split.unknown.length) }),
+        ]),
+        list(split.unknown),
+      );
+    }
     box.style.display = '';
   }
 

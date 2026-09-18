@@ -53,7 +53,7 @@ import {
   purgeInlineStyleDecl,
   unwrapEmptyInlineShells,
 } from '../utils/richTextStyle';
-import { VARIABLE_CHIP_ATTR, tokenToVariableKey } from '../variables';
+import { VARIABLE_CHIP_ATTR, VARIABLE_CHIP_UNKNOWN_ATTR, tokenToVariableKey } from '../variables';
 import { isColorPickerOpen } from './ColorPickerPopover';
 
 export interface InlineEditorOptions {
@@ -67,6 +67,13 @@ export interface InlineEditorOptions {
   onSelectionChange?: (state: SelectionState | null) => void;
   /** 文档全局列表默认缩进（px），用于工具条展示继承值 */
   globalStyles?: GlobalStyles;
+  /**
+   * 宿主变量 key 列表（编辑会话开始时的快照）。
+   * chip 化存量 token 时据此区分「有效变量」与「未知 token」：
+   * 两者都获得原子保护，但未知 token 用警示样式呈现（见 VARIABLE_CHIP_UNKNOWN_ATTR）。
+   * 省略时（无法获知列表）所有完整 token 一律按有效处理，保持宽松兼容。
+   */
+  variableKeys?: string[];
 }
 
 export interface SelectionState {
@@ -367,15 +374,30 @@ export class InlineEditor {
     // 空块的占位 <br> 若留在 chip 前方，会渲染成「变量另起一行」；
     // 仅当 <br> 前再无有效内容（真占位）时才移除。
     // chip 可能是片段根节点（文本变量），也可能嵌在 <a> 等包装内（链接变量）。
+    // 两处回溯都必须把零宽锚点 \u200b 算作「无内容」：JS 的 trim() 不剥零宽空格，
+    // chip 删除后留下的 [zwsp…, <br>] 布局会让占位判定误判成「br 前有内容」，
+    // br 摘不掉、变量掉到下一行（光标被点击/方向键移到 br 之后时触发）。
     if (
       inserted instanceof HTMLElement &&
       (inserted.hasAttribute(VARIABLE_CHIP_ATTR) ||
         inserted.querySelector(`[${VARIABLE_CHIP_ATTR}]`))
     ) {
-      const prev = inserted.previousSibling;
+      // 先跳过 chip 与 br 之间可能隔着的零宽锚点文本（仅零宽——用户空格是真实内容）
+      let prev: ChildNode | null = inserted.previousSibling;
+      while (
+        prev &&
+        prev.nodeType === Node.TEXT_NODE &&
+        !(prev.nodeValue ?? '').replace(/\u200b/g, '')
+      ) {
+        prev = prev.previousSibling;
+      }
       if (prev?.nodeName === 'BR') {
-        let node = prev.previousSibling;
-        while (node && node.nodeType === Node.TEXT_NODE && !(node.nodeValue ?? '').trim()) {
+        let node: ChildNode | null = prev.previousSibling;
+        while (
+          node &&
+          node.nodeType === Node.TEXT_NODE &&
+          !(node.nodeValue ?? '').replace(/[\u200b\s]/g, '')
+        ) {
           node = node.previousSibling;
         }
         if (!node) prev.remove();
@@ -390,6 +412,182 @@ export class InlineEditor {
     // Range API 不触发 input 事件；补发一次以走通既有联动（is-empty 同步、选区广播等）
     this.el.dispatchEvent(new Event('input', { bubbles: true }));
     return true;
+  }
+
+  /**
+   * 删除紧邻光标的变量 chip（退格向左 / Delete 向右）。
+   *
+   * chip 是 contenteditable=false + user-select:all 元素，光标紧贴它时浏览器原生
+   * 退格常只把 chip 选中而不删除。这里跳过纯零宽 / 空白文本找紧邻内容——否则
+   * 插入时补的 zwsp 挡在中间，第一次退格只删掉 zwsp、第二次才轮到「选中 chip」。
+   * @returns 是否命中并删除（true 时调用方须 preventDefault）
+   */
+  private _deleteAdjacentVariableChip(dir: -1 | 1): boolean {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return false;
+    const range = sel.getRangeAt(0);
+    // 非折叠选区：浏览器默认删除行为正常，不接管
+    if (!range.collapsed) return false;
+    if (!this.el.contains(range.startContainer)) return false;
+    const chip = dir === -1 ? this._chipBeforeCaret(range) : this._chipAfterCaret(range);
+    if (!chip) return false;
+    // 选中整个 chip 后走 execCommand('delete')：与手动 remove() 的关键区别是
+    // 前者进 contenteditable 原生撤销栈——手动摘除的事务 Ctrl+Z 找不回来。
+    const cover = document.createRange();
+    cover.setStartBefore(chip);
+    cover.setEndAfter(chip);
+    sel.removeAllRanges();
+    sel.addRange(cover);
+    const done = richTextExecCommand('delete');
+    if (done) {
+      // rich 块被删空时浏览器不一定补 <br> 锚点（各端行为不一），统一补齐；
+      // getRangeAt 拿到的是选区内的活引用，改它即移动光标
+      if (this.opts.mode === 'rich' && sel.rangeCount > 0) {
+        const after = sel.getRangeAt(0);
+        if (after.collapsed) this._ensureCaretBlockAnchor(after);
+      }
+    } else {
+      // 极端环境 execCommand 失败：退回手动摘除（牺牲可撤销，保删除可用）
+      const caret = document.createRange();
+      if (dir === -1) caret.setStartBefore(chip);
+      else caret.setStartAfter(chip);
+      caret.collapse(true);
+      chip.remove();
+      if (this.opts.mode === 'rich') this._ensureCaretBlockAnchor(caret);
+      sel.removeAllRanges();
+      sel.addRange(caret);
+    }
+    this.edited = true;
+    // execCommand / remove 均不触发 input；补发以走通 is-empty 同步等既有联动
+    this.el.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  }
+
+  /** 光标左侧紧邻的 chip（仅跨过程序插入的零宽锚点 \u200b；中间隔着用户可见字符——
+      哪怕是空格——都返回 null 走默认退格，否则退格会越过空格直接吃掉变量） */
+  private _chipBeforeCaret(range: Range): HTMLElement | null {
+    const c = range.startContainer;
+    if (c.nodeType === Node.TEXT_NODE) {
+      const before = (c.nodeValue ?? '').slice(0, range.startOffset);
+      if (before.replace(/\u200b/g, '').length > 0) return null;
+      return this._chipBeforeNode(c);
+    }
+    if (c.nodeType === Node.ELEMENT_NODE) {
+      if (range.startOffset > 0) {
+        const prev = c.childNodes[range.startOffset - 1];
+        const chip = prev ? this._asRemovableChip(prev) : null;
+        if (chip) return chip;
+        if (
+          prev?.nodeType === Node.TEXT_NODE &&
+          (prev.nodeValue ?? '').replace(/\u200b/g, '').length === 0
+        ) {
+          return this._chipBeforeNode(prev);
+        }
+        return null;
+      }
+      return this._chipBeforeNode(c);
+    }
+    return null;
+  }
+
+  /** 光标右侧紧邻的 chip（仅跨过零宽锚点；Delete 方向，逻辑与 _chipBeforeCaret 对称） */
+  private _chipAfterCaret(range: Range): HTMLElement | null {
+    const c = range.startContainer;
+    if (c.nodeType === Node.TEXT_NODE) {
+      const after = (c.nodeValue ?? '').slice(range.startOffset);
+      if (after.replace(/\u200b/g, '').length > 0) return null;
+      return this._chipAfterNode(c);
+    }
+    if (c.nodeType === Node.ELEMENT_NODE) {
+      const next = c.childNodes[range.startOffset];
+      const chip = next ? this._asRemovableChip(next) : null;
+      if (chip) return chip;
+      if (
+        next?.nodeType === Node.TEXT_NODE &&
+        (next.nodeValue ?? '').replace(/\u200b/g, '').length === 0
+      ) {
+        return this._chipAfterNode(next);
+      }
+      return null;
+    }
+    return null;
+  }
+
+  /** 沿树向左找 node 前第一个「有内容」的兄弟：是 chip 返回之，否则 null */
+  private _chipBeforeNode(node: Node): HTMLElement | null {
+    let cur: Node | null = node;
+    while (cur && cur !== this.el) {
+      const parent: Node | null = cur.parentNode;
+      if (!parent) return null;
+      const idx = Array.prototype.indexOf.call(parent.childNodes, cur);
+      for (let i = idx - 1; i >= 0; i--) {
+        const prev = parent.childNodes[i];
+        if (prev.nodeType === Node.TEXT_NODE) {
+          if ((prev.nodeValue ?? '').replace(/\u200b/g, '').length === 0) continue;
+          return null;
+        }
+        return this._asRemovableChip(prev);
+      }
+      cur = parent;
+    }
+    return null;
+  }
+
+  /** 沿树向右找 node 后第一个「有内容」的兄弟（Delete 方向） */
+  private _chipAfterNode(node: Node): HTMLElement | null {
+    let cur: Node | null = node;
+    while (cur && cur !== this.el) {
+      const parent: Node | null = cur.parentNode;
+      if (!parent) return null;
+      const idx = Array.prototype.indexOf.call(parent.childNodes, cur);
+      for (let i = idx + 1; i < parent.childNodes.length; i++) {
+        const next = parent.childNodes[i];
+        if (next.nodeType === Node.TEXT_NODE) {
+          if ((next.nodeValue ?? '').replace(/\u200b/g, '').length === 0) continue;
+          return null;
+        }
+        return this._asRemovableChip(next);
+      }
+      cur = parent;
+    }
+    return null;
+  }
+
+  /**
+   * node 若是 chip 返回之；若是「chip 为唯一内容」的 `<a>`（链接变量插入的
+   * `<a href="{{link}}"><span data-sm-var>…</span></a>`）返回整个 `<a>`——
+   * 拆掉壳里的 chip 会留下空链接。
+   */
+  private _asRemovableChip(node: Node): HTMLElement | null {
+    if (node.nodeType !== Node.ELEMENT_NODE) return null;
+    const el = node as HTMLElement;
+    if (el.hasAttribute(VARIABLE_CHIP_ATTR)) return el;
+    if (el.tagName !== 'A') return null;
+    const chip = el.querySelector(`[${VARIABLE_CHIP_ATTR}]`);
+    if (!chip) return null;
+    const rest = (el.textContent ?? '').replace(chip.textContent ?? '', '');
+    return rest.replace(/\u200b/g, '').length === 0 ? el : null;
+  }
+
+  /** 删除 chip 后光标所在块若被删空，补 `<br>` 锚点（对齐 _mount 空块初始化） */
+  private _ensureCaretBlockAnchor(caret: Range) {
+    let block: HTMLElement | null =
+      caret.startContainer.nodeType === Node.ELEMENT_NODE
+        ? (caret.startContainer as HTMLElement)
+        : caret.startContainer.parentElement;
+    while (block && block !== this.el && !/^(P|DIV|LI|H[1-6])$/.test(block.tagName)) {
+      block = block.parentElement;
+    }
+    if (!block) return;
+    const hasContent =
+      (block.textContent ?? '').replace(/[\u200b\s]/g, '').length > 0 ||
+      !!block.querySelector(`br, img, [${VARIABLE_CHIP_ATTR}]`);
+    if (!hasContent) {
+      const br = document.createElement('br');
+      block.appendChild(br);
+      caret.setStartBefore(br);
+      caret.collapse(true);
+    }
   }
 
   /** Toolbar 关闭某个面板/控件后调用，把选区还给编辑区，方便用户继续输入。 */
@@ -589,7 +787,7 @@ export class InlineEditor {
       // rich 模式：把内容里完整的 {{token}} 重新 chip 化，编辑期获得与「新插入变量」
       // 同等的原子保护——否则 commit 后再次打开，旧 token 仍是可被样式命令切断的纯文本。
       // 必须在 innerHTML 写入后执行：chip 化的是刚写入的 DOM，写在赋值前会被整体覆盖。
-      if (mode === 'rich') chipifyVariableTokens(el);
+      if (mode === 'rich') chipifyVariableTokens(el, this.opts.variableKeys);
     }
 
     // 初始聚焦并把光标移到末尾，便于"双击 → 直接输入"
@@ -653,6 +851,21 @@ export class InlineEditor {
         e.preventDefault();
         richTextExecCommand('insertLineBreak');
         return;
+      }
+      // 变量 chip 原子删除：浏览器对 contenteditable=false + user-select:all 元素
+      // 的原生退格常表现为「先把 chip 选中而不删除」，用户感知为按了没反应；
+      // keydown 阶段直接接管（rich / plain 都有 chip，html 是源码编辑无 chip）。
+      if ((e.key === 'Backspace' || e.key === 'Delete') && mode !== 'html') {
+        if (!e.isComposing && !imeComposing) {
+          const deleted = this._deleteAdjacentVariableChip(e.key === 'Backspace' ? -1 : 1);
+          if (deleted) {
+            e.preventDefault();
+            this.saveSelection();
+            this._emitSelection();
+            return;
+          }
+        }
+        // 未紧邻 chip：落入下方既有处理（列表合并 / 浏览器默认行为）
       }
       if (e.key === 'Backspace' && mode === 'rich' && multiline) {
         if (e.isComposing || imeComposing) return;
@@ -1208,8 +1421,13 @@ function plainTextToRichHtml(text: string): string {
  * 重新 chip 化，历史 token 依旧会被样式命令 / 退格切断。只有完整落在单一文本
  * 节点内的 token 才替换——已断裂的（如 `{<b>{key</b>}}`）保持原样，交给导出时
  * 的断裂扫描告警。链接变量的 `<a>` 显示文本同样会被 chip 化，href 属性不受影响。
+ *
+ * 传入 variableKeys 时按列表区分有效 / 未知：未注册 token 同样 chip 化（保护
+ * 结构不被切断，便于将来补注册后仍能匹配），但加 unknown 标记走警示样式。
  */
-function chipifyVariableTokens(root: HTMLElement): void {
+function chipifyVariableTokens(root: HTMLElement, variableKeys?: string[]): void {
+  // undefined = 宿主未提供列表（无从判定），所有完整 token 按有效处理
+  const known = variableKeys ? new Set(variableKeys) : undefined;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   const nodes: Text[] = [];
   let n = walker.nextNode();
@@ -1229,7 +1447,7 @@ function chipifyVariableTokens(root: HTMLElement): void {
     let last = 0;
     for (const m of matches) {
       if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
-      frag.appendChild(variableChipElement(m[0]));
+      frag.appendChild(variableChipElement(m[0], known));
       last = m.index + m[0].length;
     }
     if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
@@ -1238,10 +1456,12 @@ function chipifyVariableTokens(root: HTMLElement): void {
 }
 
 /** 由 token 文本构建原子 chip 元素（与 variables.variableChipHtml 生成的结构一致） */
-function variableChipElement(token: string): HTMLElement {
+function variableChipElement(token: string, knownKeys?: Set<string>): HTMLElement {
   const span = document.createElement('span');
-  span.setAttribute(VARIABLE_CHIP_ATTR, tokenToVariableKey(token));
+  const key = tokenToVariableKey(token);
+  span.setAttribute(VARIABLE_CHIP_ATTR, key);
   span.setAttribute('contenteditable', 'false');
+  if (knownKeys && !knownKeys.has(key)) span.setAttribute(VARIABLE_CHIP_UNKNOWN_ATTR, '');
   span.textContent = token;
   return span;
 }
@@ -1273,6 +1493,7 @@ export function sanitizeRichHtml(html: string): string {
       if (tag === 'span' && el.hasAttribute(VARIABLE_CHIP_ATTR)) {
         const style = el.getAttribute('style');
         el.removeAttribute(VARIABLE_CHIP_ATTR);
+        el.removeAttribute(VARIABLE_CHIP_UNKNOWN_ATTR);
         el.removeAttribute('contenteditable');
         if (!style) {
           while (el.firstChild) el.parentNode?.insertBefore(el.firstChild, el);

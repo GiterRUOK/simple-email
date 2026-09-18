@@ -49,6 +49,7 @@ export {
   variableChipHtml,
   variablePlaceholder,
   VARIABLE_CHIP_ATTR,
+  VARIABLE_CHIP_UNKNOWN_ATTR,
 } from './variables';
 export type { BodyVariableInsert, VariableKind } from './variables';
 export { findBrokenVariableTokens } from './utils/variableGuard';
