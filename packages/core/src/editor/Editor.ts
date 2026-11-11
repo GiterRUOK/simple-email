@@ -801,6 +801,9 @@ export class MailEditor {
       blockGroupTitle: ui?.paletteBlockGroupTitle ?? ui?.blockCategoryLabels?.content,
       customPaletteTooltipSuffix: ui?.customPaletteTooltipSuffix,
       hiddenPaletteBlockTypes: ui?.hiddenPaletteBlockTypes,
+      paletteGroupOrder: ui?.paletteGroupOrder,
+      paletteBlockOrder: ui?.paletteBlockOrder,
+      paletteSectionBlockOrder: ui?.paletteSectionBlockOrder,
       enableDynamicVariantKey: ui?.enableDynamicVariantKey,
     });
     const autoWrap = this.opts.autoWrapSection !== false;

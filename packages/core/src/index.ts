@@ -86,6 +86,7 @@ export type {
   EmailDoc,
   EmailMeta,
   GlobalStyles,
+  PaletteGroupKey,
   RenderContext,
   RenderEngine,
   Section,

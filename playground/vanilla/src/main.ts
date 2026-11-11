@@ -1,4 +1,5 @@
 import {
+  type EditorUiOptions,
   type EmailDoc,
   type GalleryItem,
   type ImageGalleryAdapter,
@@ -13,6 +14,19 @@ import type { SimpleMailLocale } from '@simple-mail/core';
 function getDemoLocale(): SimpleMailLocale {
   const raw = new URLSearchParams(window.location.search).get('locale');
   return raw === 'zh-CN' ? 'zh-CN' : 'en-US';
+}
+
+/**
+ * 左栏排序回归用例：?paletteOrder=components 时把组件组提到最前，
+ * 并跨 content / custom 类别重排卡片；不传参数时保持默认顺序。
+ */
+function demoPaletteOrderUi(): Partial<EditorUiOptions> {
+  const enabled = new URLSearchParams(window.location.search).get('paletteOrder') === 'components';
+  if (!enabled) return {};
+  return {
+    paletteGroupOrder: ['components', 'layout', 'sectionBlocks'],
+    paletteBlockOrder: ['text', 'button', 'image', 'hero', 'html'],
+  };
 }
 
 const container = document.getElementById('app')!;
@@ -145,7 +159,10 @@ function mount(locale: SimpleMailLocale, initialDoc?: Partial<EmailDoc>) {
       console.debug('[doc changed]', doc);
     },
     /** 体验：右栏数字 / 内边距 / 字号滑块等（字重恒为五档平铺） */
-    ui: { preferSliderControls: true },
+    ui: {
+      preferSliderControls: true,
+      ...demoPaletteOrderUi(),
+    },
     /** 点击画布灰色衬底或白底留白时取消选中 */
     clearSelectionOnCanvasMargin: true,
     /** 顶栏主题色拾色器；未设 accentColor 时使用样式表随 light/dark/system 的默认紫/靛 */

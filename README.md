@@ -461,7 +461,19 @@ function createBlocks(locale: SimpleMailLocale) {
 | `paletteBlockGroupTitle?` | 左栏合并分组标题，默认「组件」 |
 | `customPaletteTooltipSuffix?` | custom 块无 `paletteTooltip` 时的 title 后缀 |
 | `hiddenPaletteBlockTypes?` | 注册但不显示在左栏的 type（如组合块内部用的 divider） |
+| `paletteGroupOrder?` | 左栏分组顺序，取 `layout` / `sectionBlocks` / `components`；默认 `layout → sectionBlocks → components`，未列出的组按默认顺序跟在后面 |
+| `paletteBlockOrder?` | 组件组卡片顺序（block type 数组），可跨 content / custom 混排；未列出的保持注册顺序排在后面 |
+| `paletteSectionBlockOrder?` | 组合布局组卡片顺序，规则同 `paletteBlockOrder` |
 | `enableDynamicVariantKey?` | 开启 Section「动态变量名」、画布标识、palette 动态节；默认 `false` |
+
+左栏顺序示例（不传这三项时行为与 0.3.0 完全一致；playground 可用 `?paletteOrder=components` 体验）：
+
+```ts
+ui: {
+  paletteGroupOrder: ['components', 'layout', 'sectionBlocks'],
+  paletteBlockOrder: ['text', 'button', 'image', 'hero', 'html'],
+}
+```
 
 ---
 

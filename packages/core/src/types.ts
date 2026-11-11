@@ -259,6 +259,9 @@ export interface RenderContext {
 /* -------------------------------------------------------------------------- */
 
 /** MailEditor 可选 UI 行为（不改变文档模型） */
+/** 左栏分组标识，与 i18n 标题无关，供 paletteGroupOrder 使用。 */
+export type PaletteGroupKey = 'layout' | 'sectionBlocks' | 'components';
+
 export interface EditorUiOptions {
   /**
    * 为 true 时：右栏数值、内边距（四行滑块+输入）、全局/组件字号（px 滑块）、
@@ -324,6 +327,18 @@ export interface EditorUiOptions {
    * 仍注册、渲染、可被 palette 展开引用，但不显示在左栏的 block type（如组合块内部用的 divider）。
    */
   hiddenPaletteBlockTypes?: string[];
+  /**
+   * 左栏分组顺序；未列出的组按默认顺序（布局 → 组合布局 → 组件）跟在后面。
+   * 例：`['components', 'layout', 'sectionBlocks']` 把组件提到最前。
+   */
+  paletteGroupOrder?: PaletteGroupKey[];
+  /**
+   * 组件组内卡片顺序，按 block type 指定；未列出的保持注册顺序并排在其后。
+   * 两个类别先合并再排序，因此可跨 content / custom 混排。
+   */
+  paletteBlockOrder?: string[];
+  /** 组合布局组内卡片顺序，规则同 `paletteBlockOrder`。 */
+  paletteSectionBlockOrder?: string[];
   /**
    * 为 true 时：右栏 Section 可配置「动态变量名」、画布展示动态变量节标识，
    * 左栏拖入带 `sectionAttrs.dynamicVariantKey` 的组合块会创建动态变量 Section。

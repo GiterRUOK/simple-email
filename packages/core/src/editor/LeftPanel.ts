@@ -1,7 +1,7 @@
 import Sortable from 'sortablejs';
 import type { SimpleMailT } from '../i18n';
 import type { Registry } from '../registry/registry';
-import type { BlockDefinition, SectionLayout } from '../types';
+import type { BlockDefinition, PaletteGroupKey, SectionLayout } from '../types';
 import { clear, h } from '../utils/dom';
 import { paletteDropIsSectionLevel } from '../utils/paletteDrop';
 
@@ -14,6 +14,12 @@ export interface LeftPanelOptions {
   customPaletteTooltipSuffix?: string;
   /** 不显示在左栏的 block type（仍可在 Registry 中 createBlock） */
   hiddenPaletteBlockTypes?: string[];
+  /** 左栏分组顺序，未列出的组按默认顺序跟在后面 */
+  paletteGroupOrder?: PaletteGroupKey[];
+  /** 组件组卡片顺序（block type），可跨 content / custom 混排 */
+  paletteBlockOrder?: string[];
+  /** 组合布局组卡片顺序（block type） */
+  paletteSectionBlockOrder?: string[];
   /** 与画布一致：开启后带 `sectionAttrs.dynamicVariantKey` 的组合块会创建独立 Section */
   enableDynamicVariantKey?: boolean;
 }
@@ -64,6 +70,7 @@ export class LeftPanel {
     const hiddenPalette = new Set(this.opts.hiddenPaletteBlockTypes ?? []);
     const filterPalette = (defs: BlockDefinition[]) =>
       defs.filter((d) => !hiddenPalette.has(d.type));
+    // 先合并两个类别，拆分后的组件组仍可跨 content / custom 按 type 混排
     const paletteBlocks = [
       ...filterPalette(this.opts.registry.byCategory('content')),
       ...filterPalette(this.opts.registry.byCategory('custom')),
@@ -78,28 +85,35 @@ export class LeftPanel {
       else blockLevel.push(def);
     }
 
-    const wrap = h('div', { class: 'sm-blocks' });
-
-    wrap.append(this._renderLayoutGroup());
+    // 分组先收集再排序，未列出的组保持默认相对顺序
+    const groups: { key: PaletteGroupKey; el: HTMLElement }[] = [
+      { key: 'layout', el: this._renderLayoutGroup() },
+    ];
     if (sectionLevel.length) {
-      wrap.append(
-        this._renderBlockCardsGroup(
+      groups.push({
+        key: 'sectionBlocks',
+        el: this._renderBlockCardsGroup(
           this.opts.t('leftPanel.sectionBlocks'),
-          sectionLevel,
+          stableOrderBy(sectionLevel, this.opts.paletteSectionBlockOrder, (d) => d.type),
           'sections',
         ),
-      );
+      });
     }
     if (blockLevel.length) {
-      wrap.append(
-        this._renderBlockCardsGroup(
+      groups.push({
+        key: 'components',
+        el: this._renderBlockCardsGroup(
           this.opts.blockGroupTitle ?? this.opts.t('leftPanel.components'),
-          blockLevel,
+          stableOrderBy(blockLevel, this.opts.paletteBlockOrder, (d) => d.type),
           'blocks',
         ),
-      );
+      });
     }
 
+    const wrap = h('div', { class: 'sm-blocks' });
+    for (const group of stableOrderBy(groups, this.opts.paletteGroupOrder, (g) => g.key)) {
+      wrap.append(group.el);
+    }
     this.el.append(wrap);
   }
 
@@ -195,6 +209,25 @@ export class LeftPanel {
       grid,
     ]);
   }
+}
+
+/** 按 type / key 列表稳定排序：未列出的保持原相对顺序并排在末尾。 */
+function stableOrderBy<T>(
+  items: T[],
+  order: string[] | undefined,
+  keyOf: (item: T) => string,
+): T[] {
+  if (!order?.length) return items;
+  const rank = new Map<string, number>();
+  order.forEach((key, index) => rank.set(key, index));
+  return items
+    .map((item, index) => ({
+      item,
+      index,
+      rank: rank.get(keyOf(item)) ?? Number.POSITIVE_INFINITY,
+    }))
+    .sort((a, b) => (a.rank === b.rank ? a.index - b.index : a.rank - b.rank))
+    .map(({ item }) => item);
 }
 
 function layoutSvg(parts: number[]): string {
