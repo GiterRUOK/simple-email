@@ -251,6 +251,28 @@ editor.setVariables([
 ]);
 ```
 
+### 预览期系统变量
+
+有些变量（如站点 Footer）只在展示时展开，落库 / 送后端渲染的 HTML 必须保留 `{{key}}`。
+这类变量本身是**普通变量**：不需要专用块，也不锁定编辑，可以放在任意块里、
+从变量面板点击或复制插入、也可以删除。唯一的特殊之处是预览时展开。
+
+`previewVariableResolver` 只作用于内置预览弹框和 `export({ previewVariables: true })`，
+不写入 `EmailDoc`，也不会把业务变量的 sample 一起展开；源码视图与默认导出保持占位符。
+
+```ts
+const editor = new MailEditor({
+  container,
+  previewVariableResolver: (key) => (key === 'navimowFooter' ? footerHtmlBySite[currentSite] : null),
+});
+
+const { html } = editor.export({ previewVariables: true }); // 仅预览用
+const { html: stored } = editor.export(); // 落库用，保留 {{navimowFooter}}
+```
+
+`replaceVariables(text, vars, { resolver, withSampleVariables, ctx })` 也可单独调用，
+供代码模式等直接拿到 HTML 字符串的预览路径复用同一份解析逻辑。
+
 ---
 
 ## MailEditor API 速览
@@ -260,7 +282,7 @@ editor.setVariables([
 | `store` | 内部 Store，高级场景可读状态 |
 | `registry` | 块注册表 |
 | `getValue()` / `setValue(doc)` | 读写完整 `EmailDoc`；`setValue` 清空撤销栈 |
-| `export({ withSampleVariables? })` | `{ mjml, html }` |
+| `export({ withSampleVariables?, previewVariables? })` | `{ mjml, html }`；`previewVariables` 只展开 `previewVariableResolver` 命中的系统变量 |
 | `setVariables` / `getVariables` | 变量列表；`setValue` 后仍会写回 |
 | `insertVariableKey` / `insertVariableElement` / `insertVariable` | 插入占位符 |
 | `clearCanvas()` / `resetToPreset()` / `setPresetDoc(partial)` | 画布清空与重置 |

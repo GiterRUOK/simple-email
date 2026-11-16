@@ -21,6 +21,12 @@ export {
   resolveLockedMjmlCanvasContent,
 } from './utils/lockedMjml';
 export { renderDoc, replaceVariables } from './renderer';
+export type {
+  PreviewVariableContext,
+  PreviewVariableResolver,
+  RenderOptions,
+  ReplaceVariablesOptions,
+} from './renderer';
 export { isRenderableHref, resolveHref, invalidHrefMessage } from './utils/link';
 export {
   paletteDropHasSectionLayout,

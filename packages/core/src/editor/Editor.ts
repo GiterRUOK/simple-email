@@ -6,7 +6,7 @@ import {
   createI18nContext,
 } from '../i18n';
 import { Registry, defineBlock } from '../registry/registry';
-import { renderDoc } from '../renderer';
+import { type PreviewVariableResolver, renderDoc } from '../renderer';
 import {
   Store,
   createSection,
@@ -109,6 +109,11 @@ export interface EditorOptions {
    * 未传时与构造时的 `initialDoc` 合并结果一致。
    */
   presetDoc?: Partial<EmailDoc>;
+  /**
+   * 预览期变量解析器。仅用于内置预览弹框与 `export({ previewVariables: true })`，
+   * 不写入 EmailDoc，也不会替换业务变量；落库 / 导出 HTML 仍保留 {{var}} 占位符。
+   */
+  previewVariableResolver?: PreviewVariableResolver;
 }
 
 /**
@@ -461,11 +466,19 @@ export class MailEditor {
     return this.accentColorOverride;
   }
 
-  /** 导出 MJML 与编译后的 HTML。withSampleVariables=true 时把 {{var}} 替换为 sample 值用于预览。 */
-  export(opts: { withSampleVariables?: boolean } = {}) {
+  /**
+   * 导出 MJML 与编译后的 HTML。
+   * - withSampleVariables=true：把所有变量的 sample 值替换进去（设计态示例预览）。
+   * - previewVariables=true：只展开 previewVariableResolver 命中的系统变量（真实预览）。
+   * 两者都不传时保留 {{var}} 占位符，即落库 / 送后端渲染的内容。
+   */
+  export(opts: { withSampleVariables?: boolean; previewVariables?: boolean } = {}) {
     return renderDoc(this.store.doc, this.registry, {
       engine: this.opts.engine ?? 'mjml',
       withSampleVariables: opts.withSampleVariables ?? false,
+      previewVariableResolver: opts.previewVariables
+        ? this.opts.previewVariableResolver
+        : undefined,
     });
   }
 
@@ -1421,6 +1434,7 @@ export class MailEditor {
       store: this.store,
       registry: this.registry,
       t: this.i18n.t,
+      previewVariableResolver: this.opts.previewVariableResolver,
     });
     modal.open(this.root);
   }

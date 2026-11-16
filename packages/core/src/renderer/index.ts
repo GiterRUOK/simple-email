@@ -20,6 +20,21 @@ export interface RenderResult {
   brokenVariables: { fragment: string; kind: 'broken' | 'unknown'; key?: string }[];
 }
 
+export interface PreviewVariableContext {
+  doc: EmailDoc;
+  engine: RenderEngine;
+}
+
+/**
+ * 预览期变量解析器。只影响展示用的 HTML，不写回 EmailDoc、不进入导出给后端的 content。
+ * 返回 null / undefined 表示该 key 不由此解析器处理（回退到 sample 或保留占位符）。
+ * 典型用途：{{navimowFooter}} 这类由宿主按站点 / 接口动态提供的系统变量。
+ */
+export type PreviewVariableResolver = (
+  key: string,
+  ctx: PreviewVariableContext,
+) => string | null | undefined;
+
 export interface RenderOptions {
   /** 渲染引擎，目前仅 'mjml'；'table' 预留作将来直输 table HTML。 */
   engine?: RenderEngine;
@@ -28,6 +43,12 @@ export interface RenderOptions {
    * 设计态预览默认不替换，保持占位符；仅当变量显式配置了 sample 且调用方传 true 时才替换。
    */
   withSampleVariables?: boolean;
+  /**
+   * 仅用于预览 / 画布展示的变量解析。与 withSampleVariables 正交：
+   * 解析器优先命中，未命中的 key 才按 sample 处理，因此不会把业务变量一起展开。
+   * 源码视图与落库导出不传此选项，占位符保持原样。
+   */
+  previewVariableResolver?: PreviewVariableResolver;
 }
 
 export function renderDoc(
@@ -56,9 +77,11 @@ export function renderDoc(
   // 扫描须在 sample 替换之前：替换后 token 已变成样值，断裂无从检测。
   // 扫描对象是编译产物 HTML（即 replaceVariables 的实际作用对象），判据完全对齐。
   const brokenVariables = findBrokenVariableTokens(html, doc.variables);
-  if (opts.withSampleVariables) {
-    html = replaceVariables(html, doc.variables);
-  }
+  html = replaceVariables(html, doc.variables, {
+    withSampleVariables: opts.withSampleVariables ?? false,
+    resolver: opts.previewVariableResolver,
+    ctx: { doc, engine },
+  });
 
   return {
     mjml,
@@ -70,15 +93,38 @@ export function renderDoc(
   };
 }
 
+export interface ReplaceVariablesOptions {
+  /** 是否把 {{var}} 替换为 doc.variables 里的 sample 值 */
+  withSampleVariables?: boolean;
+  /** 预览期解析器，优先级高于 sample */
+  resolver?: PreviewVariableResolver;
+  ctx?: PreviewVariableContext;
+}
+
 /**
- * 用 sample 值替换 `{{var.name}}` 占位符。仅做最简单的字符串替换，
+ * 替换 `{{var.name}}` 占位符。仅做最简单的字符串替换，
  * 不做任何沙箱式表达式求值（邮件场景里下游模板引擎会再处理一次）。
+ * 两参数调用保持原有语义（替换 sample）；预览场景传 resolver 只展开命中的系统变量。
  */
-export function replaceVariables(text: string, vars: Variable[]): string {
-  if (!vars.length) return text;
-  return text.replace(/\{\{\s*([^}\s]+)\s*\}\}/g, (raw, key) => {
-    const v = vars.find((x) => x.key === key);
-    if (v && v.sample != null) return v.sample;
+export function replaceVariables(
+  text: string,
+  vars: Variable[],
+  opts: ReplaceVariablesOptions = {},
+): string {
+  const withSample = opts.withSampleVariables ?? true;
+  const resolver = opts.resolver;
+  if (!withSample && !resolver) return text;
+  const ctx: PreviewVariableContext = opts.ctx ?? {
+    doc: { variables: vars } as EmailDoc,
+    engine: 'mjml',
+  };
+  return text.replace(/\{\{\s*([^}\s]+)\s*\}\}/g, (raw, key: string) => {
+    const resolved = resolver?.(key, ctx);
+    if (resolved != null) return resolved;
+    if (withSample) {
+      const v = vars.find((x) => x.key === key);
+      if (v && v.sample != null) return v.sample;
+    }
     return raw;
   });
 }
