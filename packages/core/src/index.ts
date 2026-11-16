@@ -1,4 +1,5 @@
 export { MailEditor } from './editor/Editor';
+export type { EditorOptions, GetValueOptions } from './editor/Editor';
 export {
   createI18nContext,
   enUSMessages,
@@ -118,6 +119,7 @@ export type { OpenImageGalleryModalOptions } from './editor/ImageGalleryModal';
 export { openImageGalleryModal } from './editor/ImageGalleryModal';
 export {
   collectSelectionVariableKeys,
+  collectVariableKeys,
   DOC_CLIPBOARD_FORMAT_VERSION,
   DOC_CLIPBOARD_KIND,
   parseDocClipboard,
@@ -134,6 +136,8 @@ export type {
   DocClipboardEnvelope,
   SelectionClipboardEnvelope,
 } from './utils/docClipboard';
+export { slimDocForStorage } from './utils/docSlim';
+export type { DocVariablesMode, SlimDocOptions } from './utils/docSlim';
 export {
   blockButtonWidthCss,
   docContentWidthCss,

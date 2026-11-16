@@ -365,7 +365,7 @@ export class RightPanel {
         h('div', { class: 'sm-panel__title' }, [this.opts.t('rightPanel.doc.title')]),
         this._textField(
           this.opts.t('rightPanel.doc.subject'),
-          doc.meta.subject,
+          doc.meta.subject ?? '',
           (v) =>
             this.opts.store.update((d) => {
               d.meta.subject = v;

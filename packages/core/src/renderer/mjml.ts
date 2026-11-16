@@ -25,7 +25,7 @@ export function docToMjml(doc: EmailDoc, registry: Registry): string {
 
   return `<mjml>
   <mj-head>
-    <mj-title>${escapeAttr(doc.meta.subject || '')}</mj-title>
+    ${doc.meta.subject ? `<mj-title>${escapeAttr(doc.meta.subject)}</mj-title>` : ''}
     ${doc.meta.preheader ? `<mj-preview>${escapeAttr(doc.meta.preheader)}</mj-preview>` : ''}
     <mj-attributes>
       <mj-all font-family="${escapeAttr(attrs.fontFamily)}" />

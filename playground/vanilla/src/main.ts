@@ -178,7 +178,9 @@ function mount(locale: SimpleMailLocale, initialDoc?: Partial<EmailDoc>) {
 /** 宿主语言切换：保存当前文档 → 销毁旧实例 → 新语言重建（与 README 推荐做法一致） */
 function switchLocale(next: SimpleMailLocale) {
   if (next === currentLocale) return;
-  const currentDoc = editor?.getValue();
+  // 演示：变量表只来自 initialDoc（宿主没有调 setVariables），
+  // 因此重建实例时要显式要完整快照，否则默认裁剪会得到 variables: []
+  const currentDoc = editor?.getValue({ variables: 'all' });
   editor?.destroy();
   editor = null;
   currentLocale = next;

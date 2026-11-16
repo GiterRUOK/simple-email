@@ -9,13 +9,26 @@
 export interface EmailDoc {
   version: '1';
   meta: EmailMeta;
+  /**
+   * 变量列表的**运行期快照**，不是权威数据源。
+   *
+   * 权威在宿主：`setVariables()` 每次都会整表覆盖此字段，因此随邮件逐封落库
+   * 意义有限（业务侧改了 label/sample 后各封邮件里的副本各自过期）。
+   * `getValue()` 默认输出空数组，见 `GetValueOptions.variables`。
+   */
   variables: Variable[];
   styles: GlobalStyles;
   sections: Section[];
 }
 
 export interface EmailMeta {
-  subject: string;
+  /**
+   * 邮件主题。仅当编辑器负责收集主题时有值（右栏「邮件设置」，即 `ui.hideMailMeta !== true`）；
+   * 主题由宿主表单管理时可缺省，此时导出的 HTML 不含 `<mj-title>`，
+   * 真实主题头本就由发送端设置，与本文档无关。
+   */
+  subject?: string;
+  /** 预览文案：渲染为 `<mj-preview>`（正文隐藏文本），属导出产物的一部分，编辑器负责时必须落库 */
   preheader?: string;
   /**
    * 邮件内容区宽度：正整数按 px 存库；也可用字符串显式写 `600px`、`100%` 等。
@@ -49,7 +62,7 @@ export interface Variable {
   /** Mustache 风格变量名，例如 user.name */
   key: string;
   label: string;
-  /** 预览数据，仅设计态预览使用 */
+  /** 预览数据，仅设计态预览使用；属于业务侧示例值，`getValue()` 裁剪时会被丢弃 */
   sample?: string;
   /** 插入语义：纯文本占位 / 链接片段 / 图片块 */
   kind?: 'text' | 'link' | 'image';

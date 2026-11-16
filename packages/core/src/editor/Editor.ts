@@ -37,6 +37,7 @@ import {
   serializeDocClipboard,
   serializeSelectionClipboard,
 } from '../utils/docClipboard';
+import { type SlimDocOptions, slimDocForStorage } from '../utils/docSlim';
 import { clear, h } from '../utils/dom';
 import { appendInlineToRichHtml } from '../utils/richHtmlInsert';
 import {
@@ -80,7 +81,11 @@ export interface EditorOptions {
    * 默认 false；需要「点空白取消选中」的宿主再设为 true。
    */
   clearSelectionOnCanvasMargin?: boolean;
-  /** 文档变更回调（防抖发出） */
+  /**
+   * 文档变更回调（防抖发出）。
+   * 回传的是 `getValue()` 默认裁剪后的快照（不含变量列表），可直接持久化；
+   * 需要完整内存快照时在回调里调用 `editor.getValue({ variables: 'all' })`。
+   */
   onChange?: (doc: EmailDoc) => void;
   /**
    * 品牌/主题色（#RRGGBB），映射为界面上的 --sm-primary / --sm-primary-soft（强调、选区、主按钮等）。
@@ -115,6 +120,12 @@ export interface EditorOptions {
    */
   previewVariableResolver?: PreviewVariableResolver;
 }
+
+/**
+ * `getValue()` 的输出裁剪选项（与 `onChange` 回传的快照同源）。
+ * 字段含义见 `SlimDocOptions`。
+ */
+export type GetValueOptions = SlimDocOptions;
 
 /**
  * 编辑器主类。所有外部能力都通过它暴露。
@@ -310,13 +321,28 @@ export class MailEditor {
     // 兼容旧文档：剥离/合并已废弃的 styles.contentBackgroundColor
     this.store.replace({
       ...doc,
+      // 允许宿主传入未带 variables 的精简 JSON（落库快照默认不含变量）
+      variables: doc.variables ?? [],
       styles: { ...doc.styles, ...migrateLegacyStyles(doc.styles) },
     });
     this._applyConfiguredVariables();
   }
 
-  getValue(): EmailDoc {
-    return this.store.doc;
+  /**
+   * 读取文档快照（用于落库 / 宿主自存）。
+   *
+   * 默认**不带变量列表**：变量的权威在宿主 `setVariables`，逐封邮件存整表快照
+   * 只是会过期的派生数据；同时当 `ui.hideMailMeta === true` 时省略
+   * `meta.subject` / `meta.preheader`（那时文档里的值仅是 i18n 占位）。
+   *
+   * 需要完整内存快照时显式传参，例如宿主语言切换后原样重建实例：
+   * `getValue({ variables: 'all', omitMailMeta: false })`。
+   */
+  getValue(options: GetValueOptions = {}): EmailDoc {
+    return slimDocForStorage(this.store.doc, {
+      variables: options.variables ?? 'none',
+      omitMailMeta: options.omitMailMeta ?? this.opts.ui?.hideMailMeta === true,
+    });
   }
 
   /**
@@ -935,7 +961,8 @@ export class MailEditor {
     if (!this.opts.onChange) return;
     if (this.changeTimer) window.clearTimeout(this.changeTimer);
     this.changeTimer = window.setTimeout(() => {
-      this.opts.onChange?.(this.store.doc);
+      // 与 getValue() 同样的裁剪：宿主直接持久化本回调时，不会把变量快照等派生状态写进业务库
+      this.opts.onChange?.(this.getValue());
       this.changeTimer = null;
     }, 60) as unknown as number;
   }

@@ -175,8 +175,16 @@ export function regenerateBlockId(block: Block): Block {
   return { ...block, id: uid('blk') };
 }
 
-/** 扫描局部设计稿内容中引用的 `{{key}}` 变量名集合（粘贴时用于变量并集）。 */
-export function collectSelectionVariableKeys(envelope: SelectionClipboardEnvelope): Set<string> {
+/**
+ * 扫描内容里引用的 `{{key}}` 变量名集合。
+ * 用于局部粘贴时的变量并集，以及落库裁剪时判断哪些变量仍被内容使用。
+ */
+export function collectVariableKeys(input: {
+  sections?: Section[];
+  blocks?: Block[];
+  /** 额外参与扫描的任意值（如 `EmailMeta`：主题 / Preheader 里也可能有占位符） */
+  extra?: unknown;
+}): Set<string> {
   const keys = new Set<string>();
   const scan = (value: unknown) => {
     const text = JSON.stringify(value) ?? '';
@@ -188,7 +196,13 @@ export function collectSelectionVariableKeys(envelope: SelectionClipboardEnvelop
       m = re.exec(text);
     }
   };
-  scan(envelope.sections);
-  scan(envelope.blocks);
+  if (input.sections) scan(input.sections);
+  if (input.blocks) scan(input.blocks);
+  if (input.extra !== undefined) scan(input.extra);
   return keys;
+}
+
+/** 扫描局部设计稿内容中引用的 `{{key}}` 变量名集合（粘贴时用于变量并集）。 */
+export function collectSelectionVariableKeys(envelope: SelectionClipboardEnvelope): Set<string> {
+  return collectVariableKeys({ sections: envelope.sections, blocks: envelope.blocks });
 }

@@ -16,6 +16,7 @@ Doc → Section → Column → Block    // 仅四层，Block 不可再嵌套子�
 - [安装与集成](#安装与集成)
 - [快速开始](#快速开始)
 - [MailEditor API 速览](#maileditor-api-速览)
+- [落库快照：`getValue()` 默认裁剪什么](#落库快照getvalue-默认裁剪什么)
 - [画布清空与重置](#画布清空与重置)
 - [界面主题与品牌色](#界面主题与品牌色)
 - [国际化 i18n](#国际化-i18n)
@@ -243,6 +244,7 @@ const { mjml, html } = editor.export({ withSampleVariables: true });
 ```
 
 构造后请用 `setVariables` 注入业务变量列表。若只写在 `initialDoc.variables` 中，后续 `setValue` 恢复文档时可能被空数组覆盖。
+`doc.variables` 因此只是**运行期快照**，不是业务数据：`getValue()` / `onChange` 默认不外发它，详见「落库快照：`getValue()` 默认裁剪什么」。
 
 ```ts
 editor.setVariables([
@@ -281,7 +283,7 @@ const { html: stored } = editor.export(); // 落库用，保留 {{navimowFooter}
 |-------------|------|
 | `store` | 内部 Store，高级场景可读状态 |
 | `registry` | 块注册表 |
-| `getValue()` / `setValue(doc)` | 读写完整 `EmailDoc`；`setValue` 清空撤销栈 |
+| `getValue(options?)` / `setValue(doc)` | 读裁剪后的落库快照 / 写完整 `EmailDoc`；`setValue` 清空撤销栈 |
 | `export({ withSampleVariables?, previewVariables? })` | `{ mjml, html }`；`previewVariables` 只展开 `previewVariableResolver` 命中的系统变量 |
 | `setVariables` / `getVariables` | 变量列表；`setValue` 后仍会写回 |
 | `insertVariableKey` / `insertVariableElement` / `insertVariable` | 插入占位符 |
@@ -295,6 +297,31 @@ const { html: stored } = editor.export(); // 落库用，保留 {{navimowFooter}
 | `destroy()` | 卸载 DOM 与监听 |
 
 更多工具函数见 `@simple-mail/core` 导出（变量 HTML、动态变量节、`docClipboard`、`openImageGalleryModal` 等）。
+
+---
+
+## 落库快照：`getValue()` 默认裁剪什么
+
+`getValue()` 与 `onChange` 回传的都是**可直接持久化**的快照，默认剥掉两类派生数据：
+
+| 字段 | 默认输出 | 原因 |
+|------|----------|------|
+| `variables` | `[]` | 变量表的权威在宿主 `setVariables`（每次整表覆盖运行期快照）。逐封邮件存一份副本，会随业务侧改 label / sample 各自过期；默认 `export()` 也不替换占位符，所以落库产物不受影响 |
+| `meta.subject` / `meta.preheader` | `ui.hideMailMeta === true` 时省略 | 主题与预览文案由宿主表单管理时，文档里的值只是 i18n 占位文案（「一封新邮件」/ "New email"），存下来反而会被宿主误信并当作真值发出 |
+
+`meta.width` 是渲染输入，`styles` / `sections` 是内容本身——任何情况下都保留。
+
+```ts
+editor.getValue();                        // variables: []；hideMailMeta 时无 subject / preheader
+editor.getValue({ variables: 'used' });   // 只留内容引用到的 key，并丢弃 sample
+editor.getValue({ variables: 'all' });    // 完整内存快照（旧行为）
+editor.getValue({ omitMailMeta: false }); // 强制保留 subject / preheader
+```
+
+- `'used'` 适合「离线也要能识别未注册变量」的场景：`doc.variables` 的 key 集正是画布 chip 与 `findBrokenVariableTokens` 的判据，裁剪后仍保留被引用到的项。
+- 变量表没有宿主注入、只写在 `initialDoc.variables` 里（独立部署、示例站）时，重建实例请显式 `getValue({ variables: 'all' })`，否则新实例的变量面板为空。
+- 读回时对缺省有兜底：`setValue(doc)` 把缺失的 `variables` 记为 `[]`，`subject` 缺省时按当前语言填占位文案（`hideMailMeta` 下无副作用）。
+- 已有文档对象（如导入的设计稿 JSON）想套用同一裁剪：`slimDocForStorage(doc, { variables: 'used' })`。
 
 ---
 
@@ -420,6 +447,8 @@ function mount(locale: SimpleMailLocale, initialDoc?: Partial<EmailDoc>) {
 }
 
 function changeLocale(nextLocale: SimpleMailLocale) {
+  // 变量表由 setVariables 注入时：快照不必带变量，重建后对新实例再调一次 setVariables 即可
+  // 变量表只存在于 initialDoc.variables 时：改用 getValue({ variables: 'all' }) 保住面板
   const currentDoc = editor?.getValue();
   editor?.destroy();
   mount(nextLocale, currentDoc);
@@ -469,7 +498,7 @@ function createBlocks(locale: SimpleMailLocale) {
 | 字段 | 说明 |
 |------|------|
 | `preferSliderControls?` | 右栏数值/内边距/宽度等用滑块增强控件；字重仍为五档平铺 |
-| `hideMailMeta?` | 隐藏右栏主题、Preheader；文档级仅「版式 + 全局样式」 |
+| `hideMailMeta?` | 隐藏右栏主题、Preheader 与顶栏「邮件设置」；文档级仅「版式 + 全局样式」，且 `getValue()` 默认省略 `meta.subject` / `meta.preheader` |
 | `hideTopbarTitle?` | 隐藏顶栏产品标题 |
 | `hideTopbarMailSettings?` | 隐藏顶栏「邮件设置」 |
 | `hideTopbarFullscreen?` | 隐藏全屏按钮 |
@@ -538,6 +567,10 @@ interface Variable {
 | `image` | 新建 image 块，`src` 为 `{{key}}` |
 
 `setValue` / `resetToPreset` 后，通过 `setVariables` 注入的列表仍会写回 `doc.variables`。
+
+`doc.variables` 只是这份**运行期快照**，不是业务数据：`getValue()` / `onChange` 默认输出空数组，
+需要随邮件存档时按 `'used'` / `'all'` 显式请求（见「落库快照：`getValue()` 默认裁剪什么」）。
+默认 `export()` 不替换 `{{key}}`，因此裁剪与否不影响落库 HTML 与后端渲染。
 
 ### 插入 API
 
@@ -875,8 +908,8 @@ expandPaletteDrop?: (createBlock) => Block[] | { blocks: Block[]; sectionAttrs?:
 ```ts
 interface EmailDoc {
   version: '1';
-  meta: { subject: string; preheader?: string; width: number | string };
-  variables: Variable[];
+  meta: { subject?: string; preheader?: string; width: number | string };
+  variables: Variable[]; // 运行期快照；getValue() 默认输出 []
   styles: GlobalStyles; // 含 fontWeight 档位、listIndentDefaultPx 等
   sections: Section[];
 }

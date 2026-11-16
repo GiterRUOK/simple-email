@@ -76,8 +76,10 @@ export function renderDoc(
   html = normalizeEmailListsInHtml(html, resolveGlobalListIndentPx(doc.styles));
   // 扫描须在 sample 替换之前：替换后 token 已变成样值，断裂无从检测。
   // 扫描对象是编译产物 HTML（即 replaceVariables 的实际作用对象），判据完全对齐。
-  const brokenVariables = findBrokenVariableTokens(html, doc.variables);
-  html = replaceVariables(html, doc.variables, {
+  // variables 允许缺省：落库快照默认不带变量表（权威在宿主 setVariables）。
+  const vars = doc.variables ?? [];
+  const brokenVariables = findBrokenVariableTokens(html, vars);
+  html = replaceVariables(html, vars, {
     withSampleVariables: opts.withSampleVariables ?? false,
     resolver: opts.previewVariableResolver,
     ctx: { doc, engine },
