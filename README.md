@@ -2,6 +2,8 @@
 
 **Simple Mail** 是面向运营与开发的轻量邮件可视化编辑器。文档模型固定为四层（Doc → Section → Column → Block），导出链路为 JSON → MJML → HTML，可嵌入 React、Vue 或任意前端项目。
 
+各版本的变更内容与迁移要点见 [更新日志](./CHANGELOG.md)。
+
 ```text
 Doc → Section → Column → Block    // 仅四层，Block 不可再嵌套子组件
 左栏组件区 │ 中间画布区 │ 右栏属性配置区
@@ -320,8 +322,20 @@ editor.getValue({ omitMailMeta: false }); // 强制保留 subject / preheader
 
 - `'used'` 适合「离线也要能识别未注册变量」的场景：`doc.variables` 的 key 集正是画布 chip 与 `findBrokenVariableTokens` 的判据，裁剪后仍保留被引用到的项。
 - 变量表没有宿主注入、只写在 `initialDoc.variables` 里（独立部署、示例站）时，重建实例请显式 `getValue({ variables: 'all' })`，否则新实例的变量面板为空。
-- 读回时对缺省有兜底：`setValue(doc)` 把缺失的 `variables` 记为 `[]`，`subject` 缺省时按当前语言填占位文案（`hideMailMeta` 下无副作用）。
+- 读回缺省字段：`setValue(doc)` 把缺失的 `variables` 记为 `[]`；`meta.subject` 缺省时保持缺省（占位文案只在 `initialDoc` / `setPresetDoc` / `resetToPreset` 三条路径按当前语言填），导出产物直接不含 `<mj-title>`。
 - 已有文档对象（如导入的设计稿 JSON）想套用同一裁剪：`slimDocForStorage(doc, { variables: 'used' })`。
+
+### 从 0.3.x 升级
+
+`0.4.0` 的默认裁剪是**持久化契约的破坏性变更**，`^0.3.1` 不会自动带上来，需显式改版本号才生效。升级时检查三处读法：
+
+| 旧依赖 | 现状 | 处理 |
+|--------|------|------|
+| 用 `doc.variables` 回填变量面板 / 离线检测未注册 key | 默认拿到 `[]` | 接入 `setVariables()` 作为唯一来源；确实要存档时用 `getValue({ variables: 'all' })`（或 `'used'`） |
+| 把 `meta.subject` 当主题真值提交给发送端 | `hideMailMeta` 下该字段不再存在，类型也变为可选 | 主题一律取宿主表单；编辑器负责收集主题时保持 `hideMailMeta: false` 即可照常落库 |
+| 从不 `setVariables`，只靠 `initialDoc.variables` 带变量 | **首次保存就会把变量表写成 `[]`**（不是只在内存里丢） | 必须改用 `'all'` 输出，或改为宿主注入 |
+
+历史数据读回不受影响：旧 JSON 里已有的 `variables` / `subject` 仍按原样生效，缺省字段也都有兜底。
 
 ---
 
@@ -697,6 +711,7 @@ editor.removeSections(['sec_1', 'sec_2']);           // 批量删除（返回实
 | `pickImageFromGallery?(ctx)` | 自管图库；与 `imageGallery` 并存时**优先内置图库** |
 | `showUpload?` | 默认 `true`（有 `uploadImage` 时） |
 | `showGallery?` | 默认 `false` |
+| `permissions?` | `ImageAssetPermissions`：按 `upload` / `addUrl` / `delete` 管控，无权限时置灰提示（默认）或隐藏（`noPermissionMode: 'hide'`） |
 
 `ImageFieldContext`：`blockId` / `propKey` / `currentUrl`。
 
